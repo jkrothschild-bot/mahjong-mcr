@@ -1,34 +1,7 @@
-import { isThirteenOrphans } from '../win-detection.js'
-import { groupConcealedByType } from '../win-detection.js'
-import { meldTileTypeId, type Meld } from '../meld.js'
+import { groupConcealedByType, isThirteenOrphans } from '../win-detection.js'
 import { typeIdOfInstance, type TileTypeId } from '../tiles.js'
-import type { Decomposition } from '../win-detection.js'
 import type { FanMatch, HandContext } from './types.js'
-
-function isWindTypeId(id: TileTypeId): boolean {
-  return id === 'WE' || id === 'WS' || id === 'WW' || id === 'WN'
-}
-
-function isDragonTypeId(id: TileTypeId): boolean {
-  return id === 'DR' || id === 'DG' || id === 'DW'
-}
-
-interface CombinedSet {
-  kind: 'chow' | 'pung' | 'kong'
-  typeId: TileTypeId
-}
-
-// Combines a candidate decomposition's concealed-side sets with the
-// player's already-formed melds into one flat list of "all 4 sets" — a
-// kong is always in `melds` (decomposeHand only ever produces chow/pung
-// for the concealed portion), so this is the only place a hand's full set
-// of 4 groupings (needed by fans like Big Four Winds / Big Three Dragons,
-// which reason about the sets as a whole) comes together.
-function allSets(melds: readonly Meld[], decomposition: Decomposition): CombinedSet[] {
-  const fromMelds: CombinedSet[] = melds.map((m) => ({ kind: m.kind, typeId: meldTileTypeId(m) }))
-  const fromDecomp: CombinedSet[] = decomposition.sets.map((s) => ({ kind: s.type, typeId: s.tiles[0] }))
-  return [...fromMelds, ...fromDecomp]
-}
+import { allSets, isDragonTypeId, isWindTypeId, parseSuited } from './set-helpers.js'
 
 // 1. Big Four Winds — 88 pts. §3.8.1 p.14 / App.1 p.24: "Pungs or Kongs of
 // all four Wind Tiles." Only 4 copies of each wind exist, so "4 sets, each
@@ -78,16 +51,14 @@ const NINE_GATES_BASE_COUNTS: Readonly<Record<number, number>> = {
 function detectNineGates(ctx: HandContext): FanMatch[] {
   if (ctx.melds.length !== 0) return []
   if (ctx.concealedTiles.length !== 14) return []
-  const typeIds = ctx.concealedTiles.map(typeIdOfInstance)
-  const suitChars = new Set(typeIds.map((id) => id[0]))
-  if (suitChars.size !== 1) return []
-  const suitChar = [...suitChars][0]!
-  if (suitChar !== 'C' && suitChar !== 'D' && suitChar !== 'B') return []
+  const parsed = ctx.concealedTiles.map((tile) => parseSuited(typeIdOfInstance(tile)))
+  if (parsed.some((p) => p === null)) return [] // any honor/bonus tile disqualifies immediately
+  const suits = new Set(parsed.map((p) => p!.suit))
+  if (suits.size !== 1) return []
 
   const counts: Record<number, number> = {}
-  for (const id of typeIds) {
-    const rank = Number(id.slice(1))
-    counts[rank] = (counts[rank] ?? 0) + 1
+  for (const p of parsed) {
+    counts[p!.rank] = (counts[p!.rank] ?? 0) + 1
   }
 
   let extraRank = -1
@@ -126,12 +97,12 @@ function detectSevenShiftedPairs(ctx: HandContext): FanMatch[] {
   if (typeIds.length !== 7) return []
   if (!Object.values(counts).every((c) => c === 2)) return []
 
-  const suitChars = new Set(typeIds.map((id) => id[0]))
-  if (suitChars.size !== 1) return []
-  const suitChar = [...suitChars][0]!
-  if (suitChar !== 'C' && suitChar !== 'D' && suitChar !== 'B') return []
+  const parsed = typeIds.map(parseSuited)
+  if (parsed.some((p) => p === null)) return [] // any honor type disqualifies immediately
+  const suits = new Set(parsed.map((p) => p!.suit))
+  if (suits.size !== 1) return []
 
-  const ranks = typeIds.map((id) => Number(id.slice(1))).sort((a, b) => a - b)
+  const ranks = parsed.map((p) => p!.rank).sort((a, b) => a - b)
   for (let i = 1; i < ranks.length; i++) {
     if (ranks[i] !== ranks[i - 1]! + 1) return []
   }

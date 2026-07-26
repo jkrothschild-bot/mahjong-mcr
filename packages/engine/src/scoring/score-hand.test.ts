@@ -87,4 +87,29 @@ describe('scoreHand', () => {
     expect(result.basicPoints).toBe(88)
     expect(result.fanMatches).toEqual([{ fanId: 7, count: 1 }])
   })
+
+  it('scores a real All Honors hand (64-point tier) end to end through decomposeHand', () => {
+    // One pung exposed so this hand does NOT also satisfy Four Concealed
+    // Pungs (fan 12) — isolating All Honors alone. There's no stated
+    // exclusion between fans 11 and 12, so a fully-concealed all-honors
+    // hand legitimately stacks both (64+64=128) — a real fan-stacking
+    // case, not a bug, discovered while writing this test.
+    const melds = [pungMeld('0-0', idsFor('WE', 3))]
+    const concealedTiles = [...idsFor('WS', 3), ...idsFor('DR', 3), ...idsFor('WW', 3), ...idsFor('DG', 2)]
+    expect(concealedTiles.length).toBe(11)
+    const result = scoreHand({ concealedTiles, melds })
+    expect(result.basicPoints).toBe(64)
+    expect(result.fanMatches).toEqual([{ fanId: 11, count: 1 }])
+  })
+
+  it('correctly stacks All Honors and Four Concealed Pungs when a hand satisfies both (no stated exclusion)', () => {
+    const concealedTiles = [
+      ...idsFor('WE', 3), ...idsFor('WS', 3), ...idsFor('DR', 3), ...idsFor('WW', 3),
+      ...idsFor('DG', 2),
+    ]
+    expect(concealedTiles.length).toBe(14)
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.basicPoints).toBe(128)
+    expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([11, 12])
+  })
 })

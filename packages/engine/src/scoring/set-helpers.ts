@@ -1,0 +1,71 @@
+import type { Decomposition } from '../win-detection.js'
+import { meldTileTypeId, type Meld } from '../meld.js'
+import type { TileTypeId } from '../tiles.js'
+
+export interface CombinedSet {
+  kind: 'chow' | 'pung' | 'kong'
+  typeId: TileTypeId
+  // True for anything never claimed from another player: every
+  // decomposition-derived set (decomposeHand only ever runs against the
+  // concealed portion) and a concealed kong. False for any exposed meld
+  // (claimed pung/chow, kong claimed from a discard, or a promoted kong —
+  // promotion happens in reaction to an exposed pung, so it stays
+  // exposed). A pung/chow completed by the winning tile itself (self-draw
+  // or discard) is still concealed under this model — it was never
+  // claimed with an explicit call mid-hand; see docs/rules/decisions.md
+  // for this judgment call.
+  concealed: boolean
+}
+
+// Combines a candidate decomposition's concealed-side sets with the
+// player's already-formed melds into one flat list of "all 4 sets" —
+// needed by fans that reason about the sets as a whole (Big Four Winds,
+// Little Four Winds, Four Concealed Pungs, etc.). A kong is always in
+// `melds` (decomposeHand only ever produces chow/pung for the concealed
+// portion), so this is the only place a hand's full set of 4 groupings
+// comes together.
+export function allSets(melds: readonly Meld[], decomposition: Decomposition): CombinedSet[] {
+  const fromMelds: CombinedSet[] = melds.map((m) => ({
+    kind: m.kind,
+    typeId: meldTileTypeId(m),
+    concealed: m.exposure === 'concealed',
+  }))
+  const fromDecomp: CombinedSet[] = decomposition.sets.map((s) => ({
+    kind: s.type,
+    typeId: s.tiles[0],
+    concealed: true,
+  }))
+  return [...fromMelds, ...fromDecomp]
+}
+
+export function isWindTypeId(id: TileTypeId): boolean {
+  return id === 'WE' || id === 'WS' || id === 'WW' || id === 'WN'
+}
+
+export function isDragonTypeId(id: TileTypeId): boolean {
+  return id === 'DR' || id === 'DG' || id === 'DW'
+}
+
+export function isHonorTypeId(id: TileTypeId): boolean {
+  return isWindTypeId(id) || isDragonTypeId(id)
+}
+
+export function isTerminalTypeId(id: TileTypeId): boolean {
+  return id === 'C1' || id === 'C9' || id === 'D1' || id === 'D9' || id === 'B1' || id === 'B9'
+}
+
+export interface ParsedSuited {
+  suit: 'C' | 'D' | 'B'
+  rank: number
+}
+
+// Parses a suited tile type id into its suit + numeric rank, or null if it
+// isn't a suited tile at all. Deliberately requires the second character to
+// be a digit — a naive `id[0]` check would wrongly treat Dragons (DR/DG/DW)
+// as the same "suit" as Dots (D1-D9), since both start with 'D'. Mirrors
+// win-detection.ts's chowNeighbors regex.
+export function parseSuited(id: TileTypeId): ParsedSuited | null {
+  const match = /^([CDB])([1-9])$/.exec(id)
+  if (!match) return null
+  return { suit: match[1] as 'C' | 'D' | 'B', rank: Number(match[2]) }
+}

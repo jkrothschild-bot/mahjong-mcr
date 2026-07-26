@@ -121,6 +121,19 @@ corrected to match. See each item's status.
     - **Discard win**: the discarder pays `8 + BasicPoints`; the other two players each pay
       `8` (Extra Points only).
 
+11. **"Concealed" pung/kong for scoring purposes (fans like #12 Four Concealed Pungs, #33
+    Three Concealed Pungs, #56 Fully Concealed Hand, #62 Concealed Hand) — a set completed by
+    the winning tile itself (self-draw or discard) still counts as concealed**, as long as it
+    was never claimed with an explicit call mid-hand. Implemented in
+    `scoring/set-helpers.ts`'s `CombinedSet.concealed`: true for every set derived from
+    `decomposeHand`'s concealed-tile decomposition (which includes the appended winning tile)
+    and for a concealed kong; false only for an exposed meld (a pung/chow/kong actually
+    claimed from a discard, or a promoted kong).
+    Status: **provisional** — this is the common interpretation across most mahjong rulesets,
+    but not a statement I found explicitly in the available MCR text. Revisit if a rulebook
+    passage addressing this specific nuance turns up (e.g. while implementing fan #56/#62,
+    which hinge on the same distinction).
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).
