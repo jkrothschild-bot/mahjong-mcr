@@ -1,4 +1,3 @@
-import type { HandResult } from './game-state.js'
 import type { Seat } from './meld.js'
 import { mulberry32, nextSeed } from './rng.js'
 import type { Wind } from './tiles.js'
@@ -10,8 +9,9 @@ export interface MatchState {
   prevailingWind: Wind
   roundHandIndex: 1 | 2 | 3 | 4 // dealer-hand slot within the current wind round
   dealerSeat: Seat
-  repeatCount: number // times the current dealer has repeated this exact slot
-  matchHandNumber: number // total hands played so far, including repeats (monotonic)
+  matchHandNumber: number // 1..16, monotonic — see docs/rules/decisions.md #4: the
+  // dealer rotates unconditionally every hand (no repeat on win or draw), so a
+  // complete match is always exactly 4 rounds x 4 hands = 16, no more, no fewer.
   completed: boolean
   handSeeds: number[] // per-hand seeds already consumed, for match-level replay
 }
@@ -22,7 +22,6 @@ export function startMatch(matchSeed: number): MatchState {
     prevailingWind: 'east',
     roundHandIndex: 1,
     dealerSeat: 0,
-    repeatCount: 0,
     matchHandNumber: 1,
     completed: false,
     handSeeds: [],
@@ -54,28 +53,24 @@ export function beginHand(state: MatchState): BeginHandResult {
   return { seed, matchState: { ...state, handSeeds: [...state.handSeeds, seed] } }
 }
 
-// Dealer repeats (same seat, same prevailing wind, repeatCount++) on dealer
-// win or exhaustive draw (docs/rules/decisions.md #4 — generic-mahjong
-// default, not yet confirmed against MCR). Otherwise the dealer rotates,
-// roundHandIndex advances (wrapping 4->1 and advancing prevailingWind
-// east->south->west->north), and the match completes once north round's
-// 4th hand resolves without a repeat.
-export function advanceMatch(state: MatchState, result: HandResult): MatchState {
+// The dealer rotates to the next seat unconditionally after every hand —
+// docs/rules/decisions.md #4, §3.4.8 & §3.6.2: "the dealer should pass the
+// dice to the right, regardless of whether he wins the hand or not." There
+// is no repeat-on-win or repeat-on-draw mechanic in MCR (unlike most other
+// mahjong variants) — a complete match is always exactly 16 hands. The hand
+// outcome (win vs. exhaustive draw) plays no role in this transition at
+// all, hence no HandResult parameter.
+export function advanceMatch(state: MatchState): MatchState {
   if (state.completed) return state
 
-  const dealerWon = result.outcome === 'win' && (result.winnerSeats ?? []).includes(state.dealerSeat)
-  const dealerRepeats = result.outcome === 'exhaustiveDraw' || dealerWon
-
-  if (dealerRepeats) {
-    return { ...state, repeatCount: state.repeatCount + 1, matchHandNumber: state.matchHandNumber + 1 }
-  }
-
-  const wasLastHandOfMatch = state.roundHandIndex === 4 && state.prevailingWind === 'north'
-  if (wasLastHandOfMatch) {
-    return { ...state, completed: true, repeatCount: 0, matchHandNumber: state.matchHandNumber + 1 }
-  }
-
   const isLastHandOfRound = state.roundHandIndex === 4
+  const wasLastHandOfMatch = isLastHandOfRound && state.prevailingWind === 'north'
+
+  // The match is over after hand 16 (north round's 4th hand) — nothing to
+  // rotate into, so matchHandNumber stays at 16 rather than advancing to a
+  // nonexistent 17th hand.
+  if (wasLastHandOfMatch) return { ...state, completed: true }
+
   const nextDealerSeat = ((state.dealerSeat + 1) % 4) as Seat
   const nextRoundHandIndex = (isLastHandOfRound ? 1 : state.roundHandIndex + 1) as 1 | 2 | 3 | 4
   const nextPrevailingWind = isLastHandOfRound
@@ -87,7 +82,6 @@ export function advanceMatch(state: MatchState, result: HandResult): MatchState 
     dealerSeat: nextDealerSeat,
     roundHandIndex: nextRoundHandIndex,
     prevailingWind: nextPrevailingWind,
-    repeatCount: 0,
     matchHandNumber: state.matchHandNumber + 1,
   }
 }

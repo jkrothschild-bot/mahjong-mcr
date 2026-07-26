@@ -137,6 +137,48 @@ export function isSevenPairs(concealedTiles: readonly TileInstanceId[], melds: r
   return values.length === 7 && values.every((count) => count === 2)
 }
 
+// §3.7.2.2 shape (2), p.13: 13 distinct terminal/honor types — the 1 and 9
+// of each suit plus all 7 honors — twelve of them as single tiles and one
+// doubled as the pair (14 tiles total, no melds). Structurally this can
+// never include a meld: any pung/kong of a required type would need 3-4
+// physical copies of it while still needing all 13 *other* distinct types
+// represented as well, which doesn't fit in a 14-tile hand.
+const THIRTEEN_ORPHAN_TYPE_IDS: readonly TileTypeId[] = [
+  'C1', 'C9', 'D1', 'D9', 'B1', 'B9', 'WE', 'WS', 'WW', 'WN', 'DR', 'DG', 'DW',
+]
+
+export function isThirteenOrphans(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): boolean {
+  if (melds.length !== 0) return false
+  if (concealedTiles.length !== 14) return false
+  const counts = groupConcealedByType(concealedTiles)
+
+  for (const id of Object.keys(counts)) {
+    if (!THIRTEEN_ORPHAN_TYPE_IDS.includes(id)) return false // a non terminal/honor tile is present
+  }
+
+  let pairsFound = 0
+  for (const id of THIRTEEN_ORPHAN_TYPE_IDS) {
+    const count = counts[id] ?? 0
+    if (count === 0) return false // missing one of the 13 required types
+    if (count === 1) continue
+    if (count === 2) {
+      pairsFound++
+      continue
+    }
+    return false // 3+ copies of one type can't occur in this shape
+  }
+  return pairsFound === 1
+}
+
+// Structural shapes recognized so far: standard (four sets + pair), seven
+// pairs, and Thirteen Orphans. §3.7.2.2 also recognizes a fourth shape —
+// Lesser/Greater Honors and Knitted Tiles (14 single tiles, no pair at all)
+// — deferred to M2 pending the fan-list extraction for its exact
+// Lesser/Greater tile-composition split; see docs/rules/decisions.md #6.
 export function isWinningHand(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): boolean {
-  return decomposeHand(concealedTiles, melds).length > 0 || isSevenPairs(concealedTiles, melds)
+  return (
+    decomposeHand(concealedTiles, melds).length > 0 ||
+    isSevenPairs(concealedTiles, melds) ||
+    isThirteenOrphans(concealedTiles, melds)
+  )
 }

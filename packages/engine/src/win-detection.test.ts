@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decomposeHand, isSevenPairs, isWinningHand } from './win-detection.js'
+import { decomposeHand, isSevenPairs, isThirteenOrphans, isWinningHand } from './win-detection.js'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileTypeId } from './tiles.js'
 import type { Meld } from './meld.js'
 
@@ -136,5 +136,57 @@ describe('isSevenPairs / isWinningHand — seven pairs', () => {
     ]
     const meld = exposedPung('0-0', 'DR')
     expect(isSevenPairs(concealed, [meld])).toBe(false)
+  })
+})
+
+describe('isThirteenOrphans / isWinningHand — Thirteen Orphans (§3.7.2.2 shape 2, p.13)', () => {
+  it('recognizes one of each of the 13 terminal/honor types plus a pair of one of them', () => {
+    const concealed = [
+      ...idsFor('C1', 1), ...idsFor('C9', 1), ...idsFor('D1', 1), ...idsFor('D9', 1),
+      ...idsFor('B1', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+      ...idsFor('DR', 1), ...idsFor('DG', 1),
+      ...idsFor('DW', 2), // the doubled type completing the pair
+    ]
+    expect(concealed.length).toBe(14)
+    expect(isThirteenOrphans(concealed, [])).toBe(true)
+    expect(isWinningHand(concealed, [])).toBe(true)
+  })
+
+  it('rejects a hand missing one of the 13 required types, even with an extra duplicate elsewhere', () => {
+    const concealed = [
+      ...idsFor('C1', 1), ...idsFor('C9', 1), ...idsFor('D1', 1), ...idsFor('D9', 1),
+      ...idsFor('B1', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+      ...idsFor('DR', 3), ...idsFor('DG', 1),
+      // no DW at all -> DW is missing; DR tripled instead to still reach 14
+      // physical tiles (11 singles + 3 DR = 14)
+    ]
+    expect(concealed.length).toBe(14)
+    expect(isThirteenOrphans(concealed, [])).toBe(false)
+    expect(isWinningHand(concealed, [])).toBe(false)
+  })
+
+  it('rejects a bare 13-tile tenpai orphans hand (one tile short, no doubled type yet)', () => {
+    const concealed = [
+      ...idsFor('C1', 1), ...idsFor('C9', 1), ...idsFor('D1', 1), ...idsFor('D9', 1),
+      ...idsFor('B1', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+      ...idsFor('DR', 1), ...idsFor('DG', 1), ...idsFor('DW', 1),
+    ]
+    expect(concealed.length).toBe(13)
+    expect(isThirteenOrphans(concealed, [])).toBe(false)
+  })
+
+  it('rejects a 14-tile hand containing a non-terminal/honor tile, even if otherwise orphans-shaped', () => {
+    const concealed = [
+      ...idsFor('C1', 1), ...idsFor('C9', 1), ...idsFor('D1', 1), ...idsFor('D9', 1),
+      ...idsFor('B1', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+      ...idsFor('DR', 1), ...idsFor('DG', 1),
+      ...idsFor('C5', 2), // a simple-tile pair instead of doubling one of the 13 required types (DW is missing entirely)
+    ]
+    expect(concealed.length).toBe(14)
+    expect(isThirteenOrphans(concealed, [])).toBe(false)
   })
 })

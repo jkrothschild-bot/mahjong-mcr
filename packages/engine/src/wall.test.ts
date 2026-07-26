@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildWall,
-  DEAD_WALL_SIZE,
   drawTile,
   drawWithFlowerReplacement,
   drawableRemaining,
@@ -31,22 +30,22 @@ describe('buildWall', () => {
 })
 
 describe('drawableRemaining / isWallExhausted', () => {
-  it('starts at 144 - DEAD_WALL_SIZE right after buildWall (deal has not consumed anything yet)', () => {
+  it('starts at 144 right after buildWall (deal has not consumed anything yet)', () => {
     const wall = buildWall(1)
-    expect(drawableRemaining(wall)).toBe(144 - DEAD_WALL_SIZE)
+    expect(drawableRemaining(wall)).toBe(144)
     expect(isWallExhausted(wall)).toBe(false)
   })
 
-  it('after the initial deal (INITIAL_DEAL_COUNT logical draws), matches the classic post-deal remaining count', () => {
+  it('after the initial deal (INITIAL_DEAL_COUNT logical draws), matches 144 minus what was dealt', () => {
     let wall = buildWall(1)
     for (let i = 0; i < INITIAL_DEAL_COUNT; i++) {
       wall = drawTile(wall).wall
     }
-    expect(drawableRemaining(wall)).toBe(144 - DEAD_WALL_SIZE - INITIAL_DEAL_COUNT)
+    expect(drawableRemaining(wall)).toBe(144 - INITIAL_DEAL_COUNT)
   })
 
-  it('is exhausted once drawIndex reaches 144 - DEAD_WALL_SIZE', () => {
-    const wall: Wall = { tiles: buildDeck(), drawIndex: 144 - DEAD_WALL_SIZE }
+  it('is exhausted once drawIndex reaches 144 — the whole wall, no reserved buffer (docs/rules/decisions.md #3)', () => {
+    const wall: Wall = { tiles: buildDeck(), drawIndex: 144 }
     expect(drawableRemaining(wall)).toBe(0)
     expect(isWallExhausted(wall)).toBe(true)
   })
@@ -63,7 +62,7 @@ describe('drawTile', () => {
   })
 
   it('throws when the wall is exhausted', () => {
-    const wall: Wall = { tiles: buildDeck(), drawIndex: 144 - DEAD_WALL_SIZE }
+    const wall: Wall = { tiles: buildDeck(), drawIndex: 144 }
     expect(() => drawTile(wall)).toThrow()
   })
 })
@@ -94,9 +93,10 @@ describe('drawWithFlowerReplacement', () => {
 
   it('terminates as exhausted if the wall runs out mid flower-replacement chain', () => {
     const tiles = buildDeck()
-    // Put a flower tile right at the last drawable index, so drawing it
-    // leaves the wall exhausted before a replacement can be drawn.
-    const lastDrawable = 144 - DEAD_WALL_SIZE - 1
+    // Put a flower tile right at the last drawable index (143, the whole
+    // wall — no reserved dead-wall buffer), so drawing it leaves the wall
+    // exhausted before a replacement can be drawn.
+    const lastDrawable = 143
     const customOrder = tiles.slice()
     const temp = customOrder[lastDrawable]!
     const flowerIdx = customOrder.indexOf(136)

@@ -113,7 +113,7 @@ export function playRandomMatch(params: RandomMatchParams): RandomMatchResult {
       maxActions: params.maxActionsPerHand,
     })
     params.onHandEnd?.(finalState, matchState)
-    matchState = advanceMatch(matchState, finalState.result!)
+    matchState = advanceMatch(matchState)
   }
 
   return { matchState, handsPlayed }

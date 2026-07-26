@@ -16,3 +16,8 @@ npm-debug.log*
 # Claude Code local settings (per-machine, not shared)
 .claude/settings.local.json
 
+# MCR rulebook: ©2006 World Mahjong Organization, all rights reserved.
+# This repo is public (PLAN.md §5) — keep the actual PDF local-only and
+# link to the source instead of redistributing it. See docs/rules/README.md.
+docs/rules/mcr_EN.pdf
+

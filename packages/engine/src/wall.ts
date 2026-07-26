@@ -1,9 +1,6 @@
 import { mulberry32, shuffle } from './rng.js'
 import { buildDeck, isFlowerOrSeason, type TileInstanceId } from './tiles.js'
 
-// Provisional defaults — see docs/rules/decisions.md item 3. Not yet
-// confirmed against the MCR rulebook; low risk either way.
-export const DEAD_WALL_SIZE = 14
 // Number of *logical* tiles the initial deal hands out (13 * 4 + the
 // dealer's folded-in 14th tile) — used by game-state.ts's deal loop. This is
 // NOT the wall's starting drawIndex: dealing must go through the same
@@ -12,9 +9,14 @@ export const DEAD_WALL_SIZE = 14
 // always starts at drawIndex 0 and the deal consumes it draw-by-draw.
 export const INITIAL_DEAL_COUNT = 53
 
+// docs/rules/decisions.md #3: there is no fixed dead-wall reserve in MCR —
+// the term never appears in the rulebook. §3.4.30 defines a Draw Game as
+// occurring when "the wall has been completely depleted": the entire
+// 144-tile wall (minus whatever was dealt) is drawable, with kong/flower
+// replacements simply coming from the opposite ("back") end of the same
+// single pool rather than a separate reserved buffer.
 export interface Wall {
-  // Fixed shuffled order for this hand, derived once from a seed. The
-  // trailing DEAD_WALL_SIZE indices are permanently undrawable "dead wall."
+  // Fixed shuffled order for this hand, derived once from a seed.
   tiles: readonly TileInstanceId[]
   drawIndex: number // next index to hand out, for ANY draw (deal, normal, or replacement)
 }
@@ -25,7 +27,7 @@ export function buildWall(seed: number): Wall {
 }
 
 export function drawableRemaining(wall: Wall): number {
-  return wall.tiles.length - DEAD_WALL_SIZE - wall.drawIndex
+  return wall.tiles.length - wall.drawIndex
 }
 
 export function isWallExhausted(wall: Wall): boolean {
