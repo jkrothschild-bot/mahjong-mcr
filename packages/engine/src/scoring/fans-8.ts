@@ -1,17 +1,6 @@
 import { typeIdOfInstance, type TileTypeId } from '../tiles.js'
 import type { FanMatch, HandContext } from './types.js'
-import { allSets, parseSuited, type ParsedSuited } from './set-helpers.js'
-
-const SUIT_CHARS = ['C', 'D', 'B'] as const
-type SuitChar = (typeof SUIT_CHARS)[number]
-const SUIT_PERMUTATIONS: readonly SuitChar[][] = [
-  ['C', 'D', 'B'],
-  ['C', 'B', 'D'],
-  ['D', 'C', 'B'],
-  ['D', 'B', 'C'],
-  ['B', 'C', 'D'],
-  ['B', 'D', 'C'],
-]
+import { allSets, parseSuited, SUIT_PERMUTATIONS, type ParsedSuited, type SuitChar } from './set-helpers.js'
 
 // 39. Mixed Straight — 8 pts. §3.8.1 p.16 / App.1 p.36: "A straight (tiles 1
 // through 9) formed by chows from all three suits." Chow(1) + chow(4) +

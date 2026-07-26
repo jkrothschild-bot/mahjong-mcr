@@ -2,6 +2,7 @@ import { decomposeHand, isSevenPairs, isThirteenOrphans } from '../win-detection
 import type { Meld } from '../meld.js'
 import type { TileInstanceId } from '../tiles.js'
 import { areExclusive } from './exclusions.js'
+import { FANS_6_DETECTORS } from './fans-6.js'
 import { FANS_8_DETECTORS } from './fans-8.js'
 import { FANS_12_DETECTORS } from './fans-12.js'
 import { FANS_16_DETECTORS } from './fans-16.js'
@@ -16,7 +17,7 @@ import type { FanMatch, HandContext, ScoreResult } from './types.js'
 const CHICKEN_HAND_FAN_ID = 43
 
 // All registered detectors across every implemented batch. Adding a new
-// batch file (e.g. fans-6.ts) is purely additive: spread its detector map
+// batch file (e.g. fans-4.ts) is purely additive: spread its detector map
 // in here too. Fan 43 (Chicken Hand) is deliberately absent from every
 // batch map — it's a whole-scorer fallback, handled below in
 // scoreOneCandidate, not a per-fan detector (see fans-8.ts's comment).
@@ -29,6 +30,7 @@ const ALL_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> 
   ...FANS_16_DETECTORS,
   ...FANS_12_DETECTORS,
   ...FANS_8_DETECTORS,
+  ...FANS_6_DETECTORS,
 }
 
 function pointsOf(match: FanMatch): number {

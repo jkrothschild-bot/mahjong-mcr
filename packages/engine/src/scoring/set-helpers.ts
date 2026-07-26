@@ -54,8 +54,23 @@ export function isTerminalTypeId(id: TileTypeId): boolean {
   return id === 'C1' || id === 'C9' || id === 'D1' || id === 'D9' || id === 'B1' || id === 'B9'
 }
 
+export type SuitChar = 'C' | 'D' | 'B'
+
+// All 6 orderings of the 3 suits — used by fans that need "one set per
+// suit, ranks forming some pattern" without a fixed suit-to-position
+// mapping (Mixed Shifted Pungs, Mixed Shifted Chows): the rulebook doesn't
+// pin which suit gets which rank, just that some assignment works.
+export const SUIT_PERMUTATIONS: readonly SuitChar[][] = [
+  ['C', 'D', 'B'],
+  ['C', 'B', 'D'],
+  ['D', 'C', 'B'],
+  ['D', 'B', 'C'],
+  ['B', 'C', 'D'],
+  ['B', 'D', 'C'],
+]
+
 export interface ParsedSuited {
-  suit: 'C' | 'D' | 'B'
+  suit: SuitChar
   rank: number
 }
 

@@ -48,13 +48,15 @@ describe('resolveFanConflicts', () => {
 })
 
 describe('scoreHand', () => {
-  it('scores a real Big Four Winds hand at 88 points', () => {
+  it('scores a real Big Four Winds hand at 88+6, since a simple-tile pair unavoidably also triggers Half Flush', () => {
     // Pair is a simple tile (C5, neither terminal nor honor) so this hand
     // does NOT also incidentally satisfy All Terminals and Honors (fan 18)
-    // — isolating Big Four Winds alone. Fan 18 only overlaps with Big Four
-    // Winds when the pair happens to also be terminal/honor; that's a
-    // legitimate independent stack, not tested here (see exclusions.ts's
-    // comment on why [1, 18] isn't a blanket exclusion).
+    // — see exclusions.ts's comment on why [1, 18] isn't a blanket
+    // exclusion. But a suited pair alongside 4 honor-only sets means this
+    // hand is unavoidably also "one suit (the pair) combined with honor
+    // tiles" — Half Flush (fan 50) — for ANY suited pair choice, so rather
+    // than chase a fully clean isolation, this test just verifies the
+    // correct combined total.
     const melds = [
       pungMeld('0-0', idsFor('WE', 3)),
       pungMeld('0-1', idsFor('WS', 3)),
@@ -63,8 +65,8 @@ describe('scoreHand', () => {
     ]
     const concealedTiles = idsFor('C5', 2)
     const result = scoreHand({ concealedTiles, melds })
-    expect(result.basicPoints).toBe(88)
-    expect(result.fanMatches).toEqual([{ fanId: 1, count: 1 }])
+    expect(result.basicPoints).toBe(94)
+    expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([1, 50])
   })
 
   it('falls back to Chicken Hand (8 pts) when no other fan matches', () => {
@@ -106,34 +108,40 @@ describe('scoreHand', () => {
     expect(result.fanMatches).toEqual([{ fanId: 7, count: 1 }])
   })
 
-  it('scores a real All Honors hand (64-point tier) end to end through decomposeHand', () => {
-    // 2 wind pungs + 2 dragon pungs (exposed) + a 3rd-wind pair — avoids
-    // every honor "count tier" fan (Big/Little Four Winds need 3 or 4 wind
-    // pungs; Big/Little Three Dragons need 2 or 3 dragon pungs with a
-    // dragon pair; Big Three Winds needs 3 wind pungs; Four/Three Concealed
-    // Pungs need 4 or 3 concealed pungs) so this isolates All Honors alone.
-    // Discovered by trial and error across three sessions — honor-family
-    // fans overlap constantly by coincidence, never by necessary subset.
+  it('scores a real All Honors hand at 64+6, since a 4-pung all-honor hand can never avoid every honor-count fan', () => {
+    // Only 7 honor types exist (4 winds + 3 dragons), and since a pung uses
+    // 3 of a type's 4 copies, a 4-pung-plus-pair all-honor hand always uses
+    // exactly 5 DISTINCT honor types (4 pung-types + 1 pair-type — the pair
+    // can never reuse a pung's type, since only 1 copy would be left).
+    // That forces the wind/dragon pung split among the 4 sets into one of
+    // (1,3), (2,2), (3,1), (4,0) windPungs/dragonPungs — and EVERY one of
+    // those hits some other honor-family fan (3 dragon pungs = Big Three
+    // Dragons 88pts; 3 or 4 wind pungs = Big Three/Four Winds; only the
+    // (2,2) split's forced overlap is mild: exactly 2 dragon pungs always
+    // also satisfies Two Dragon Pungs, fan 54, 6pts). So rather than chase
+    // an impossible full isolation, this uses the mildest unavoidable
+    // split and verifies the correct combined total.
     const melds = [pungMeld('0-0', idsFor('WE', 3)), pungMeld('0-1', idsFor('WS', 3))]
     const concealedTiles = [...idsFor('DR', 3), ...idsFor('DG', 3), ...idsFor('WW', 2)]
     expect(concealedTiles.length).toBe(8)
     const result = scoreHand({ concealedTiles, melds })
-    expect(result.basicPoints).toBe(64)
-    expect(result.fanMatches).toEqual([{ fanId: 11, count: 1 }])
+    expect(result.basicPoints).toBe(70)
+    expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([11, 54])
   })
 
-  it('correctly stacks All Honors and Four Concealed Pungs when a hand satisfies both (no stated exclusion)', () => {
-    // Same "avoid every honor count-tier fan" construction as above, but
-    // fully concealed this time so Four Concealed Pungs (fan 12) also
-    // applies alongside All Honors — a genuine independent stack.
+  it('correctly stacks All Honors, Four Concealed Pungs, and the forced Two Dragon Pungs overlap', () => {
+    // Same (2,2) wind/dragon split as above (see its comment for why this
+    // is the mildest achievable honor-family overlap), fully concealed this
+    // time so Four Concealed Pungs (fan 12) also applies — three
+    // legitimately co-occurring fans, no bug.
     const concealedTiles = [
       ...idsFor('WE', 3), ...idsFor('WS', 3), ...idsFor('DR', 3), ...idsFor('DG', 3),
       ...idsFor('WW', 2),
     ]
     expect(concealedTiles.length).toBe(14)
     const result = scoreHand({ concealedTiles, melds: [] })
-    expect(result.basicPoints).toBe(128)
-    expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([11, 12])
+    expect(result.basicPoints).toBe(134)
+    expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([11, 12, 54])
   })
 
   it('scores a real Quadruple Chow hand (48-point tier), picking the max across decomposeHand\'s multiple valid parses', () => {
