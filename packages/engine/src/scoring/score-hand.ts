@@ -2,6 +2,7 @@ import { decomposeHand, isSevenPairs, isThirteenOrphans } from '../win-detection
 import type { Meld } from '../meld.js'
 import type { TileInstanceId } from '../tiles.js'
 import { areExclusive } from './exclusions.js'
+import { FANS_8_DETECTORS } from './fans-8.js'
 import { FANS_12_DETECTORS } from './fans-12.js'
 import { FANS_16_DETECTORS } from './fans-16.js'
 import { FANS_24_DETECTORS } from './fans-24.js'
@@ -12,9 +13,13 @@ import { FANS_88_DETECTORS } from './fans-88.js'
 import { FAN_REGISTRY } from './registry.js'
 import type { FanMatch, HandContext, ScoreResult } from './types.js'
 
+const CHICKEN_HAND_FAN_ID = 43
+
 // All registered detectors across every implemented batch. Adding a new
-// batch file (e.g. fans-8.ts) is purely additive: spread its detector map
-// in here too.
+// batch file (e.g. fans-6.ts) is purely additive: spread its detector map
+// in here too. Fan 43 (Chicken Hand) is deliberately absent from every
+// batch map — it's a whole-scorer fallback, handled below in
+// scoreOneCandidate, not a per-fan detector (see fans-8.ts's comment).
 const ALL_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> = {
   ...FANS_88_DETECTORS,
   ...FANS_64_DETECTORS,
@@ -23,6 +28,7 @@ const ALL_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> 
   ...FANS_24_DETECTORS,
   ...FANS_16_DETECTORS,
   ...FANS_12_DETECTORS,
+  ...FANS_8_DETECTORS,
 }
 
 function pointsOf(match: FanMatch): number {
@@ -59,6 +65,15 @@ export function resolveFanConflicts(matches: readonly FanMatch[]): FanMatch[] {
 function scoreOneCandidate(ctx: HandContext): ScoreResult {
   const rawMatches = Object.values(ALL_DETECTORS).flatMap((detect) => detect(ctx))
   const fanMatches = resolveFanConflicts(rawMatches)
+  if (fanMatches.length === 0) {
+    // Chicken Hand (fan 43), §3.8.1 p.16: "A hand that would otherwise earn
+    // 0 points" falls back to this — guarantees every structurally valid
+    // win is worth at least 8 points, satisfying §3.9.1.1's minimum by
+    // construction. Only kicks in when NO other fan matches this
+    // candidate; scoreHand's max-across-candidates selection already
+    // prefers any real-fan total over this whenever one exists.
+    return { fanMatches: [{ fanId: CHICKEN_HAND_FAN_ID, count: 1 }], basicPoints: FAN_REGISTRY[CHICKEN_HAND_FAN_ID]!.points }
+  }
   const basicPoints = fanMatches.reduce((sum, m) => sum + pointsOf(m), 0)
   return { fanMatches, basicPoints }
 }
@@ -66,6 +81,13 @@ function scoreOneCandidate(ctx: HandContext): ScoreResult {
 export interface ScoreHandParams {
   concealedTiles: TileInstanceId[] // final concealed tiles, winning tile included
   melds: Meld[]
+  // Win-circumstance context for the 8-point tier's "special situation"
+  // fans — see HandContext's own doc comment in types.ts for why these are
+  // optional and not yet wired from real game state.
+  winMethod?: 'selfDraw' | 'discard' | 'robKong'
+  isLastTileOfWall?: boolean
+  isLastDiscardOfGame?: boolean
+  wonOnKongReplacement?: boolean
 }
 
 // Tries every valid decomposition (decomposeHand can return several for an
@@ -75,17 +97,18 @@ export interface ScoreHandParams {
 // on top of the same principle applying within one candidate's own fan
 // conflicts (resolveFanConflicts above).
 export function scoreHand(params: ScoreHandParams): ScoreResult {
-  const { concealedTiles, melds } = params
+  const { concealedTiles, melds, winMethod, isLastTileOfWall, isLastDiscardOfGame, wonOnKongReplacement } = params
+  const winCircumstance = { winMethod, isLastTileOfWall, isLastDiscardOfGame, wonOnKongReplacement }
   const candidates: HandContext[] = []
 
   for (const decomposition of decomposeHand(concealedTiles, melds)) {
-    candidates.push({ concealedTiles, melds, decomposition, specialShape: null })
+    candidates.push({ concealedTiles, melds, decomposition, specialShape: null, ...winCircumstance })
   }
   if (isSevenPairs(concealedTiles, melds)) {
-    candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'sevenPairs' })
+    candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'sevenPairs', ...winCircumstance })
   }
   if (isThirteenOrphans(concealedTiles, melds)) {
-    candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'thirteenOrphans' })
+    candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'thirteenOrphans', ...winCircumstance })
   }
 
   if (candidates.length === 0) return { fanMatches: [], basicPoints: 0 }

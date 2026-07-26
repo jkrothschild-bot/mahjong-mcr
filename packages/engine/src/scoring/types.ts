@@ -18,6 +18,20 @@ export interface HandContext {
   melds: Meld[]
   decomposition: Decomposition | null // the one candidate parse for this trial; null if using specialShape instead
   specialShape: 'sevenPairs' | 'thirteenOrphans' | null
+
+  // Win-circumstance context, added for the 8-point tier's "special
+  // situation" fans (Last Tile Draw, Last Tile Claim, Out with Replacement
+  // Tile, Robbing the Kong). All optional/undefined-safe so every earlier
+  // batch's tests (which don't set these) keep working unchanged. These
+  // mirror what game-state.ts's HandResult already tracks (winMethod) plus
+  // a couple of fields the live engine doesn't populate yet — scoreHand()
+  // is still a standalone module (see M2 session 1's decision not to wire
+  // it into moves.ts's win legality yet), so wiring real values in from
+  // GameState is tracked as follow-up, same integration point.
+  winMethod?: 'selfDraw' | 'discard' | 'robKong'
+  isLastTileOfWall?: boolean // self-draw win on literally the wall's final drawable tile (fan 44)
+  isLastDiscardOfGame?: boolean // discard win on the literal last discard of the game (fans 45/46)
+  wonOnKongReplacement?: boolean // self-draw win on a kong's replacement tile specifically, not a flower-chain continuation of one (fan 46)
 }
 
 export interface FanMatch {

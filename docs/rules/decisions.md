@@ -150,6 +150,23 @@ corrected to match. See each item's status.
     the text and the example support. Revisit if a cleaner example or additional worked case
     ever contradicts the "any non-empty split" assumption.
 
+13. **Fan #45 (Last Tile Claim) and fan #46 (Out with Replacement Tile) textually overlap —
+    confirmed in the rulebook's own summary table (§3.8.1 p.16, rendered directly as an image
+    to check this precisely), not an extraction error.** Fan 45: "The last tile (of the game)
+    discarded by another player." Fan 46's own text, verbatim: "Going out (making mahjong) off
+    the discard which is the last tile in the game. Going out (making mahjong) on the
+    replacement tile drawn after achieving a kong (not on a Flower replacement)." Fan 46's
+    first clause is the *identical* condition as fan 45's entire definition. No exclusion
+    between 45 and 46 is stated anywhere (unlike fan 44's explicit "points for Self-Drawn may
+    not be combined" note, or fan 47's "points for Last Tile may not be combined" note).
+    Implemented literally: both fans fire together whenever a discard win happens to be the
+    literal last discard of the game (scoring 8+8=16 for that specific rare event), per
+    `scoring/fans-8.ts`'s `detectLastTileClaim`/`detectOutWithReplacementTile`.
+    Status: **provisional** — this reads as a genuine rulebook redundancy (or an intentional
+    double-award for a specific rare event) rather than a translation artifact, but no
+    corroborating source was checked. Revisit if this combination ever looks wrong in practice
+    (e.g. once the scorer is wired into live play and this scenario actually occurs).
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).

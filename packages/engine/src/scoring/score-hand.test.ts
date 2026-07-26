@@ -67,19 +67,31 @@ describe('scoreHand', () => {
     expect(result.fanMatches).toEqual([{ fanId: 1, count: 1 }])
   })
 
-  it('scores a hand matching none of the implemented fans at 0 points', () => {
-    // An ordinary hand: three chows, a pung, a pair — none of the 7
-    // implemented (88-point) fans apply to this.
+  it('falls back to Chicken Hand (8 pts) when no other fan matches', () => {
+    // A deliberately "boring" hand: two shifted-by-3 chows in one suit (not
+    // a 1-or-2 shift, so it doesn't trip Pure Shifted Chows), a chow in a
+    // second suit at a rank that doesn't line up into any straight, a lone
+    // pung (not a triple), and a non-terminal/non-honor/non-reversible
+    // pair — chosen to avoid every fan implemented so far. Since M2 session
+    // 8, a hand matching nothing else falls back to fan 43 (Chicken Hand)
+    // rather than scoring literal 0 — real rulebook behavior (§3.8.1 p.16),
+    // not a simplification. (An earlier version of this test, from session
+    // 1, used a hand that later sessions' Mixed Straight fan legitimately
+    // started matching — a good sign the pipeline actually works across
+    // batches, but it meant this test needed a tile set immune to *every*
+    // fan implemented so far, not just the ones that existed when it was
+    // written.)
     const concealedTiles = [
-      ...idsFor('C1', 1), ...idsFor('C2', 1), ...idsFor('C3', 1),
-      ...idsFor('D4', 1), ...idsFor('D5', 1), ...idsFor('D6', 1),
-      ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1),
-      ...idsFor('DW', 3),
+      ...idsFor('C2', 1), ...idsFor('C3', 1), ...idsFor('C4', 1),
+      ...idsFor('C5', 1), ...idsFor('C6', 1), ...idsFor('C7', 1),
+      ...idsFor('D1', 1), ...idsFor('D2', 1), ...idsFor('D3', 1),
+      ...idsFor('B5', 3),
       ...idsFor('C9', 2),
     ]
+    expect(concealedTiles.length).toBe(14)
     const result = scoreHand({ concealedTiles, melds: [] })
-    expect(result.basicPoints).toBe(0)
-    expect(result.fanMatches).toEqual([])
+    expect(result.basicPoints).toBe(8)
+    expect(result.fanMatches).toEqual([{ fanId: 43, count: 1 }])
   })
 
   it('scores a Thirteen Orphans hand at 88 points via the special-shape path', () => {
