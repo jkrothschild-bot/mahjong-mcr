@@ -70,25 +70,29 @@ describe('scoreHand', () => {
   })
 
   it('falls back to Chicken Hand (8 pts) when no other fan matches', () => {
-    // A deliberately "boring" hand: two shifted-by-3 chows in one suit (not
-    // a 1-or-2 shift, so it doesn't trip Pure Shifted Chows), a chow in a
-    // second suit at a rank that doesn't line up into any straight, a lone
-    // pung (not a triple), and a non-terminal/non-honor/non-reversible
-    // pair — chosen to avoid every fan implemented so far. Since M2 session
-    // 8, a hand matching nothing else falls back to fan 43 (Chicken Hand)
-    // rather than scoring literal 0 — real rulebook behavior (§3.8.1 p.16),
-    // not a simplification. (An earlier version of this test, from session
-    // 1, used a hand that later sessions' Mixed Straight fan legitimately
-    // started matching — a good sign the pipeline actually works across
-    // batches, but it meant this test needed a tile set immune to *every*
-    // fan implemented so far, not just the ones that existed when it was
-    // written.)
+    // A deliberately "boring" hand, immune to every fan implemented so far
+    // (now including the full 4/2/1-point tiers): 3 chows scattered across
+    // suits with no shared rank, no same-suit shift, and none touching a
+    // terminal (avoids the whole Double/Triple/Straight/Terminal-Chow
+    // family and Outside Hand); one pung of a plain non-terminal odd simple
+    // tile (avoids Pung of Terminals or Honors, Double Pung, All Even
+    // Pungs); a lone dragon PAIR, not pung, to kill No Honors (76) without
+    // tripping any dragon-pung fan or Pung of Terminals/Honors (which only
+    // counts pungs, not pairs); all 3 suits used (kills One Voided Suit,
+    // Half/Full Flush). Since M2 session 8, a hand matching nothing else
+    // falls back to fan 43 (Chicken Hand) rather than scoring literal 0 —
+    // real rulebook behavior (§3.8.1 p.16), not a simplification. (This
+    // hand has already been rebuilt twice as new batches started
+    // legitimately matching the previous one — a good sign the pipeline
+    // works across batches, but it means this test needs a tile set immune
+    // to *every* fan implemented so far, not just the ones that existed
+    // when it was last written.)
     const concealedTiles = [
-      ...idsFor('C2', 1), ...idsFor('C3', 1), ...idsFor('C4', 1),
-      ...idsFor('C5', 1), ...idsFor('C6', 1), ...idsFor('C7', 1),
-      ...idsFor('D1', 1), ...idsFor('D2', 1), ...idsFor('D3', 1),
-      ...idsFor('B5', 3),
-      ...idsFor('C9', 2),
+      ...idsFor('C3', 1), ...idsFor('C4', 1), ...idsFor('C5', 1),
+      ...idsFor('D5', 1), ...idsFor('D6', 1), ...idsFor('D7', 1),
+      ...idsFor('B2', 1), ...idsFor('B3', 1), ...idsFor('B4', 1),
+      ...idsFor('B7', 3),
+      ...idsFor('DR', 2),
     ]
     expect(concealedTiles.length).toBe(14)
     const result = scoreHand({ concealedTiles, melds: [] })
@@ -120,10 +124,19 @@ describe('scoreHand', () => {
     // (2,2) split's forced overlap is mild: exactly 2 dragon pungs always
     // also satisfies Two Dragon Pungs, fan 54, 6pts). So rather than chase
     // an impossible full isolation, this uses the mildest unavoidable
-    // split and verifies the correct combined total.
-    const melds = [pungMeld('0-0', idsFor('WE', 3)), pungMeld('0-1', idsFor('WS', 3))]
-    const concealedTiles = [...idsFor('DR', 3), ...idsFor('DG', 3), ...idsFor('WW', 2)]
-    expect(concealedTiles.length).toBe(8)
+    // split and verifies the correct combined total. All 4 sets are
+    // exposed melds here (not split concealed/exposed) specifically to
+    // avoid ALSO tripping Two Concealed Pungs (66, 2pts) — that overlap
+    // isn't a universal fact about All Honors (melding is a free choice),
+    // just an easily-avoided artifact of how this fixture is built.
+    const melds = [
+      pungMeld('0-0', idsFor('WE', 3)),
+      pungMeld('0-1', idsFor('WS', 3)),
+      pungMeld('0-2', idsFor('DR', 3)),
+      pungMeld('0-3', idsFor('DG', 3)),
+    ]
+    const concealedTiles = idsFor('WW', 2)
+    expect(concealedTiles.length).toBe(2)
     const result = scoreHand({ concealedTiles, melds })
     expect(result.basicPoints).toBe(70)
     expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([11, 54])
@@ -149,17 +162,35 @@ describe('scoreHand', () => {
     // pung+chow+pung+pung) that decomposeHand will find alongside the
     // "4 identical chows" parse — scoreHand must pick whichever scores
     // highest, not just the first one found.
+    //
+    // The pair choice here is an unavoidable three-way tradeoff: Quadruple
+    // Chow's own definition never constrains the pair, so it's either (a)
+    // the SAME suit as the 4 chows, triggering Full Flush (+24 — the worst
+    // option), (b) an HONOR tile, triggering Half Flush (+6), or (c), used
+    // here, a DIFFERENT suit's simple tile, which unavoidably also
+    // satisfies All Chows (63 — the pair isn't honor, and all 4 real sets
+    // are chows) and One Voided Suit (75 — exactly 2 suits used) for a
+    // minimal +3. This is the smallest achievable combined total, not a
+    // bug — same "verify the correct combined total" approach as the All
+    // Honors test above, since a fully isolated Quadruple Chow hand doesn't
+    // exist.
     const concealedTiles = [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('D5', 2)]
     expect(concealedTiles.length).toBe(14)
     const result = scoreHand({ concealedTiles, melds: [] })
-    expect(result.basicPoints).toBe(48)
-    expect(result.fanMatches).toEqual([{ fanId: 14, count: 1 }])
+    expect(result.basicPoints).toBe(51)
+    expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([14, 63, 75])
   })
 
-  it('scores Seven Shifted Pairs at 88 alone, not 88+24, since it always also structurally satisfies Seven Pairs', () => {
+  it('scores Seven Shifted Pairs at 88 alone, not 88+24 or more, once its unavoidable structural implications are excluded', () => {
+    // Ranks 1-7 (not 2-8) specifically: touching the terminal (rank 1)
+    // keeps this hand out of All Simples (68) territory, so the only
+    // structural freebie left is No Honors (76) — genuinely unavoidable,
+    // since honor tiles have no rank and can never form a consecutive-pair
+    // run — excluded via exclusions.ts's [6, 76] (added this session), on
+    // top of the pre-existing [6, 19] (Seven Pairs).
     const concealedTiles = [
-      ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2), ...idsFor('D5', 2),
-      ...idsFor('D6', 2), ...idsFor('D7', 2), ...idsFor('D8', 2),
+      ...idsFor('D1', 2), ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2),
+      ...idsFor('D5', 2), ...idsFor('D6', 2), ...idsFor('D7', 2),
     ]
     expect(concealedTiles.length).toBe(14)
     const result = scoreHand({ concealedTiles, melds: [] })

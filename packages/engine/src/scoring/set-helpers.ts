@@ -1,6 +1,6 @@
 import type { Decomposition } from '../win-detection.js'
 import { meldTileTypeId, type Meld } from '../meld.js'
-import type { TileTypeId } from '../tiles.js'
+import { typeIdOf, type TileTypeId, type Wind } from '../tiles.js'
 
 export interface CombinedSet {
   kind: 'chow' | 'pung' | 'kong'
@@ -52,6 +52,12 @@ export function isHonorTypeId(id: TileTypeId): boolean {
 
 export function isTerminalTypeId(id: TileTypeId): boolean {
   return id === 'C1' || id === 'C9' || id === 'D1' || id === 'D9' || id === 'B1' || id === 'B9'
+}
+
+// Maps a Wind (used by HandContext's prevailingWind/seatWind) to its tile
+// type id, so wind-pung fans can compare directly against a set's typeId.
+export function windTypeId(wind: Wind): TileTypeId {
+  return typeIdOf({ kind: 'wind', wind })
 }
 
 export type SuitChar = 'C' | 'D' | 'B'

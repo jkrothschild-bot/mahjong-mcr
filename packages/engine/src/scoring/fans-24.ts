@@ -7,8 +7,13 @@ import { allSets, isHonorTypeId, parseSuited } from './set-helpers.js'
 // seven pairs." Direct reuse of win-detection.ts's isSevenPairs (M1). Note:
 // Seven Shifted Pairs (fan 6, 88 pts) is a stricter version of this same
 // shape — see exclusions.ts's [6, 19] entry for why that pair is excluded.
+// Gated on ctx.specialShape === 'sevenPairs' — see fans-88.ts's
+// detectSevenShiftedPairs comment for why (avoids piggybacking onto a
+// standard-decomposition candidate of the same 14 tiles).
 function detectSevenPairs(ctx: HandContext): FanMatch[] {
-  return isSevenPairs(ctx.concealedTiles, ctx.melds) ? [{ fanId: 19, count: 1 }] : []
+  return ctx.specialShape === 'sevenPairs' && isSevenPairs(ctx.concealedTiles, ctx.melds)
+    ? [{ fanId: 19, count: 1 }]
+    : []
 }
 
 // The three "knitted sequences" — {1,4,7}, {2,5,8}, {3,6,9} — identified by

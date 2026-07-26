@@ -1,7 +1,10 @@
 import { decomposeHand, isSevenPairs, isThirteenOrphans } from '../win-detection.js'
 import type { Meld } from '../meld.js'
-import type { TileInstanceId } from '../tiles.js'
+import type { TileInstanceId, Wind } from '../tiles.js'
 import { areExclusive } from './exclusions.js'
+import { FANS_1_DETECTORS } from './fans-1.js'
+import { FANS_2_DETECTORS } from './fans-2.js'
+import { FANS_4_DETECTORS } from './fans-4.js'
 import { FANS_6_DETECTORS } from './fans-6.js'
 import { FANS_8_DETECTORS } from './fans-8.js'
 import { FANS_12_DETECTORS } from './fans-12.js'
@@ -31,6 +34,9 @@ const ALL_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> 
   ...FANS_12_DETECTORS,
   ...FANS_8_DETECTORS,
   ...FANS_6_DETECTORS,
+  ...FANS_4_DETECTORS,
+  ...FANS_2_DETECTORS,
+  ...FANS_1_DETECTORS,
 }
 
 function pointsOf(match: FanMatch): number {
@@ -90,6 +96,13 @@ export interface ScoreHandParams {
   isLastTileOfWall?: boolean
   isLastDiscardOfGame?: boolean
   wonOnKongReplacement?: boolean
+  // Context for the 4/2/1-point tiers — see HandContext's own doc comment
+  // in types.ts for why these are optional and not yet wired from real
+  // game state.
+  isLastCopyOfItsKind?: boolean
+  prevailingWind?: Wind
+  seatWind?: Wind
+  winningTile?: TileInstanceId
 }
 
 // Tries every valid decomposition (decomposeHand can return several for an
@@ -99,8 +112,28 @@ export interface ScoreHandParams {
 // on top of the same principle applying within one candidate's own fan
 // conflicts (resolveFanConflicts above).
 export function scoreHand(params: ScoreHandParams): ScoreResult {
-  const { concealedTiles, melds, winMethod, isLastTileOfWall, isLastDiscardOfGame, wonOnKongReplacement } = params
-  const winCircumstance = { winMethod, isLastTileOfWall, isLastDiscardOfGame, wonOnKongReplacement }
+  const {
+    concealedTiles,
+    melds,
+    winMethod,
+    isLastTileOfWall,
+    isLastDiscardOfGame,
+    wonOnKongReplacement,
+    isLastCopyOfItsKind,
+    prevailingWind,
+    seatWind,
+    winningTile,
+  } = params
+  const winCircumstance = {
+    winMethod,
+    isLastTileOfWall,
+    isLastDiscardOfGame,
+    wonOnKongReplacement,
+    isLastCopyOfItsKind,
+    prevailingWind,
+    seatWind,
+    winningTile,
+  }
   const candidates: HandContext[] = []
 
   for (const decomposition of decomposeHand(concealedTiles, melds)) {

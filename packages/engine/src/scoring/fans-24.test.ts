@@ -23,8 +23,17 @@ describe('Seven Pairs (fan 19)', () => {
       ...idsFor('C1', 2), ...idsFor('C2', 2), ...idsFor('C3', 2), ...idsFor('C4', 2),
       ...idsFor('C5', 2), ...idsFor('C6', 2), ...idsFor('C7', 2),
     ]
-    const ctx = ctxWith({ concealedTiles })
+    const ctx = ctxWith({ concealedTiles, specialShape: 'sevenPairs' })
     expect(FANS_24_DETECTORS[19]!(ctx)).toEqual([{ fanId: 19, count: 1 }])
+  })
+
+  it('rejects a matching tile shape when specialShape is not sevenPairs (avoids piggybacking on a standard-decomposition candidate)', () => {
+    const concealedTiles = [
+      ...idsFor('C1', 2), ...idsFor('C2', 2), ...idsFor('C3', 2), ...idsFor('C4', 2),
+      ...idsFor('C5', 2), ...idsFor('C6', 2), ...idsFor('C7', 2),
+    ]
+    const ctx = ctxWith({ concealedTiles })
+    expect(FANS_24_DETECTORS[19]!(ctx)).toEqual([])
   })
 
   it('rejects a standard (non-seven-pairs) hand', () => {

@@ -167,6 +167,59 @@ corrected to match. See each item's status.
     corroborating source was checked. Revisit if this combination ever looks wrong in practice
     (e.g. once the scorer is wired into live play and this scenario actually occurs).
 
+14. **M2's final three point tiers (4/2/1) — the fan-scoring system is now 100% complete
+    (81/81 fans have metadata; 78 have detectors — 43 and 81 are deliberate whole-scorer/
+    settlement fallbacks, not per-fan detectors).** Several judgment calls made closing out
+    this last stretch:
+    - **A real architectural bug, found and fixed**: fans 6 (Seven Shifted Pairs), 7
+      (Thirteen Orphans), and 19 (Seven Pairs) re-derived their shape from raw
+      `concealedTiles` instead of checking `ctx.specialShape`/`ctx.decomposition`. Since
+      `scoreHand` trials the *same* 14 tiles as several independent candidates (the special
+      shape, plus every standard decomposition `decomposeHand` finds), an ungated detector
+      could fire on a standard-decomposition candidate too, illegitimately stacking a
+      pair-based fan onto sets that candidate is reading as chows/pungs instead — a direct
+      violation of the Non-Separation Principle (§3.9.1.5). Surfaced once the 1/2-point
+      tiers added chow/pair-based fans that could piggyback this way (Seven Shifted Pairs
+      jumped from a clean 88 to 95). Fixed by gating all three on `ctx.specialShape`.
+    - **Outside Hand (55)** implemented literally: every set (chow, pung, kong) *and* the
+      pair must individually contain a terminal or honor tile — a chow only qualifies if it
+      touches a terminal (1-2-3 or 7-8-9, not a middle run), a pung/kong/pair qualifies only
+      if its own tile type *is* one (a pung is 3 identical tiles, so "contains" and "is" are
+      equivalent for it).
+    - **One Voided Suit (75)** implemented as *exactly* 2 suits used, not "at most 2" —
+      a 1-suit hand is Half/Full Flush's territory instead. Not a direct rulebook quote;
+      the alternate ("at most 2") reading would make this fan silently stack onto every
+      Half/Full Flush hand too, which reads wrong. **Status: provisional.**
+    - **Last Tile (58)**, **Prevalent Wind (60)** / **Seat Wind (61)** all need context the
+      live engine doesn't populate yet (cross-table tile visibility; a prevailing/seat wind
+      concept at all — `game-state.ts` has neither). Added as new optional `HandContext`
+      fields (`isLastCopyOfItsKind`, `prevailingWind`, `seatWind`), same "declared now, wired
+      from real game state later" pattern as the 8-point tier's win-circumstance fields.
+    - **Edge/Closed/Single Wait (77/78/79)** — implemented properly, not approximated: added
+      a `winningTile` context field, then for a given decomposition candidate, removed that
+      tile from the hand and checked *all 34 standard tile types* against
+      `isWinningHand` to count how many independently complete the pre-win 13 tiles. Each
+      fan's own text includes "(not valid if waiting for more than one tile)" — this is
+      exactly that check, not a simplification: only when exactly one type completes the
+      hand does a shape get classified (pair-match → Single; middle-of-a-chow → Closed;
+      the "3" of 1-2-3 or "7" of 7-8-9 specifically → Edge, since no tile exists on the far
+      side of either). The one residual limitation: it evaluates one decomposition candidate
+      at a time, consistent with how every other fan here works.
+    - **Several new DERIVED exclusions** (same "not a literal rulebook quote, but a direct
+      logical consequence" category as the earlier `[8,18]`/`[11,18]`/`[6,19]` entries),
+      needed because this session introduced the first *generic, per-unit countable* fans
+      (Dragon Pung 59, Double Pung 65, Mixed Double Chow 70, Concealed Kong 67, Melded Kong
+      74) — each of which unavoidably also fires whenever a same-family *named exact-count*
+      fan fires for the same physical sets: `[54,59]`, `[32,65]`, `[41,70]`, `[48,67]`,
+      `[57,74]`, `[38,73]`. Also added `[28,71]`/`[28,72]` (Pure Straight trivially contains
+      a Short Straight and a Two-Terminal-Chows sub-shape), `[56,80]` (Fully Concealed Hand
+      requires self-draw by definition, same as Self-Drawn), and `[6,76]` (Seven Shifted
+      Pairs can never include an honor tile — honors have no rank — so it's unconditionally
+      also "No Honors").
+    - **Fan 81 (Flower Tiles)** has no detector in `fans-1.ts`, same as Chicken Hand (43):
+      it's scored via `settlement.ts`'s separate `flowerPoints`, never as a `basicPoints`
+      fan match.
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).

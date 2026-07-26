@@ -164,8 +164,17 @@ describe('Seven Shifted Pairs (fan 6)', () => {
       ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2), ...idsFor('D5', 2),
       ...idsFor('D6', 2), ...idsFor('D7', 2), ...idsFor('D8', 2),
     ]
-    const ctx = ctxWith({ concealedTiles })
+    const ctx = ctxWith({ concealedTiles, specialShape: 'sevenPairs' })
     expect(FANS_88_DETECTORS[6]!(ctx)).toEqual([{ fanId: 6, count: 1 }])
+  })
+
+  it('rejects a matching tile shape when specialShape is not sevenPairs (avoids piggybacking on a standard-decomposition candidate)', () => {
+    const concealedTiles = [
+      ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2), ...idsFor('D5', 2),
+      ...idsFor('D6', 2), ...idsFor('D7', 2), ...idsFor('D8', 2),
+    ]
+    const ctx = ctxWith({ concealedTiles })
+    expect(FANS_88_DETECTORS[6]!(ctx)).toEqual([])
   })
 
   it('rejects 7 pairs in one suit that are not consecutive', () => {
@@ -173,7 +182,7 @@ describe('Seven Shifted Pairs (fan 6)', () => {
       ...idsFor('D1', 2), ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2),
       ...idsFor('D5', 2), ...idsFor('D6', 2), ...idsFor('D9', 2), // gap before the last pair
     ]
-    const ctx = ctxWith({ concealedTiles })
+    const ctx = ctxWith({ concealedTiles, specialShape: 'sevenPairs' })
     expect(FANS_88_DETECTORS[6]!(ctx)).toEqual([])
   })
 
@@ -182,7 +191,7 @@ describe('Seven Shifted Pairs (fan 6)', () => {
       ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2), ...idsFor('D5', 2),
       ...idsFor('D6', 2), ...idsFor('D7', 2), ...idsFor('C8', 2),
     ]
-    const ctx = ctxWith({ concealedTiles })
+    const ctx = ctxWith({ concealedTiles, specialShape: 'sevenPairs' })
     expect(FANS_88_DETECTORS[6]!(ctx)).toEqual([])
   })
 })
@@ -195,8 +204,19 @@ describe('Thirteen Orphans (fan 7)', () => {
       ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
       ...idsFor('DR', 1), ...idsFor('DG', 1), ...idsFor('DW', 2),
     ]
-    const ctx = ctxWith({ concealedTiles })
+    const ctx = ctxWith({ concealedTiles, specialShape: 'thirteenOrphans' })
     expect(FANS_88_DETECTORS[7]!(ctx)).toEqual([{ fanId: 7, count: 1 }])
+  })
+
+  it('rejects the same tile shape when specialShape is not thirteenOrphans', () => {
+    const concealedTiles = [
+      ...idsFor('C1', 1), ...idsFor('C9', 1), ...idsFor('D1', 1), ...idsFor('D9', 1),
+      ...idsFor('B1', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+      ...idsFor('DR', 1), ...idsFor('DG', 1), ...idsFor('DW', 2),
+    ]
+    const ctx = ctxWith({ concealedTiles })
+    expect(FANS_88_DETECTORS[7]!(ctx)).toEqual([])
   })
 
   it('rejects a standard hand', () => {

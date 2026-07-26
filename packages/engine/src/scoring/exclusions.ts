@@ -41,6 +41,64 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // fan 19's own text (fan 6 excludes Full Flush/Concealed Hand/Single Wait;
   // fan 19 excludes Concealed Hand/Single Wait — neither mentions the other).
   [6, 19],
+  // 6 -> 76: derived. Seven Shifted Pairs requires 7 consecutive ranks in
+  // one suit — honor tiles have no rank at all, so this shape can never
+  // include one; every Seven Shifted Pairs hand is unavoidably also "No
+  // Honors" (76). A genuine universal implication (unlike, say, Big Four
+  // Winds vs. fan 18), found via a failing test once fan 76 existed.
+  [6, 76],
+  // 54 -> 59: derived. Two Dragon Pungs (54, named/flat 6pts for exactly 2
+  // dragon pungs) unavoidably also satisfies the generic countable Dragon
+  // Pung (59, 2pts each) at count 2 = 4pts for the SAME two physical pungs —
+  // without this, both would stack (6+4=10) by double-counting one pair of
+  // sets under two different naming schemes. Neither fan's own text mentions
+  // the other. See docs/rules/decisions.md's M2-tail-batches entry.
+  [54, 59],
+  // 32 -> 65: derived, same "named exact-count fan implies the generic
+  // countable per-unit fan" pattern as 54->59. Triple Pung (32, all 3 suits
+  // share a rank) trivially contains 2 of those 3 suits, which is exactly
+  // Double Pung's (65) own definition — without this, a hand could score
+  // Triple Pung (16) AND Double Pung again for a sub-pair of the same pungs.
+  [32, 65],
+  // 41 -> 70: derived, same pattern again. Mixed Triple Chow (41, all 3
+  // suits share a chow rank) trivially contains 2 of those 3 suits, which is
+  // Mixed Double Chow's (70) own definition.
+  [41, 70],
+  // 48 -> 67: derived, same pattern. Two Concealed Kongs (48, named/flat
+  // 8pts for exactly 2 concealed kongs) unavoidably also satisfies the
+  // generic countable Concealed Kong (67, 2pts each) at count 2 = 4pts for
+  // the same two physical kongs.
+  [48, 67],
+  // 57 -> 74: derived, same pattern. Two Melded Kongs (57, named/flat 4pts
+  // for exactly 2 exposed kongs) unavoidably also satisfies the generic
+  // countable Melded Kong (74, 1pt each) at count 2 = 2pts for the same two
+  // physical kongs.
+  [57, 74],
+  // 28 -> 71: derived. Pure Straight (28: chow(1)+chow(4)+chow(7), same
+  // suit) trivially contains chow(1)+chow(4) as a 6-consecutive-tile run —
+  // exactly Short Straight's (71) own definition — as a sub-pair of its own
+  // 3 chows. (Four Shifted Chows, fan 16, already excludes 71 via the
+  // original rulebook-transcribed table; this adds the analogous Pure
+  // Straight case, which the book's own text for fan 28/71 doesn't mention.)
+  [28, 71],
+  // 28 -> 72: derived, same source hand shape. Pure Straight's chow(1) and
+  // chow(7) (same suit) are trivially also "Two Terminal Chows" (72, one
+  // 1-2-3 and one 7-8-9 in the same suit) — the rulebook already excludes
+  // this pairing for the OTHER two terminal-chow fans (13 and 29) but not
+  // for Pure Straight specifically.
+  [28, 72],
+  // 38 -> 73: derived, same "named exact-count wind/honor fan implies the
+  // generic per-unit Pung of Terminals or Honors fan" pattern already
+  // present for fans 1/4/8/9/11 (all of which already exclude 73 in the
+  // original table). Big Three Winds (38, 3 wind pungs) trivially also
+  // satisfies 73's count-3 for those same pungs.
+  [38, 73],
+  // 56 -> 80: derived. Fully Concealed Hand (56) requires a self-drawn win
+  // by its own definition, which is exactly Self-Drawn's (80) entire
+  // definition — every hand satisfying 56 unavoidably also satisfies 80 for
+  // the same win. Same pattern as fan 44's existing (rulebook-stated)
+  // exclusion of 80.
+  [56, 80],
   // 1. Big Four Winds
   [1, 38], // Big Three Winds
   [1, 49], // All Pungs

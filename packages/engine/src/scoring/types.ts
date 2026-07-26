@@ -1,6 +1,6 @@
 import type { Decomposition } from '../win-detection.js'
 import type { Meld, Seat } from '../meld.js'
-import type { TileInstanceId } from '../tiles.js'
+import type { TileInstanceId, Wind } from '../tiles.js'
 
 // Everything a fan detector needs to decide whether (and how many times) it
 // applies to a completed hand. Grown incrementally as later fan batches need
@@ -32,6 +32,20 @@ export interface HandContext {
   isLastTileOfWall?: boolean // self-draw win on literally the wall's final drawable tile (fan 44)
   isLastDiscardOfGame?: boolean // discard win on the literal last discard of the game (fans 45/46)
   wonOnKongReplacement?: boolean // self-draw win on a kong's replacement tile specifically, not a flower-chain continuation of one (fan 46)
+
+  // Added for the 4/2/1-point tiers. Same "optional, undefined-safe,
+  // real-value wiring deferred" pattern as the win-circumstance fields
+  // above — game-state.ts doesn't track a prevailing/seat wind concept yet,
+  // and scoreHand() doesn't know which physical tile completed the hand
+  // (concealedTiles already has it merged in indistinguishably), so these
+  // are genuine new context the live engine will need to supply later.
+  isLastCopyOfItsKind?: boolean // winning tile is the 4th/last copy of its type, with the other 3 already visible to all players via discards/exposures (fan 58, Last Tile)
+  prevailingWind?: Wind // the match's current prevailing wind (fan 60, Prevalent Wind)
+  seatWind?: Wind // this player's seat wind (fan 61, Seat Wind)
+  // The specific physical tile that completed the hand, so wait-shape fans
+  // (77/78/79) can identify which set/pair it belongs to. Undefined-safe:
+  // wait-type detectors simply don't match without it.
+  winningTile?: TileInstanceId
 }
 
 export interface FanMatch {

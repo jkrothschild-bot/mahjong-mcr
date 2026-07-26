@@ -89,7 +89,21 @@ function detectFourKongs(ctx: HandContext): FanMatch[] {
 // the base Seven Pairs shape (win-detection.ts's isSevenPairs): same
 // concealed-only + 7-distinct-pairs check, plus the 7 types must be one
 // suit with consecutive ranks.
+//
+// Gated on ctx.specialShape === 'sevenPairs' (not just re-derived from raw
+// tiles): scoreHand trials the SAME 14 tiles as several independent
+// candidates (the special shape, plus every standard-decomposition
+// candidate decomposeHand finds, e.g. reading three shifted pairs as a
+// chow instead). Without this gate, this detector would also fire on a
+// standard-decomposition candidate whose tiles just happen to structurally
+// look like shifted pairs too — illegitimately combining a pair-based fan
+// with sets that candidate is reading as chows/pungs instead, violating
+// the Non-Separation Principle (§3.9.1.5: a fixed set combination can't be
+// rearranged to also claim a different fan). Found via a failing test once
+// the 1/2-point tiers added chow/pair-based fans that could piggyback on a
+// standard decomposition of the same seven-shifted-pairs tile set.
 function detectSevenShiftedPairs(ctx: HandContext): FanMatch[] {
+  if (ctx.specialShape !== 'sevenPairs') return []
   if (ctx.melds.length !== 0) return []
   if (ctx.concealedTiles.length !== 14) return []
   const counts = groupConcealedByType(ctx.concealedTiles)
@@ -112,8 +126,14 @@ function detectSevenShiftedPairs(ctx: HandContext): FanMatch[] {
 // 7. Thirteen Orphans — 88 pts. §3.7.2.2 p.13 (structural shape) / §3.8.1
 // p.14 / App.1 p.26. Direct reuse of win-detection.ts's isThirteenOrphans
 // (already implemented and tested in M1) — no separate logic needed here.
+// Gated on ctx.specialShape (see fan 6's comment above for why) — harmless
+// in practice today, since a genuine 13-orphan tile multiset structurally
+// can never also admit a standard decomposition, but kept for the same
+// correctness reason and in case that ever changes.
 function detectThirteenOrphans(ctx: HandContext): FanMatch[] {
-  return isThirteenOrphans(ctx.concealedTiles, ctx.melds) ? [{ fanId: 7, count: 1 }] : []
+  return ctx.specialShape === 'thirteenOrphans' && isThirteenOrphans(ctx.concealedTiles, ctx.melds)
+    ? [{ fanId: 7, count: 1 }]
+    : []
 }
 
 export const FANS_88_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> = {
