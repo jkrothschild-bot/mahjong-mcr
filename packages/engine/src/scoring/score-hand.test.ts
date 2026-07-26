@@ -95,14 +95,15 @@ describe('scoreHand', () => {
   })
 
   it('scores a real All Honors hand (64-point tier) end to end through decomposeHand', () => {
-    // Two pungs exposed so this hand does NOT also satisfy Four Concealed
-    // Pungs (fan 12, needs 4 concealed) or Three Concealed Pungs (fan 33,
-    // needs exactly 3 concealed) — isolating All Honors alone. There's no
-    // stated exclusion between fan 11 and either of those, so hands that
-    // genuinely satisfy both legitimately stack — real fan-stacking cases,
-    // not bugs, discovered while writing this test (twice).
+    // 2 wind pungs + 2 dragon pungs (exposed) + a 3rd-wind pair — avoids
+    // every honor "count tier" fan (Big/Little Four Winds need 3 or 4 wind
+    // pungs; Big/Little Three Dragons need 2 or 3 dragon pungs with a
+    // dragon pair; Big Three Winds needs 3 wind pungs; Four/Three Concealed
+    // Pungs need 4 or 3 concealed pungs) so this isolates All Honors alone.
+    // Discovered by trial and error across three sessions — honor-family
+    // fans overlap constantly by coincidence, never by necessary subset.
     const melds = [pungMeld('0-0', idsFor('WE', 3)), pungMeld('0-1', idsFor('WS', 3))]
-    const concealedTiles = [...idsFor('DR', 3), ...idsFor('WW', 3), ...idsFor('DG', 2)]
+    const concealedTiles = [...idsFor('DR', 3), ...idsFor('DG', 3), ...idsFor('WW', 2)]
     expect(concealedTiles.length).toBe(8)
     const result = scoreHand({ concealedTiles, melds })
     expect(result.basicPoints).toBe(64)
@@ -110,9 +111,12 @@ describe('scoreHand', () => {
   })
 
   it('correctly stacks All Honors and Four Concealed Pungs when a hand satisfies both (no stated exclusion)', () => {
+    // Same "avoid every honor count-tier fan" construction as above, but
+    // fully concealed this time so Four Concealed Pungs (fan 12) also
+    // applies alongside All Honors — a genuine independent stack.
     const concealedTiles = [
-      ...idsFor('WE', 3), ...idsFor('WS', 3), ...idsFor('DR', 3), ...idsFor('WW', 3),
-      ...idsFor('DG', 2),
+      ...idsFor('WE', 3), ...idsFor('WS', 3), ...idsFor('DR', 3), ...idsFor('DG', 3),
+      ...idsFor('WW', 2),
     ]
     expect(concealedTiles.length).toBe(14)
     const result = scoreHand({ concealedTiles, melds: [] })

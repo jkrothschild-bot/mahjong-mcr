@@ -2,6 +2,7 @@ import { decomposeHand, isSevenPairs, isThirteenOrphans } from '../win-detection
 import type { Meld } from '../meld.js'
 import type { TileInstanceId } from '../tiles.js'
 import { areExclusive } from './exclusions.js'
+import { FANS_12_DETECTORS } from './fans-12.js'
 import { FANS_16_DETECTORS } from './fans-16.js'
 import { FANS_24_DETECTORS } from './fans-24.js'
 import { FANS_32_DETECTORS } from './fans-32.js'
@@ -12,7 +13,7 @@ import { FAN_REGISTRY } from './registry.js'
 import type { FanMatch, HandContext, ScoreResult } from './types.js'
 
 // All registered detectors across every implemented batch. Adding a new
-// batch file (e.g. fans-12.ts) is purely additive: spread its detector map
+// batch file (e.g. fans-8.ts) is purely additive: spread its detector map
 // in here too.
 const ALL_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> = {
   ...FANS_88_DETECTORS,
@@ -21,6 +22,7 @@ const ALL_DETECTORS: Readonly<Record<number, (ctx: HandContext) => FanMatch[]>> 
   ...FANS_32_DETECTORS,
   ...FANS_24_DETECTORS,
   ...FANS_16_DETECTORS,
+  ...FANS_12_DETECTORS,
 }
 
 function pointsOf(match: FanMatch): number {
