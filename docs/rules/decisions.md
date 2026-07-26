@@ -134,10 +134,27 @@ corrected to match. See each item's status.
     passage addressing this specific nuance turns up (e.g. while implementing fan #56/#62,
     which hinge on the same distinction).
 
+12. **Greater Honors and Knitted Tiles (fan #20) — exact tile-composition rule**, resolved by
+    rendering Appendix 1 page 29's worked example directly (image, not text extraction — the
+    tile diagrams are pictures that `pdftotext` can't read). The example shows: all 7 distinct
+    honors (E/S/W/N/Red/Green/White) + 7 suit singles split 3+2+2 across three DIFFERENT
+    knitted sequences ({1,4,7}/{2,5,8}/{3,6,9}), one sequence per suit — e.g. Characters 1,7
+    (2 of "1-4-7"), Dots/Bamboo covering the other two sequences. Implemented as: 14 distinct
+    singles total (no pair, no melds — matches §3.7.2.2 shape 3), exactly 7 honors, and the
+    remaining 7 suit tiles partitioned so each suit's ranks all share one knitted-sequence
+    residue (`rank % 3`) and all three sequences are used across the three suits.
+    Status: **the 7/7 honor-vs-suit split and the "3 different sequences, one per suit" rule
+    are confirmed by the example**; the specific 3/2/2 per-suit count is *not* asserted as a
+    fixed formula — only that specific example happens to use it — the implemented rule
+    allows any non-empty per-suit split summing to 7, which is the more general reading both
+    the text and the example support. Revisit if a cleaner example or additional worked case
+    ever contradicts the "any non-empty split" assumption.
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).
-- Implement Honors-and-Knitted-Tiles in `win-detection.ts` once the fan-list extraction
-  pins down the exact Lesser/Greater tile-composition split (Fan #20/#34) — tracked for M2.
+- Implement Lesser Honors and Knitted Tiles in `win-detection.ts`/`scoring/` — same rendering
+  approach as fan #20 (item #12) should resolve it directly once that batch comes up; likely
+  differs from Greater only in allowing fewer than 7 honors (compensated by more suit tiles).
 - Appendix 4 (seat/table rotation detail) is missing from the available PDF — if a more
   complete copy ever turns up, re-verify item #4 (dealer rotation) against it specifically.

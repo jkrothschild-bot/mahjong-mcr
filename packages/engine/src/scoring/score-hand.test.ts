@@ -130,4 +130,15 @@ describe('scoreHand', () => {
     expect(result.basicPoints).toBe(48)
     expect(result.fanMatches).toEqual([{ fanId: 14, count: 1 }])
   })
+
+  it('scores Seven Shifted Pairs at 88 alone, not 88+24, since it always also structurally satisfies Seven Pairs', () => {
+    const concealedTiles = [
+      ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2), ...idsFor('D5', 2),
+      ...idsFor('D6', 2), ...idsFor('D7', 2), ...idsFor('D8', 2),
+    ]
+    expect(concealedTiles.length).toBe(14)
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.basicPoints).toBe(88)
+    expect(result.fanMatches).toEqual([{ fanId: 6, count: 1 }])
+  })
 })

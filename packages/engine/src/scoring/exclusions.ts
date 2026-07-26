@@ -35,6 +35,12 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // 8/11 -> 18: derived (see comment above), not a literal rulebook quote
   [8, 18],
   [11, 18],
+  // 6 -> 19: derived, same reasoning — Seven Shifted Pairs (6) is a strictly
+  // stricter version of Seven Pairs (19): 7 consecutive-rank same-suit pairs
+  // are still, trivially, "seven pairs." Not stated explicitly in fan 6's or
+  // fan 19's own text (fan 6 excludes Full Flush/Concealed Hand/Single Wait;
+  // fan 19 excludes Concealed Hand/Single Wait — neither mentions the other).
+  [6, 19],
   // 1. Big Four Winds
   [1, 38], // Big Three Winds
   [1, 49], // All Pungs
