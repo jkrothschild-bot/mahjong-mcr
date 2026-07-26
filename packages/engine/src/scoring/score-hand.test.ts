@@ -112,4 +112,16 @@ describe('scoreHand', () => {
     expect(result.basicPoints).toBe(128)
     expect(result.fanMatches.map((m) => m.fanId).sort()).toEqual([11, 12])
   })
+
+  it('scores a real Quadruple Chow hand (48-point tier), picking the max across decomposeHand\'s multiple valid parses', () => {
+    // This tile multiset also has other valid decompositions (e.g.
+    // pung+chow+pung+pung) that decomposeHand will find alongside the
+    // "4 identical chows" parse — scoreHand must pick whichever scores
+    // highest, not just the first one found.
+    const concealedTiles = [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('D5', 2)]
+    expect(concealedTiles.length).toBe(14)
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.basicPoints).toBe(48)
+    expect(result.fanMatches).toEqual([{ fanId: 14, count: 1 }])
+  })
 })
