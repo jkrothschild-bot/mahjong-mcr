@@ -49,13 +49,19 @@ describe('resolveFanConflicts', () => {
 
 describe('scoreHand', () => {
   it('scores a real Big Four Winds hand at 88 points', () => {
+    // Pair is a simple tile (C5, neither terminal nor honor) so this hand
+    // does NOT also incidentally satisfy All Terminals and Honors (fan 18)
+    // — isolating Big Four Winds alone. Fan 18 only overlaps with Big Four
+    // Winds when the pair happens to also be terminal/honor; that's a
+    // legitimate independent stack, not tested here (see exclusions.ts's
+    // comment on why [1, 18] isn't a blanket exclusion).
     const melds = [
       pungMeld('0-0', idsFor('WE', 3)),
       pungMeld('0-1', idsFor('WS', 3)),
       pungMeld('0-2', idsFor('WW', 3)),
       pungMeld('0-3', idsFor('WN', 3)),
     ]
-    const concealedTiles = idsFor('C1', 2)
+    const concealedTiles = idsFor('C5', 2)
     const result = scoreHand({ concealedTiles, melds })
     expect(result.basicPoints).toBe(88)
     expect(result.fanMatches).toEqual([{ fanId: 1, count: 1 }])

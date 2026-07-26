@@ -17,6 +17,15 @@ describe('EXCLUDES / areExclusive', () => {
     expect(areExclusive(78, 79)).toBe(true)
   })
 
+  it('All Terminals and All Honors are excluded against All Terminals and Honors (derived, not a literal quote)', () => {
+    // Found via a failing scoreHand test in M2 session 4: every All
+    // Terminals (8) or All Honors (11) hand unconditionally also satisfies
+    // the broader All Terminals and Honors (18) criteria, so they must not
+    // double-count — see the comment above RAW_EXCLUSION_PAIRS.
+    expect(areExclusive(8, 18)).toBe(true)
+    expect(areExclusive(11, 18)).toBe(true)
+  })
+
   it('every registered fan id in the table is within 1-81', () => {
     for (const [a, set] of EXCLUDES.entries()) {
       expect(a).toBeGreaterThanOrEqual(1)

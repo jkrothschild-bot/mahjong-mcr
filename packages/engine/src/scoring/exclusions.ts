@@ -13,7 +13,28 @@
 // are encoded here — a "combines with X if self-drawn" note is a positive
 // combinability statement (informational only; two fans not listed here are
 // allowed to combine by default), not an exclusion, and is NOT encoded.
+//
+// Two entries below ([8,18] and [11,18]) are an exception: they were ADDED
+// (not found stated explicitly in fan 18's own "does not combine with" text)
+// because they're a direct, unconditional logical consequence of the fan
+// definitions themselves — every hand satisfying All Terminals (8) or All
+// Honors (11) necessarily also satisfies the broader All Terminals and
+// Honors (18) criteria (a hand entirely of terminals, or entirely of
+// honors, trivially qualifies as "terminals mixed with honors" too) — this
+// is exactly what §3.9.1.5's Non-Repeat Principle describes ("a fan
+// inevitably implied... by another fan"), just not spelled out as an
+// explicit pairwise note for this particular pair. Found via a failing
+// test (docs/rules/decisions.md has no separate entry for this — noted
+// here since it's really an exclusions.ts data point, not a rules
+// ambiguity). Contrast with Big Four Winds (1), which does NOT get a
+// blanket exclusion against 18 despite sometimes co-occurring — that
+// overlap depends on which pair tile the hand happens to have (not a
+// universal implication), so it's a legitimate independent stack, not a
+// Non-Repeat case.
 const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
+  // 8/11 -> 18: derived (see comment above), not a literal rulebook quote
+  [8, 18],
+  [11, 18],
   // 1. Big Four Winds
   [1, 38], // Big Three Winds
   [1, 49], // All Pungs
