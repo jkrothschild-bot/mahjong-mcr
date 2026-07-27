@@ -142,4 +142,23 @@ describe('HandTiles', () => {
     expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-2')
     expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-2')
   })
+
+  it('marks the just-drawn tile distinctly from an explicit selection, so it is identifiable without clicking', () => {
+    const [c1] = idsFor('C1', 1)
+    const [c2] = idsFor('C2', 1)
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} justDrawnTileId={c2} />)
+
+    expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-sky-400')
+    expect(screen.getByTestId(`hand-tile-${c2}`).className).not.toContain('ring-amber-400')
+    expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-sky-400')
+  })
+
+  it('lets an explicit selection\'s amber ring take precedence over the just-drawn ring on the same tile', () => {
+    const [c1] = idsFor('C1', 1)
+    render(<HandTiles order={[c1!]} onReorder={() => {}} selectedTileId={c1} justDrawnTileId={c1} />)
+
+    const el = screen.getByTestId(`hand-tile-${c1}`)
+    expect(el.className).toContain('ring-amber-400')
+    expect(el.className).not.toContain('ring-sky-400')
+  })
 })

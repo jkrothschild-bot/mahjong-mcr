@@ -15,6 +15,11 @@ export interface HandTilesProps {
   // clicking a discard/meld tile elsewhere on the board can highlight a
   // matching tile here without it being "selected for discard."
   highlightedTypeId?: string
+  // The tile most recently drawn this turn (GameState.lastDrawnTile) — its
+  // display position depends on sort/drag state and isn't otherwise
+  // distinguishable from the rest of the hand once it lands, so it gets its
+  // own marker independent of selection/highlighting.
+  justDrawnTileId?: TileInstanceId | null
 }
 
 const END_ZONE_ID = '__end__'
@@ -36,7 +41,7 @@ function resolveDropTarget(clientX: number, clientY: number): TileInstanceId | n
 // its new position on release; sorting and drag both funnel through the
 // same onReorder/order state (useHandOrder), so there's one place hand
 // position changes happen, matching CLAUDE.md's zone-movement rule.
-export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highlightedTypeId }: HandTilesProps) {
+export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highlightedTypeId, justDrawnTileId }: HandTilesProps) {
   const [draggingId, setDraggingId] = useState<TileInstanceId | null>(null)
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>, id: TileInstanceId) {
@@ -70,6 +75,7 @@ export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highl
           className={tileFaceClassName({
             dimmed: draggingId === id,
             highlighted: selectedTileId === id || highlightedTypeId === typeIdOfInstance(id),
+            justDrawn: justDrawnTileId === id,
             extra: 'cursor-grab',
           })}
         >

@@ -25,6 +25,9 @@ export interface SeatProps {
   onTileClick?: (id: number) => void
   canDiscard?: boolean
   onRequestDiscard?: () => void
+  // The tile the human just drew this turn (GameState.lastDrawnTile) — only
+  // meaningful while it's actually their turn to discard.
+  justDrawnTileId?: number | null
   // Tile inspector (Phase 6) — fires for any seat's discard/meld tile, and
   // additionally for the human's own hand tiles (see onTileClick above).
   onInspectTile?: (id: number) => void
@@ -51,6 +54,7 @@ export function Seat({
   onTileClick,
   canDiscard,
   onRequestDiscard,
+  justDrawnTileId,
   onInspectTile,
 }: SeatProps) {
   return (
@@ -106,6 +110,7 @@ export function Seat({
             onTileClick={onTileClick}
             selectedTileId={selectedTileId}
             highlightedTypeId={selectedTypeId}
+            justDrawnTileId={justDrawnTileId}
           />
         </div>
       ) : (

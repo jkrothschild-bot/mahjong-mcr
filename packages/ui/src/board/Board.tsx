@@ -64,6 +64,11 @@ export function Board({
   }
   const unseenCounts = computeUnseenCounts(state, HUMAN_SEAT)
 
+  // GameState.lastDrawnTile is only meaningful while its owner is actually
+  // sitting on it awaiting a discard — isHumanTurn already encodes exactly
+  // that condition for the human seat, so reuse it rather than re-deriving.
+  const justDrawnTileId = isHumanTurn ? (state.lastDrawnTile ?? null) : null
+
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-4">
       <div className="flex flex-wrap items-center justify-center gap-4">
@@ -93,6 +98,7 @@ export function Board({
                 onTileClick={isHuman ? handleHumanHandTileClick : undefined}
                 canDiscard={isHuman ? isHumanTurn && selectedTileId !== null : undefined}
                 onRequestDiscard={isHuman ? onRequestDiscard : undefined}
+                justDrawnTileId={isHuman ? justDrawnTileId : undefined}
                 onInspectTile={inspectTile}
               />
             </div>

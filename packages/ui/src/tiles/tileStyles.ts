@@ -15,11 +15,25 @@ export const TILE_BACK_CLASSES = 'border-indigo-900 bg-indigo-950 text-indigo-20
 
 export const TILE_HIGHLIGHT_CLASSES = 'ring-2 ring-amber-400'
 
-export function tileFaceClassName(opts: { highlighted?: boolean; dimmed?: boolean; extra?: string } = {}): string {
+// The tile the player just drew sits physically apart from the rest of a
+// real hand until they decide what to do with it — a distinct ring color
+// (never amber, so it can't be confused with an explicit selection/tile-
+// inspector match) plus a slight lift communicates "this one's new" without
+// requiring a click to find out, per SPEC.md §5a item 4 ("what's in my
+// hand" answerable at a glance) and §5c's tactile-lift precedent for
+// selection. A static transform, not an animation (CLAUDE.md/PLAN.md defer
+// tile-movement animation).
+export const TILE_JUST_DRAWN_RING_CLASSES = 'ring-2 ring-sky-400'
+export const TILE_JUST_DRAWN_LIFT_CLASSES = '-translate-y-1'
+
+export function tileFaceClassName(
+  opts: { highlighted?: boolean; dimmed?: boolean; justDrawn?: boolean; extra?: string } = {},
+): string {
   return [
     TILE_BOX_BASE,
     TILE_FACE_CLASSES,
-    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
+    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : opts.justDrawn ? TILE_JUST_DRAWN_RING_CLASSES : '',
+    opts.justDrawn ? TILE_JUST_DRAWN_LIFT_CLASSES : '',
     opts.dimmed ? 'opacity-40' : '',
     opts.extra ?? '',
   ]
