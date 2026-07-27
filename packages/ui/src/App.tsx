@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Board } from './board/Board.js'
+import { ScoreScreen } from './board/ScoreScreen.js'
 import { TileCountGrid } from './board/TileCountGrid.js'
 import { computeUnseenCounts } from './board/unseenCounts.js'
 import { CallOutToast } from './game/CallOutToast.js'
@@ -11,13 +12,11 @@ import { useGameLoop } from './game/useGameLoop.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
 
-const ZERO_SCORES = { 0: 0, 1: 0, 2: 0, 3: 0 } as const
-
 function App() {
   const { settings, update } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
-  const { state, matchState, isHumanTurn, humanPendingClaim, submitHumanMove } = useGameLoop({
+  const { state, matchState, matchScores, isHumanTurn, humanPendingClaim, submitHumanMove, startNextHand } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
   })
@@ -64,13 +63,10 @@ function App() {
       </div>
 
       <main className="flex-1 flex flex-col items-center justify-center gap-6 p-4">
-        {/* Real per-hand match scoring lands in Phase 8 (end-of-hand score
-            screen) — PlayerState.score is never updated by the engine
-            itself, so until settlement is wired in, every seat shows 0. */}
         <Board
           state={state}
           matchState={matchState}
-          matchScores={ZERO_SCORES}
+          matchScores={matchScores}
           isHumanTurn={isHumanTurn}
           selectedTileId={selectedTileId}
           onTileClick={selectTile}
@@ -93,6 +89,8 @@ function App() {
         unseenCounts={computeUnseenCounts(state, HUMAN_SEAT)}
         onClose={() => setTileCountGridOpen(false)}
       />
+
+      <ScoreScreen state={state} matchScores={matchScores} onNextHand={startNextHand} />
     </div>
   )
 }

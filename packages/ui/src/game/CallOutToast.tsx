@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { typeIdOfInstance, type Action, type GameState, type Seat } from '@mahjong-mcr/engine'
+import { typeIdOfInstance, type Action, type GameState } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
 import { HUMAN_SEAT } from './humanSeat.js'
+import { seatDisplayName } from './seatDisplayName.js'
 
 export interface CallOutToastProps {
   state: GameState
   dismissAfterMs?: number
-}
-
-function seatDisplayName(seat: Seat, state: GameState): string {
-  if (seat === HUMAN_SEAT) return 'You'
-  const wind = state.players[seat].seatWind
-  return wind.charAt(0).toUpperCase() + wind.slice(1)
 }
 
 function verbFor(claimType: 'chow' | 'pung' | 'kong'): string {

@@ -1,7 +1,90 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { initLoopState, useGameLoop } from './useGameLoop.js'
+import { applyMove } from '@mahjong-mcr/engine'
+import {
+  TILE_TYPE_BY_ID,
+  emptyHand,
+  seatWindFor,
+  typeIdOfInstance,
+  type GameState,
+  type Hand,
+  type PlayerState,
+  type Seat,
+  type TileTypeId,
+} from '@mahjong-mcr/engine'
+import { applySettlement, initLoopState, useGameLoop } from './useGameLoop.js'
 import { HUMAN_SEAT } from './humanSeat.js'
+
+const ZERO_SCORES: Record<Seat, number> = { 0: 0, 1: 0, 2: 0, 3: 0 }
+
+function idsFor(typeId: TileTypeId, count: number): number[] {
+  const ids: number[] = []
+  for (let i = 0; i < TILE_TYPE_BY_ID.length && ids.length < count; i++) {
+    if (typeIdOfInstance(i) === typeId) ids.push(i)
+  }
+  if (ids.length < count) throw new Error(`Not enough tiles of type ${typeId} (wanted ${count})`)
+  return ids
+}
+
+function handWith(concealedTiles: number[]): Hand {
+  return { ...emptyHand(), concealedTiles }
+}
+
+function tenpaiWaitingOnC5(): number[] {
+  return [
+    ...idsFor('C3', 1),
+    ...idsFor('C4', 1),
+    ...idsFor('D4', 1),
+    ...idsFor('D5', 1),
+    ...idsFor('D6', 1),
+    ...idsFor('B7', 1),
+    ...idsFor('B8', 1),
+    ...idsFor('B9', 1),
+    ...idsFor('DW', 3),
+    ...idsFor('C9', 2),
+  ]
+}
+
+function baseState(hands: [Hand, Hand, Hand, Hand]): GameState {
+  const players = hands.map(
+    (hand, seat): PlayerState => ({ seat: seat as Seat, seatWind: seatWindFor(seat as Seat, 0), hand, discards: [], score: 0 }),
+  ) as [PlayerState, PlayerState, PlayerState, PlayerState]
+
+  return {
+    seed: 1,
+    handNumber: 1,
+    prevailingWind: 'east',
+    dealerSeat: 0,
+    wall: { tiles: idsFor('C1', 1), drawIndex: 0 },
+    players,
+    currentSeat: 0,
+    phase: 'awaitingDraw',
+    actionLog: [],
+  }
+}
+
+describe('applySettlement', () => {
+  it('leaves scores unchanged after an exhaustive draw', () => {
+    const state: GameState = { ...baseState([handWith([]), handWith([]), handWith([]), handWith([])]), phase: 'handEnded', result: { outcome: 'exhaustiveDraw' } }
+    expect(applySettlement(state, ZERO_SCORES)).toEqual(ZERO_SCORES)
+  })
+
+  it('accumulates a self-draw win\'s settlement into the running totals', () => {
+    const [c5] = idsFor('C5', 1)
+    let state = baseState([handWith(tenpaiWaitingOnC5()), handWith([]), handWith([]), handWith([])])
+    state.wall = { tiles: [c5!, ...idsFor('C6', 4)], drawIndex: 0 }
+    state = applyMove(state, 0, { kind: 'draw' })
+    state = applyMove(state, 0, { kind: 'selfDrawWin' })
+
+    const scores = applySettlement(state, ZERO_SCORES)
+    expect(scores[0]).toBeGreaterThan(0)
+    expect(Object.values(scores).reduce((sum, v) => sum + v, 0)).toBe(0)
+
+    // A second hand's settlement adds onto the first, rather than replacing it.
+    const scoresAfterTwoHands = applySettlement(state, scores)
+    expect(scoresAfterTwoHands[0]).toBe(scores[0] * 2)
+  })
+})
 
 describe('initLoopState', () => {
   it('starts hand 1 of the match with the dealer at seat 0', () => {
