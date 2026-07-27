@@ -41,7 +41,7 @@ describe('Seat', () => {
       />,
     )
     expect(screen.getByRole('list', { name: 'Your hand' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Suit' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Sort hand' })).toBeInTheDocument()
   })
 
   it('renders dealer and turn badges only when true, identically regardless of seat', () => {
