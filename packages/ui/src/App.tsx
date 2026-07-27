@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Board } from './board/Board.js'
+import { CallOutToast } from './game/CallOutToast.js'
+import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { useGameLoop } from './game/useGameLoop.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
@@ -9,7 +11,10 @@ const ZERO_SCORES = { 0: 0, 1: 0, 2: 0, 3: 0 } as const
 function App() {
   const { settings, update } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { state, matchState } = useGameLoop({ matchSeed: 42, botSpeedMs: settings.botSpeedMs })
+  const { state, matchState, humanPendingClaim, submitHumanMove } = useGameLoop({
+    matchSeed: 42,
+    botSpeedMs: settings.botSpeedMs,
+  })
 
   return (
     <div className="min-h-svh bg-neutral-900 text-neutral-100 flex flex-col">
@@ -30,11 +35,23 @@ function App() {
         </div>
       )}
 
+      <div className="flex justify-center px-4 pt-3">
+        <CallOutToast state={state} />
+      </div>
+
       <main className="flex-1 flex flex-col items-center justify-center gap-6 p-4">
         {/* Real per-hand match scoring lands in Phase 8 (end-of-hand score
             screen) — PlayerState.score is never updated by the engine
             itself, so until settlement is wired in, every seat shows 0. */}
         <Board state={state} matchState={matchState} matchScores={ZERO_SCORES} />
+
+        <ClaimPrompt
+          state={state}
+          pendingClaim={humanPendingClaim}
+          claimTimerEnabled={settings.claimTimerEnabled}
+          claimTimerMs={settings.claimTimerMs}
+          onDeclare={submitHumanMove}
+        />
       </main>
     </div>
   )
