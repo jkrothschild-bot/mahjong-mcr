@@ -1,4 +1,5 @@
 import { typeIdOfInstance, type Meld } from '@mahjong-mcr/engine'
+import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceClassName } from '../tiles/tileStyles.js'
 
 export interface MeldsProps {
@@ -33,7 +34,7 @@ export function Melds({ seat, melds, selectedTypeId, onTileClick }: MeldsProps) 
                   extra: onTileClick ? 'cursor-pointer' : undefined,
                 })}
               >
-                {typeId}
+                <TileFaceContent typeId={typeId} />
               </div>
             )
           })}

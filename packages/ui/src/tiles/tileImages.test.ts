@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vitest'
+import { ALL_TILE_TYPE_IDS } from '../board/tileNames.js'
+import { botBackImageSrc, tileImageSrc } from './tileImages.js'
+
+describe('tileImageSrc', () => {
+  it('returns a real asset URL for all 34 standard tile types', () => {
+    for (const typeId of ALL_TILE_TYPE_IDS) {
+      expect(tileImageSrc(typeId)).toBeTruthy()
+    }
+  })
+
+  it('maps suited tiles through the m/p/s (Characters/Dots/Bamboo) convention, not the engine\'s own C/D/B codes', () => {
+    expect(tileImageSrc('C5')).toMatch(/m5/)
+    expect(tileImageSrc('D5')).toMatch(/p5/)
+    expect(tileImageSrc('B5')).toMatch(/s5/)
+  })
+
+  it('maps winds and dragons through their traditional asset letters', () => {
+    expect(tileImageSrc('WE')).toMatch(/\/E[^/]*\.png/)
+    expect(tileImageSrc('WS')).toMatch(/\/S[^/]*\.png/)
+    expect(tileImageSrc('WW')).toMatch(/\/W[^/]*\.png/)
+    expect(tileImageSrc('WN')).toMatch(/\/N[^/]*\.png/)
+    expect(tileImageSrc('DR')).toMatch(/\/C[^/]*\.png/) // Chun (red)
+    expect(tileImageSrc('DG')).toMatch(/\/F[^/]*\.png/) // Faat (green)
+    expect(tileImageSrc('DW')).toMatch(/\/P[^/]*\.png/) // Pak (white)
+  })
+
+  it('returns undefined for flowers/seasons — no art exists for these yet', () => {
+    expect(tileImageSrc('F1')).toBeUndefined()
+    expect(tileImageSrc('S1')).toBeUndefined()
+  })
+})
+
+describe('botBackImageSrc', () => {
+  it('returns a real asset URL', () => {
+    expect(botBackImageSrc()).toBeTruthy()
+  })
+})

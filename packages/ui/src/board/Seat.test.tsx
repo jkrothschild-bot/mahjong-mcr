@@ -22,7 +22,9 @@ describe('Seat', () => {
     const p = player({ seat: 2, hand: { ...emptyHand(), concealedTiles } })
     render(<Seat seat={2} player={p} isDealer={false} isCurrentTurn={false} isHuman={false} matchScore={0} />)
     expect(screen.queryByText('C1')).not.toBeInTheDocument()
-    expect(screen.getAllByTestId(/seat-2-back-/)).toHaveLength(13)
+    const backs = screen.getAllByTestId(/seat-2-back-/)
+    expect(backs).toHaveLength(13)
+    expect(backs[0]!.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/bot-back/))
   })
 
   it('shows the human seat as real, sortable hand tiles', () => {

@@ -44,4 +44,12 @@ describe('Discards', () => {
     fireEvent.click(screen.getByTestId(`discard-tile-${c1}`))
     expect(onTileClick).toHaveBeenCalledWith(c1)
   })
+
+  it('renders real tile-face art, not just the text label', () => {
+    const [c1] = idsFor('C1', 1)
+    render(<Discards seat={0} tiles={[c1!]} />)
+    const img = screen.getByTestId(`discard-tile-${c1}`).querySelector('img')
+    expect(img).toBeInTheDocument()
+    expect(img).toHaveAttribute('src', expect.stringMatching(/m1/))
+  })
 })

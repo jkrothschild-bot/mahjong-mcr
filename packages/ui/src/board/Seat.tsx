@@ -2,6 +2,7 @@ import type { PlayerState, Seat as SeatId } from '@mahjong-mcr/engine'
 import { HandTiles } from '../hand/HandTiles.js'
 import { SortToolbar } from '../hand/SortToolbar.js'
 import type { SortMode } from '../hand/handOrder.js'
+import { botBackImageSrc } from '../tiles/tileImages.js'
 import { tileBackCompactClassName } from '../tiles/tileStyles.js'
 import { Discards } from './Discards.js'
 import { Melds } from './Melds.js'
@@ -117,7 +118,7 @@ export function Seat({
         <div role="list" aria-label={`Seat ${seat} concealed tiles`} className="flex flex-wrap gap-1">
           {player.hand.concealedTiles.map((_, index) => (
             <div key={index} data-testid={`seat-${seat}-back-${index}`} role="listitem" className={tileBackCompactClassName()}>
-              {'░'}
+              <img src={botBackImageSrc()} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
             </div>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { useState, type PointerEvent } from 'react'
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceClassName } from '../tiles/tileStyles.js'
 
 export interface HandTilesProps {
@@ -79,7 +80,7 @@ export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highl
             extra: 'cursor-grab',
           })}
         >
-          {typeIdOfInstance(id)}
+          <TileFaceContent typeId={typeIdOfInstance(id)} />
         </div>
       ))}
       <div data-tile-id={END_ZONE_ID} data-testid="hand-end-zone" className="min-h-11 min-w-6" aria-hidden />

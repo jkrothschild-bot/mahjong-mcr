@@ -13,7 +13,9 @@ describe('DiscardConfirmModal', () => {
     const onCancel = vi.fn()
     render(<DiscardConfirmModal tileId={0} onConfirm={onConfirm} onCancel={onCancel} />)
 
-    expect(screen.getByRole('dialog', { name: 'Confirm discard' })).toHaveTextContent('1 Characters')
+    const dialog = screen.getByRole('dialog', { name: 'Confirm discard' })
+    expect(dialog).toHaveTextContent('1 Characters')
+    expect(dialog.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/m1/))
 
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(onConfirm).toHaveBeenCalled()

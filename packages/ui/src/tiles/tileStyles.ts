@@ -2,8 +2,13 @@
 // renders: the hand, discard rivers, melds, and the tile inspector's
 // highlight state. Centralized so all these renderers read as the "same
 // game," not a patchwork of independently-styled boxes.
+//
+// Fixed-size + overflow-hidden (rather than the old min-size/padding box)
+// so real tile-face art (TileFaceContent) renders as a clean, contained
+// image; text-sm/font-semibold still matter for the text fallback
+// (flowers/seasons — no art yet).
 export const TILE_BOX_BASE =
-  'flex min-h-11 min-w-11 select-none items-center justify-center rounded-md border px-2 py-3 text-sm font-semibold'
+  'flex h-14 w-11 shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold'
 
 export const TILE_FACE_CLASSES = 'border-neutral-500 bg-neutral-100 text-neutral-900'
 
@@ -41,18 +46,16 @@ export function tileFaceClassName(
     .join(' ')
 }
 
-export function tileBackClassName(): string {
-  return [TILE_BOX_BASE, TILE_BACK_CLASSES].join(' ')
-}
-
 // A bot's concealed hand is never interactive (nothing to tap — the tiles
 // are hidden), so it's exempt from the ≥44px touch-target rule that
-// tileBackClassName's shared TILE_BOX_BASE enforces for real controls. A
-// compact, wrapping back keeps 13-14 tiles from forcing the whole board
-// wider than an iPad viewport (SPEC.md §5a/§5b) the way one un-wrapped row
-// of full-size boxes did.
+// TILE_BOX_BASE enforces for real controls. A compact, wrapping back keeps
+// 13-14 tiles from forcing the whole board wider than an iPad viewport
+// (SPEC.md §5a/§5b) the way one un-wrapped row of full-size boxes did.
 export function tileBackCompactClassName(): string {
-  return 'flex h-8 w-6 shrink-0 select-none items-center justify-center rounded border text-xs font-semibold border-indigo-900 bg-indigo-950 text-indigo-200'
+  return [
+    'flex h-8 w-6 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
+    TILE_BACK_CLASSES,
+  ].join(' ')
 }
 
 // A discard river's job is to show what's already been played, not to
@@ -65,7 +68,7 @@ export function tileBackCompactClassName(): string {
 // space across every seat's panel.
 export function tileFaceCompactClassName(opts: { highlighted?: boolean; extra?: string } = {}): string {
   return [
-    'flex h-8 w-7 shrink-0 select-none items-center justify-center rounded border text-xs font-semibold',
+    'flex h-8 w-7 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
     TILE_FACE_CLASSES,
     opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
     opts.extra ?? '',

@@ -1,5 +1,7 @@
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
+import { TileFaceContent } from '../tiles/TileFaceContent.js'
+import { tileFaceClassName } from '../tiles/tileStyles.js'
 
 export interface DiscardConfirmModalProps {
   tileId: TileInstanceId | null
@@ -9,11 +11,15 @@ export interface DiscardConfirmModalProps {
 
 export function DiscardConfirmModal({ tileId, onConfirm, onCancel }: DiscardConfirmModalProps) {
   if (tileId === null) return null
-  const name = tileDisplayName(typeIdOfInstance(tileId))
+  const typeId = typeIdOfInstance(tileId)
+  const name = tileDisplayName(typeId)
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50">
-      <div role="dialog" aria-label="Confirm discard" className="flex flex-col gap-4 rounded-lg border border-neutral-600 bg-neutral-800 p-5">
+      <div role="dialog" aria-label="Confirm discard" className="flex flex-col items-center gap-4 rounded-lg border border-neutral-600 bg-neutral-800 p-5">
+        <div className={tileFaceClassName()}>
+          <TileFaceContent typeId={typeId} />
+        </div>
         <p className="text-sm">
           Discard <b>{name}</b>?
         </p>

@@ -38,4 +38,12 @@ describe('Melds', () => {
     fireEvent.click(screen.getByTestId('meld-tile-0-0-0'))
     expect(onTileClick).toHaveBeenCalledWith(c5)
   })
+
+  it('renders real tile-face art, not just the text label', () => {
+    const meld: Meld = { id: '0-0', kind: 'pung', exposure: 'exposed', tiles: idsFor('C5', 3), ownerSeat: 0 }
+    render(<Melds seat={0} melds={[meld]} />)
+    const img = screen.getByTestId('meld-tile-0-0-0').querySelector('img')
+    expect(img).toBeInTheDocument()
+    expect(img).toHaveAttribute('src', expect.stringMatching(/m5/))
+  })
 })

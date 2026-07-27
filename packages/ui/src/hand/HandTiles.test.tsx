@@ -39,6 +39,15 @@ describe('HandTiles', () => {
     expect(items[1]).toHaveTextContent('WE')
   })
 
+  it('renders real tile-face art, not just the text label', () => {
+    const [c1] = idsFor('C1', 1)
+    render(<HandTiles order={[c1!]} onReorder={() => {}} />)
+
+    const img = screen.getByTestId(`hand-tile-${c1}`).querySelector('img')
+    expect(img).toBeInTheDocument()
+    expect(img).toHaveAttribute('src', expect.stringMatching(/m1/))
+  })
+
   it('calls onReorder with the dragged tile and the tile dropped onto', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)

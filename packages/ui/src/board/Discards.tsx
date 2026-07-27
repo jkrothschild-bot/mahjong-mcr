@@ -1,4 +1,5 @@
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 
 export interface DiscardsProps {
@@ -31,7 +32,7 @@ export function Discards({ seat, tiles, selectedTypeId, onTileClick }: DiscardsP
               extra: onTileClick ? 'cursor-pointer' : undefined,
             })}
           >
-            {typeId}
+            <TileFaceContent typeId={typeId} />
           </div>
         )
       })}
