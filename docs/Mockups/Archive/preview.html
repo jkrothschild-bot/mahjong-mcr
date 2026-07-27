@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mahjong Mentor — Learning-first MCR game mockup</title>
+<style>
+  :root{
+    --bg:#081411;
+    --panel:#10231f;
+    --panel-2:#142a25;
+    --felt:#0e5c47;
+    --felt-deep:#073a2d;
+    --felt-light:#16705a;
+    --wood:#7a4b2d;
+    --wood-light:#a67149;
+    --wood-dark:#3f2518;
+    --cream:#fffaf0;
+    --ink:#1f2825;
+    --muted:#9fb8b0;
+    --muted-2:#6f8f85;
+    --line:rgba(255,255,255,.10);
+    --gold:#f0bb57;
+    --gold-2:#ffd98d;
+    --teal:#52d6c3;
+    --green:#6cd69a;
+    --red:#df655c;
+    --blue:#5f8fd8;
+    --shadow:0 20px 60px rgba(0,0,0,.38);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    min-width:1120px;
+    background:
+      radial-gradient(circle at 28% 5%, rgba(55,123,99,.16), transparent 28%),
+      linear-gradient(180deg,#0b1916,#06100e 78%);
+    color:#eef8f4;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow:hidden;
+  }
+  button{font:inherit}
+  .app{height:100vh;display:grid;grid-template-rows:66px 1fr}
+  .topbar{
+    display:flex;align-items:center;gap:20px;padding:0 22px;
+    background:rgba(6,17,14,.94);border-bottom:1px solid var(--line);
+    box-shadow:0 8px 30px rgba(0,0,0,.24);z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:11px;min-width:245px}
+  .brand-mark{
+    width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+    background:linear-gradient(145deg,var(--gold-2),var(--gold));color:#3a2606;
+    font-family:Georgia,serif;font-size:22px;font-weight:800;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 8px 22px rgba(240,187,87,.18)
+  }
+  .brand-copy b{display:block;font-size:15px;letter-spacing:.2px}
+  .brand-copy span{font-size:11px;color:var(--muted)}
+  .mode-switch{
+    display:flex;align-items:center;padding:4px;background:#11241f;border:1px solid var(--line);border-radius:11px;
+  }
+  .mode-switch button{
+    border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;
+  }
+  .mode-switch button.active{background:#1e3a32;color:white;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .game-meta{display:flex;align-items:center;gap:10px;margin-left:auto}
+  .meta-pill{
+    display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:9px;
+    background:#10221d;border:1px solid var(--line);font-size:12px;color:var(--muted)
+  }
+  .meta-pill strong{color:white;font-size:12px}
+  .wind-dot{width:20px;height:20px;border-radius:7px;background:var(--gold);color:#3a2606;display:grid;place-items:center;font-weight:900}
+  .icon-btn,.coach-toggle{
+    height:36px;border-radius:10px;border:1px solid var(--line);background:#11241f;color:#dfeee9;padding:0 12px;cursor:pointer;
+  }
+  .coach-toggle{border-color:rgba(240,187,87,.42);color:#2f2208;background:linear-gradient(180deg,var(--gold-2),var(--gold));font-weight:800}
+
+  .workspace{display:grid;grid-template-columns:minmax(760px,1fr) 370px;gap:14px;padding:14px;height:calc(100vh - 66px)}
+  .play-area{min-width:0;display:grid;grid-template-rows:1fr 78px;gap:12px}
+  .table-shell{
+    position:relative;min-height:0;border-radius:28px;padding:15px;
+    background:
+      linear-gradient(90deg,rgba(255,255,255,.11),transparent 16%,rgba(0,0,0,.18) 64%,rgba(255,255,255,.06)),
+      repeating-linear-gradient(90deg,rgba(255,255,255,.028) 0 2px,transparent 2px 11px),
+      linear-gradient(145deg,var(--wood-light),var(--wood) 52%,var(--wood-dark));
+    box-shadow:var(--shadow),inset 0 2px 0 rgba(255,255,255,.16),inset 0 -8px 20px rgba(0,0,0,.25);
+  }
+  .table-shell:before{
+    content:"";position:absolute;inset:7px;border-radius:22px;border:1px solid rgba(255,255,255,.11);pointer-events:none
+  }
+  .felt{
+    height:100%;position:relative;overflow:hidden;border-radius:18px;
+    background:
+      radial-gradient(ellipse at 50% 44%,rgba(35,135,105,.60),transparent 48%),
+      repeating-linear-gradient(135deg,rgba(255,255,255,.018) 0 1px,transparent 1px 4px),
+      linear-gradient(165deg,var(--felt-light),var(--felt) 45%,var(--felt-deep));
+    box-shadow:inset 0 0 80px rgba(0,0,0,.47),inset 0 2px 8px rgba(255,255,255,.05);
+  }
+  .felt:after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.16;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23b8e3d3' stroke-opacity='.22'%3E%3Cpath d='M0 18c28 15 47 10 63-9M57 120c11-22 30-31 63-28'/%3E%3Ccircle cx='95' cy='22' r='2'/%3E%3Ccircle cx='18' cy='92' r='1.5'/%3E%3C/g%3E%3C/svg%3E")
+  }
+  .table-grid{
+    position:relative;z-index:1;height:100%;padding:12px 15px 10px;
+    display:grid;grid-template-columns:150px minmax(450px,1fr) 150px;grid-template-rows:112px minmax(255px,1fr) 190px;
+  }
+  .seat{position:relative;color:#dcece6}
+  .seat.north{grid-column:2;grid-row:1;justify-self:center;width:72%}
+  .seat.west{grid-column:1;grid-row:2;align-self:center;width:100%}
+  .seat.east{grid-column:3;grid-row:2;align-self:center;width:100%}
+  .seat.you{grid-column:1/4;grid-row:3;align-self:end;width:100%}
+  .seat-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .seat.north .seat-head{justify-content:center}
+  .seat.east .seat-head{justify-content:flex-end}
+  .avatar{width:27px;height:27px;border-radius:9px;background:#e9f2ee;color:#234137;display:grid;place-items:center;font-weight:900;font-size:11px;box-shadow:0 4px 10px rgba(0,0,0,.22)}
+  .avatar.active{background:var(--gold);color:#3a2606}
+  .seat-info b{display:block;font-size:12px;line-height:1.1}
+  .seat-info span{display:block;font-size:10px;color:#a9c6bc;margin-top:2px}
+  .turn-tag{margin-left:auto;background:rgba(240,187,87,.16);border:1px solid rgba(240,187,87,.34);color:#ffe0a0;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+  .seat.east .turn-tag{margin-left:0;margin-right:auto;order:-1}
+
+  .concealed{display:flex;gap:2px;justify-content:center;margin:0 auto}
+  .seat.west .concealed,.seat.east .concealed{display:grid;grid-template-columns:repeat(2,18px);gap:2px;width:max-content}
+  .back-tile{width:28px;height:39px;border-radius:4px;border:1px solid #d4c7a5;background:linear-gradient(180deg,#f2e8cc 0 8%,#2b9b78 9% 84%,#177457 85%);box-shadow:0 3px 0 #a89669,0 5px 8px rgba(0,0,0,.35)}
+  .seat.west .back-tile,.seat.east .back-tile{width:18px;height:25px;border-radius:3px;box-shadow:0 2px 0 #a89669,0 3px 5px rgba(0,0,0,.3)}
+  .melds{display:flex;gap:4px;margin-top:8px;justify-content:center}
+  .seat.west .melds{justify-content:flex-start}.seat.east .melds{justify-content:flex-end}
+
+  .center-zone{grid-column:2;grid-row:2;position:relative;display:grid;place-items:center}
+  .center-mat{
+    width:min(540px,94%);height:min(310px,94%);position:relative;border-radius:22px;
+    border:1px solid rgba(214,246,235,.10);background:rgba(0,31,24,.14);
+    box-shadow:inset 0 0 45px rgba(0,0,0,.18)
+  }
+  .round-core{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:116px;height:90px;border-radius:20px;
+    background:rgba(4,37,29,.74);border:1px solid rgba(255,255,255,.13);display:grid;place-items:center;text-align:center;
+    box-shadow:0 12px 28px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.06)
+  }
+  .round-core .round{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:#a8c3ba}
+  .round-core strong{font-size:24px;color:white;line-height:1.15}
+  .round-core small{font-size:10px;color:#9fb8b0}
+  .discard-river{position:absolute;display:grid;grid-template-columns:repeat(6,29px);gap:4px}
+  .discard-river.n{top:10px;left:50%;transform:translateX(-50%)}
+  .discard-river.s{bottom:10px;left:50%;transform:translateX(-50%)}
+  .discard-river.w{left:12px;top:50%;transform:translateY(-50%);grid-template-columns:repeat(3,29px)}
+  .discard-river.e{right:12px;top:50%;transform:translateY(-50%);grid-template-columns:repeat(3,29px)}
+
+  .tile{
+    --tw:29px;--th:39px;
+    width:var(--tw);height:var(--th);position:relative;flex:0 0 auto;border-radius:6px;
+    background:linear-gradient(180deg,#fffef9 0%,#fffaf0 62%,#e9dcc0 100%);
+    border:1px solid #d4c59e;color:#24352f;overflow:hidden;user-select:none;
+    box-shadow:inset 0 1px 0 white,inset 0 -3px 4px rgba(110,82,35,.17),0 2px 0 #bba97e,0 5px 8px rgba(0,0,0,.34);
+    transition:transform .14s ease, box-shadow .14s ease,filter .14s ease;
+  }
+  .tile.small{--tw:29px;--th:39px;border-radius:5px}
+  .tile.mini{--tw:25px;--th:34px;border-radius:5px}
+  .tile.hand{--tw:54px;--th:72px;border-radius:9px;cursor:pointer}
+  .tile.hand:hover{transform:translateY(-7px);box-shadow:inset 0 1px 0 white,inset 0 -3px 4px rgba(110,82,35,.17),0 3px 0 #bba97e,0 15px 17px rgba(0,0,0,.43)}
+  .tile.hand.recommended{box-shadow:0 0 0 3px var(--gold),0 0 24px rgba(240,187,87,.42),inset 0 1px 0 white,inset 0 -3px 4px rgba(110,82,35,.17),0 3px 0 #bba97e,0 13px 16px rgba(0,0,0,.40)}
+  .tile.hand.recommended:after{content:"BEST";position:absolute;top:2px;right:3px;background:var(--gold);color:#3a2606;border-radius:4px;padding:1px 3px;font-size:6px;font-weight:1000;letter-spacing:.3px}
+  .tile.hand.selected{transform:translateY(-10px);box-shadow:0 0 0 3px var(--teal),0 0 24px rgba(82,214,195,.33),inset 0 1px 0 white,inset 0 -3px 4px rgba(110,82,35,.17),0 3px 0 #bba97e,0 16px 20px rgba(0,0,0,.46)}
+  .tile.visible-match{box-shadow:0 0 0 2px var(--teal),0 0 15px rgba(82,214,195,.34),inset 0 1px 0 white,0 2px 0 #bba97e,0 5px 8px rgba(0,0,0,.34)}
+  .tile .corner{position:absolute;left:3px;top:2px;font-size:7px;font-weight:900;color:#8c7d5a;z-index:2}
+  .tile.hand .corner{left:5px;top:4px;font-size:9px}
+  .tile .english{display:none;position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:6px;font-weight:900;letter-spacing:.45px;color:#756b54}
+  body.show-labels .tile .english{display:block}
+  .tile-face{position:absolute;inset:4px 3px 4px;display:grid;place-items:center}
+  .tile.hand .tile-face{inset:7px 5px 7px}
+  .character-face{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:.82;font-family:"Noto Serif CJK SC","Microsoft YaHei",serif;color:#bb3f38;font-weight:900}
+  .character-face .num{font-size:18px;color:#263a33}.tile.hand .character-face .num{font-size:31px}
+  .character-face .wan{font-size:11px;margin-top:3px}.tile.hand .character-face .wan{font-size:18px;margin-top:5px}
+  .honor-face{font-family:"Noto Serif CJK SC","Microsoft YaHei",serif;font-size:24px;font-weight:900}.tile.hand .honor-face{font-size:42px}
+  .honor-face.red{color:#d4423a}.honor-face.green{color:#27875d}.honor-face.wind{color:#263a33}
+  .white-dragon{width:70%;height:62%;border:3px solid #4c78b7;border-radius:3px;box-shadow:inset 0 0 0 2px #fff}.tile.hand .white-dragon{border-width:5px}
+  .dots{width:86%;height:84%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:1px;align-items:center;justify-items:center}
+  .dot{width:6px;height:6px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fbfff7 0 18%,#d34f48 20% 43%,#8e2d2c 45% 58%,#f5dfb2 60% 66%,#246aa3 68%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .tile.hand .dot{width:11px;height:11px}
+  .dot.green{background:radial-gradient(circle at 35% 35%,#fbfff7 0 18%,#4ea871 20% 43%,#246941 45% 58%,#f5dfb2 60% 66%,#2a789f 68%)}
+  .dot.blue{background:radial-gradient(circle at 35% 35%,#fbfff7 0 18%,#4f81c5 20% 43%,#2d568d 45% 58%,#f5dfb2 60% 66%,#be5148 68%)}
+  .bams{width:88%;height:84%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:1px;align-items:center;justify-items:center}
+  .bam{width:4px;height:11px;border-radius:4px;background:linear-gradient(90deg,#1c7b52,#77bd79 45%,#17633f 56%,#63ad6f);position:relative}
+  .bam:before,.bam:after{content:"";position:absolute;left:-1px;right:-1px;height:2px;border-radius:2px;background:#256e4b}.bam:before{top:2px}.bam:after{bottom:2px}
+  .tile.hand .bam{width:7px;height:19px}.tile.hand .bam:before,.tile.hand .bam:after{height:3px}
+  .bam.red{background:linear-gradient(90deg,#b3423b,#e87461 45%,#8d2f2c 56%,#d75d50)}
+  .empty{visibility:hidden}
+
+  .own-zone{position:relative;background:rgba(2,28,22,.40);border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:10px 12px 11px;box-shadow:0 15px 30px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.04)}
+  .own-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .you-label{display:flex;align-items:center;gap:8px}.you-label b{display:block;font-size:12px}.you-label span{display:block;font-size:10px;color:#a9c6bc;margin-top:2px}
+  .hand-tools{display:flex;align-items:center;gap:6px}
+  .micro-btn{border:1px solid var(--line);background:rgba(255,255,255,.055);color:#bdd2ca;border-radius:7px;padding:5px 8px;font-size:10px;cursor:pointer}
+  .micro-btn.active{background:rgba(82,214,195,.16);border-color:rgba(82,214,195,.32);color:#dffff9}
+  .hand-row{display:flex;justify-content:center;align-items:flex-end;gap:5px;padding:2px 0 1px;min-height:82px}
+  .tile.drawn{margin-left:12px}
+  .meld-preview{position:absolute;left:14px;bottom:99px;display:flex;gap:3px}
+  .decision-note{position:absolute;right:15px;bottom:102px;color:#b6cdc5;font-size:9px;background:rgba(4,35,27,.72);border:1px solid rgba(255,255,255,.10);padding:5px 8px;border-radius:7px}
+
+  .action-bar{
+    display:flex;align-items:center;gap:10px;padding:10px 13px;background:linear-gradient(180deg,#10231f,#0b1b17);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.22)
+  }
+  .turn-message{min-width:250px}.turn-message b{display:block;font-size:13px}.turn-message span{font-size:11px;color:var(--muted)}
+  .actions{display:flex;gap:8px;margin-left:auto}
+  .action-btn{height:42px;min-width:82px;border-radius:10px;border:1px solid var(--line);background:#173029;color:#dfeee9;cursor:pointer;font-weight:800;font-size:12px}
+  .action-btn:disabled{opacity:.42;cursor:not-allowed}
+  .action-btn.primary{background:linear-gradient(180deg,var(--gold-2),var(--gold));border-color:#e4a932;color:#3a2606;box-shadow:0 7px 18px rgba(240,187,87,.18)}
+  .action-btn.pass{background:#142821;color:#acc4bb}
+  .key{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;margin-left:4px;border-radius:5px;background:rgba(0,0,0,.18);font-size:9px}
+
+  .coach{
+    min-width:0;height:100%;display:flex;flex-direction:column;background:linear-gradient(180deg,#132823,#0d1f1b);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow)
+  }
+  .coach.hidden{display:none}.workspace.coach-hidden{grid-template-columns:1fr}
+  .coach-header{padding:14px 14px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.018)}
+  .coach-title{display:flex;align-items:center;justify-content:space-between}
+  .coach-title h2{font-size:15px;margin:0}.coach-title span{font-size:10px;color:#78e4c9;background:rgba(82,214,195,.12);border:1px solid rgba(82,214,195,.22);padding:4px 7px;border-radius:999px}
+  .coach-sub{font-size:10px;color:var(--muted);margin-top:4px}
+  .coach-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:12px;padding:4px;background:#0b1d18;border-radius:10px}
+  .coach-tabs button{border:0;background:transparent;color:#829f95;border-radius:7px;padding:7px 4px;font-size:10px;font-weight:800;cursor:pointer}
+  .coach-tabs button.active{background:#1b3931;color:white}
+  .coach-body{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .coach-card{background:#f8f7f1;color:#26312d;border-radius:14px;padding:12px;box-shadow:0 9px 24px rgba(0,0,0,.19)}
+  .coach-card.dark{background:#173029;color:#edf8f4;border:1px solid rgba(255,255,255,.08);box-shadow:none}
+  .eyebrow{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#74847f;font-weight:900}
+  .best-move{display:grid;grid-template-columns:58px 1fr;gap:11px;align-items:center;margin-top:7px}
+  .move-title{display:flex;align-items:center;gap:7px}.move-title h3{font-size:18px;margin:0}.confidence{font-size:9px;font-weight:900;color:#277c56;background:#dff3e8;border-radius:999px;padding:3px 6px}
+  .move-copy p{font-size:11px;line-height:1.45;color:#5c6b66;margin:5px 0 0}
+  .why-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+  .why-box{background:#ecefe9;border-radius:9px;padding:8px}.why-box strong{display:block;font-size:13px}.why-box span{display:block;font-size:9px;color:#68766f;margin-top:2px}
+  .reason-list{list-style:none;padding:0;margin:8px 0 0}.reason-list li{position:relative;padding:6px 0 6px 17px;border-bottom:1px solid #e5e6df;font-size:10.5px;line-height:1.42}.reason-list li:last-child{border-bottom:0}.reason-list li:before{content:"✓";position:absolute;left:0;top:6px;color:#2c8a60;font-weight:1000}
+  .fan-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)}.fan-row:last-child{border-bottom:0}.fan-status{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:rgba(108,214,154,.14);color:#7ce4aa;font-size:11px;font-weight:900}.fan-copy{flex:1}.fan-copy b{display:block;font-size:10.5px}.fan-copy span{font-size:9px;color:#91ada3}.fan-points{font-size:11px;font-weight:900;color:#ffd98d}
+  .progress{height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:5px}.progress i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#4ec4aa,#80dfb1)}
+  .compare-row{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #e5e6df;cursor:pointer}.compare-row:last-child{border-bottom:0}.compare-row:hover{background:#f0f1eb;margin:0 -6px;padding-left:6px;padding-right:6px;border-radius:8px}.compare-copy b{display:block;font-size:10.5px}.compare-copy span{font-size:9px;color:#73817b}.rating{font-size:9px;font-weight:900;border-radius:999px;padding:4px 6px}.rating.best{background:#dff3e8;color:#277c56}.rating.ok{background:#f8edcf;color:#87661e}.rating.risk{background:#f7dedd;color:#a6463f}
+  .coach-footer{margin-top:auto;border-top:1px solid var(--line);padding:10px 12px;background:#0c1d19;display:flex;align-items:center;justify-content:space-between}.coach-footer span{font-size:10px;color:#9eb7ae}.switch{width:38px;height:22px;border-radius:999px;background:#2f6556;position:relative;cursor:pointer}.switch:after{content:"";position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#eaf8f2;box-shadow:0 2px 5px rgba(0,0,0,.3)}
+
+  .toast{position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:4;background:rgba(5,34,27,.92);border:1px solid rgba(255,255,255,.13);color:#dcece6;border-radius:10px;padding:8px 11px;font-size:10px;box-shadow:0 10px 25px rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1;top:25px}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}@keyframes pulse{50%{filter:brightness(1.12)}}
+  @media(max-height:820px){
+    .workspace{padding:10px;gap:10px}.table-grid{grid-template-rows:94px minmax(225px,1fr) 174px}.tile.hand{--tw:48px;--th:64px}.hand-row{min-height:73px}.own-zone{padding-top:8px}.coach-body{gap:8px}.coach-card{padding:10px}.reason-list li{padding-top:4px;padding-bottom:4px}.why-grid{margin-top:8px}.action-bar{height:68px}
+  }
+</style>
+</head>
+<body class="show-labels">
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">麻</div>
+      <div class="brand-copy"><b>Mahjong Mentor</b><span>Learn the thinking, not just the rules</span></div>
+    </div>
+    <div class="mode-switch" aria-label="Game mode">
+      <button>Play</button><button class="active">Learn</button><button>Review</button>
+    </div>
+    <div class="game-meta">
+      <div class="meta-pill"><span class="wind-dot">E</span><span>Round</span><strong>East 2</strong></div>
+      <div class="meta-pill"><span>Wall</span><strong>42</strong></div>
+      <div class="meta-pill"><span>Minimum</span><strong>8 pts</strong></div>
+      <button class="icon-btn" id="labelsBtn" title="Toggle English labels">EN labels</button>
+      <button class="icon-btn" title="Settings">⚙</button>
+      <button class="coach-toggle" id="coachToggle">Coach on</button>
+    </div>
+  </header>
+
+  <main class="workspace" id="workspace">
+    <section class="play-area">
+      <div class="table-shell">
+        <div class="felt">
+          <div class="toast" id="toast">Matching visible tiles are highlighted.</div>
+          <div class="table-grid">
+            <section class="seat north">
+              <div class="seat-head"><div class="avatar">N</div><div class="seat-info"><b>Mei</b><span>North · 23,600</span></div></div>
+              <div class="concealed" id="northWall"></div>
+              <div class="melds" id="northMelds"></div>
+            </section>
+
+            <section class="seat west">
+              <div class="seat-head"><div class="avatar active">W</div><div class="seat-info"><b>Alex</b><span>West · 24,800</span></div><span class="turn-tag">thinking</span></div>
+              <div class="concealed" id="westWall"></div>
+              <div class="melds" id="westMelds"></div>
+            </section>
+
+            <section class="center-zone">
+              <div class="center-mat">
+                <div class="discard-river n" id="riverN"></div>
+                <div class="discard-river w" id="riverW"></div>
+                <div class="round-core"><div><div class="round">East round</div><strong>42</strong><small>tiles left</small></div></div>
+                <div class="discard-river e" id="riverE"></div>
+                <div class="discard-river s" id="riverS"></div>
+              </div>
+            </section>
+
+            <section class="seat east">
+              <div class="seat-head"><span class="turn-tag">dealer</span><div class="seat-info" style="text-align:right"><b>Priya</b><span>East · 26,400</span></div><div class="avatar">E</div></div>
+              <div class="concealed" id="eastWall"></div>
+              <div class="melds" id="eastMelds"></div>
+            </section>
+
+            <section class="seat you">
+              <div class="own-zone">
+                <div class="own-top">
+                  <div class="you-label"><div class="avatar">S</div><div><b>You</b><span>South · 25,200 · concealed hand</span></div></div>
+                  <div class="hand-tools"><button class="micro-btn active">Sort: suit</button><button class="micro-btn">Undo sort</button><button class="micro-btn" id="visibleBtn">Visible tiles</button></div>
+                </div>
+                <div class="meld-preview" id="ownMelds"></div>
+                <div class="decision-note">Drawn tile is separated · click any tile to compare</div>
+                <div class="hand-row" id="handRow"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <div class="turn-message"><b id="turnTitle">Your turn: choose one tile to discard</b><span id="turnSub">The coach recommends 1 Characters because it is isolated.</span></div>
+        <div class="actions">
+          <button class="action-btn" disabled>Chow</button>
+          <button class="action-btn" disabled>Pung</button>
+          <button class="action-btn pass">Pass</button>
+          <button class="action-btn primary" id="discardBtn">Discard 1 Characters <span class="key">D</span></button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="coach" id="coach">
+      <div class="coach-header">
+        <div class="coach-title"><h2>Strategy coach</h2><span>Guided mode</span></div>
+        <div class="coach-sub">Advice is explained in plain English and updates as you inspect tiles.</div>
+        <div class="coach-tabs"><button class="active">Best move</button><button>Hand plan</button><button>Rules</button></div>
+      </div>
+      <div class="coach-body">
+        <article class="coach-card">
+          <div class="eyebrow">Recommended discard</div>
+          <div class="best-move">
+            <div id="coachTile"></div>
+            <div class="move-copy"><div class="move-title"><h3 id="moveName">1 Characters</h3><span class="confidence">High confidence</span></div><p id="moveSummary">It is your only isolated tile. Removing it leaves three completed 6–7–8 chows and two useful pairs.</p></div>
+          </div>
+          <div class="why-grid"><div class="why-box"><strong>3</strong><span>direct winning tiles remain</span></div><div class="why-box"><strong>8+</strong><span>points already protected</span></div></div>
+          <ul class="reason-list" id="reasonList">
+            <li>Keeps Mixed Triple Chow: 6–7–8 in all three suits.</li>
+            <li>A 5 Characters or Red Dragon completes your fourth set.</li>
+            <li>Discarding from a pair would reduce your direct winning tiles.</li>
+          </ul>
+        </article>
+
+        <article class="coach-card dark">
+          <div class="eyebrow" style="color:#8fb2a7">Your route to a legal win</div>
+          <div class="fan-row"><div class="fan-status">✓</div><div class="fan-copy"><b>Mixed Triple Chow</b><span>6–7–8 in characters, dots and bamboo</span><div class="progress"><i style="width:100%"></i></div></div><div class="fan-points">8</div></div>
+          <div class="fan-row"><div class="fan-status">2</div><div class="fan-copy"><b>Red Dragon Pung</b><span>Draw one more Red Dragon</span><div class="progress"><i style="width:67%"></i></div></div><div class="fan-points">+2</div></div>
+          <div class="fan-row"><div class="fan-status">C</div><div class="fan-copy"><b>Concealed Hand</b><span>Still available while you avoid calls</span><div class="progress"><i style="width:82%"></i></div></div><div class="fan-points">+2</div></div>
+        </article>
+
+        <article class="coach-card">
+          <div class="eyebrow">Compare your choices</div>
+          <div class="compare-row" data-pick="m1"><div id="cmp1"></div><div class="compare-copy"><b>1 Characters</b><span>Isolated terminal · loses no structure</span></div><span class="rating best">Best</span></div>
+          <div class="compare-row" data-pick="m5"><div id="cmp2"></div><div class="compare-copy"><b>5 Characters</b><span>Breaks a pair and removes two winning tiles</span></div><span class="rating risk">Avoid</span></div>
+          <div class="compare-row" data-pick="C"><div id="cmp3"></div><div class="compare-copy"><b>Red Dragon</b><span>Breaks a valuable pair with only one copy visible</span></div><span class="rating risk">Avoid</span></div>
+        </article>
+      </div>
+      <div class="coach-footer"><span>Explain automatically after each draw</span><div class="switch" title="Auto coach enabled"></div></div>
+    </aside>
+  </main>
+</div>
+
+<script>
+const chineseNums={1:'一',2:'二',3:'三',4:'四',5:'五',6:'六',7:'七',8:'八',9:'九'};
+const tileNames={m:'Characters',p:'Dots',s:'Bamboo',E:'East',S:'South',W:'West',N:'North',C:'Red Dragon',F:'Green Dragon',P:'White Dragon'};
+const T=(suit,n,id)=>({suit,n,id:id||suit+n,key:(['E','S','W','N','C','F','P'].includes(suit)?suit:suit+n)});
+
+function patternPositions(n){
+  const maps={
+    1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8],7:[0,2,3,4,5,6,8],8:[0,1,2,3,5,6,7,8],9:[0,1,2,3,4,5,6,7,8]
+  }; return maps[n]||[];
+}
+function displayName(t){return ['E','S','W','N','C','F','P'].includes(t.suit)?tileNames[t.suit]:`${t.n} ${tileNames[t.suit]}`}
+function tileFace(t){
+  if(t.suit==='m') return `<div class="character-face"><span class="num">${chineseNums[t.n]}</span><span class="wan">萬</span></div>`;
+  if(t.suit==='p'){
+    let cells=''; for(let i=0;i<9;i++){const on=patternPositions(t.n).includes(i); const cls=(i%3===1?'green':i%3===2?'blue':'');cells+=`<span class="${on?'dot '+cls:'empty dot'}"></span>`} return `<div class="dots">${cells}</div>`;
+  }
+  if(t.suit==='s'){
+    let cells=''; for(let i=0;i<9;i++){const on=patternPositions(t.n).includes(i); const cls=(i===4&&t.n%2===1?'red':'');cells+=`<span class="${on?'bam '+cls:'empty bam'}"></span>`} return `<div class="bams">${cells}</div>`;
+  }
+  if(t.suit==='P') return `<div class="white-dragon"></div>`;
+  const glyph={E:'東',S:'南',W:'西',N:'北',C:'中',F:'發'}[t.suit];
+  const cls=t.suit==='C'?'red':t.suit==='F'?'green':'wind';
+  return `<div class="honor-face ${cls}">${glyph}</div>`;
+}
+function tileEl(t,size='small',extra=''){
+  const el=document.createElement('div'); el.className=`tile ${size} ${extra}`.trim(); el.dataset.key=t.key;el.dataset.name=displayName(t);el.title=displayName(t);
+  const corner=['m','p','s'].includes(t.suit)?t.n:'';
+  const short=['m','p','s'].includes(t.suit)?`${t.n} ${t.suit.toUpperCase()}`:t.suit;
+  el.innerHTML=`<span class="corner">${corner}</span><div class="tile-face">${tileFace(t)}</div><span class="english">${short}</span>`;
+  return el;
+}
+function fillBacks(id,count,side=false){const c=document.getElementById(id);for(let i=0;i<count;i++)c.appendChild(Object.assign(document.createElement('div'),{className:'back-tile'}))}
+function renderTiles(id,tiles,size='small'){const c=document.getElementById(id);tiles.forEach(t=>c.appendChild(tileEl(t,size)))}
+
+fillBacks('northWall',13);fillBacks('westWall',13);fillBacks('eastWall',13);
+renderTiles('northMelds',[T('s',3),T('s',4),T('s',5)],'mini');
+renderTiles('westMelds',[T('C'),T('C'),T('C')],'mini');
+renderTiles('eastMelds',[T('p',2),T('p',3),T('p',4)],'mini');
+renderTiles('ownMelds',[],'mini');
+
+const rivers={
+  riverN:[T('m',9),T('p',2),T('S'),T('s',1),T('m',3),T('P'),T('p',9),T('s',4),T('N')],
+  riverW:[T('p',1),T('m',2),T('F'),T('s',9),T('p',5),T('m',7),T('E'),T('p',4),T('s',2)],
+  riverE:[T('m',1),T('p',8),T('W'),T('s',5),T('m',3),T('C'),T('p',3),T('s',9),T('m',7)],
+  riverS:[T('p',9),T('s',1),T('N'),T('m',2),T('p',4),T('s',3)]
+};
+Object.entries(rivers).forEach(([id,ts])=>renderTiles(id,ts,'small'));
+
+const hand=[T('m',1,'m1'),T('m',5,'m5a'),T('m',5,'m5b'),T('m',6,'m6'),T('m',7,'m7'),T('m',8,'m8'),T('p',6,'p6'),T('p',7,'p7'),T('p',8,'p8'),T('s',6,'s6'),T('s',7,'s7'),T('s',8,'s8'),T('C',0,'C1'),T('C',0,'C2')];
+let selected='m1';
+const handRow=document.getElementById('handRow');
+function renderHand(){
+  handRow.innerHTML='';
+  hand.forEach((t,i)=>{
+    const extra=[t.id==='m1'?'recommended':'',t.id===selected?'selected':'',i===hand.length-1?'drawn':''].join(' ');
+    const el=tileEl(t,'hand',extra);el.onclick=()=>selectTile(t.id);handRow.appendChild(el)
+  });
+}
+const advice={
+  m1:{name:'1 Characters',summary:'It is your only isolated tile. Removing it leaves three completed 6–7–8 chows and two useful pairs.',sub:'The coach recommends 1 Characters because it is isolated.',reasons:['Keeps Mixed Triple Chow: 6–7–8 in all three suits.','A 5 Characters or Red Dragon completes your fourth set.','Discarding from a pair would reduce your direct winning tiles.']},
+  m5:{name:'5 Characters',summary:'This is playable, but it breaks one of your two pairs and cuts the number of direct winning tiles.',sub:'5 Characters is risky because it breaks a useful pair.',reasons:['You would rely mainly on the Red Dragon pair to become a pung.','The isolated 1 Characters would still remain in your hand.','Your 6–7–8 chows stay intact, but the hand becomes less efficient.']},
+  C1:{name:'Red Dragon',summary:'This keeps the 5 Characters pair, but gives up a valuable honour pair that could add two points.',sub:'Red Dragon is possible, but wastes a valuable pair.',reasons:['Only one Red Dragon is visible, so one winning copy remains.','A Red Dragon pung would add 2 points.','The isolated 1 Characters still contributes nothing to your structure.']},
+  C2:null
+}; advice.C2=advice.C1;
+function findTile(id){return hand.find(t=>t.id===id)}
+function selectTile(id){
+  selected=id;renderHand();clearMatches();const t=findTile(id);document.querySelectorAll(`.tile[data-key="${t.key}"]`).forEach(el=>{if(!el.classList.contains('hand'))el.classList.add('visible-match')});
+  const a=advice[id]||{name:displayName(t),summary:'Inspecting this tile. The coach compares how much structure and scoring potential you keep after discarding it.',sub:`Selected ${displayName(t)}. Review the explanation before discarding.`,reasons:['Check whether this tile is isolated, paired or part of a sequence.','Prefer discards that preserve several possible winning draws.','Consider both efficiency and the eight-point requirement.']};
+  document.getElementById('moveName').textContent=a.name;document.getElementById('moveSummary').textContent=a.summary;document.getElementById('turnSub').textContent=a.sub;document.getElementById('discardBtn').innerHTML=`Discard ${a.name} <span class="key">D</span>`;
+  document.getElementById('reasonList').innerHTML=a.reasons.map(x=>`<li>${x}</li>`).join('');
+  const ct=document.getElementById('coachTile');ct.innerHTML='';ct.appendChild(tileEl(t,'hand'));
+}
+function clearMatches(){document.querySelectorAll('.visible-match').forEach(e=>e.classList.remove('visible-match'))}
+renderHand();
+['coachTile','cmp1','cmp2','cmp3'].forEach(id=>document.getElementById(id).innerHTML='');
+document.getElementById('coachTile').appendChild(tileEl(T('m',1),'hand'));
+document.getElementById('cmp1').appendChild(tileEl(T('m',1),'mini'));
+document.getElementById('cmp2').appendChild(tileEl(T('m',5),'mini'));
+document.getElementById('cmp3').appendChild(tileEl(T('C'),'mini'));
+
+document.querySelectorAll('.compare-row').forEach(row=>row.onclick=()=>{const k=row.dataset.pick;if(k==='C')selectTile('C1');else if(k==='m5')selectTile('m5a');else selectTile('m1')});
+document.getElementById('labelsBtn').onclick=()=>document.body.classList.toggle('show-labels');
+document.getElementById('visibleBtn').onclick=()=>{const t=findTile(selected);clearMatches();document.querySelectorAll(`.tile[data-key="${t.key}"]`).forEach(el=>{if(!el.classList.contains('hand'))el.classList.add('visible-match')});const toast=document.getElementById('toast');toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1700)};
+document.getElementById('coachToggle').onclick=()=>{const c=document.getElementById('coach'),w=document.getElementById('workspace');c.classList.toggle('hidden');w.classList.toggle('coach-hidden');document.getElementById('coachToggle').textContent=c.classList.contains('hidden')?'Coach off':'Coach on'};
+document.getElementById('discardBtn').onclick=()=>{const t=findTile(selected);document.getElementById('turnTitle').textContent=`Discarded ${displayName(t)} — waiting for Alex`;document.getElementById('turnSub').textContent='The hand review will explain what changed after the next draw.';document.getElementById('discardBtn').disabled=true;document.getElementById('discardBtn').textContent='Waiting…'};
+document.querySelectorAll('.mode-switch button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.mode-switch button').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+document.querySelectorAll('.coach-tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.coach-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='d')document.getElementById('discardBtn').click()});
+</script>
+</body>
+</html>
