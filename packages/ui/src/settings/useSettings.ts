@@ -3,8 +3,6 @@ import { useCallback, useState } from 'react'
 export interface Settings {
   botSpeedMs: number
   confirmBeforeDiscard: boolean
-  claimTimerEnabled: boolean
-  claimTimerMs: number
 }
 
 // SPEC.md §7's bot-speed presets. A named preset, not a raw slider value,
@@ -19,8 +17,6 @@ export const BOT_SPEED_PRESETS = {
 export const DEFAULT_SETTINGS: Settings = {
   botSpeedMs: BOT_SPEED_PRESETS.normal,
   confirmBeforeDiscard: false,
-  claimTimerEnabled: true,
-  claimTimerMs: 8000,
 }
 
 const STORAGE_KEY = 'mcr-mahjong:settings:v1'
@@ -48,9 +44,6 @@ export function loadSettings(raw: string | null): Settings {
     botSpeedMs: isNumber(candidate.botSpeedMs) ? candidate.botSpeedMs : DEFAULT_SETTINGS.botSpeedMs,
     confirmBeforeDiscard:
       typeof candidate.confirmBeforeDiscard === 'boolean' ? candidate.confirmBeforeDiscard : DEFAULT_SETTINGS.confirmBeforeDiscard,
-    claimTimerEnabled:
-      typeof candidate.claimTimerEnabled === 'boolean' ? candidate.claimTimerEnabled : DEFAULT_SETTINGS.claimTimerEnabled,
-    claimTimerMs: isNumber(candidate.claimTimerMs) ? candidate.claimTimerMs : DEFAULT_SETTINGS.claimTimerMs,
   }
 }
 

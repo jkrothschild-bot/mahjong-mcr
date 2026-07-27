@@ -73,13 +73,7 @@ function App() {
           onRequestDiscard={requestDiscard}
         />
 
-        <ClaimPrompt
-          state={state}
-          pendingClaim={humanPendingClaim}
-          claimTimerEnabled={settings.claimTimerEnabled}
-          claimTimerMs={settings.claimTimerMs}
-          onDeclare={submitHumanMove}
-        />
+        <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
       </main>
 
       <DiscardConfirmModal tileId={pendingConfirmTileId} onConfirm={confirmDiscard} onCancel={cancelDiscard} />

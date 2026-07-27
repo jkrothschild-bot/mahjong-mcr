@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { legalMoves, typeIdOfInstance, type GameState, type Move, type PendingClaim } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
 import { HUMAN_SEAT } from './humanSeat.js'
@@ -8,8 +8,6 @@ export interface ClaimPromptProps {
   // undefined unless HUMAN_SEAT itself must declare right now (see
   // useGameLoop's humanPendingClaim) — the component renders nothing then.
   pendingClaim: PendingClaim | undefined
-  claimTimerEnabled: boolean
-  claimTimerMs: number
   onDeclare: (move: Move) => void
 }
 
@@ -32,39 +30,29 @@ function moveLabel(move: Move): string {
   }
 }
 
-// A claim window's identity for timer-restart purposes: the (fromSeat,
-// tile, kind) triple stays constant for the window's whole lifetime, but
-// pendingClaim.declarations — and therefore the pendingClaim object
-// reference itself — changes every time ANY seat (including bots) declares
-// within that same window. Keying the timer effect on this instead of the
-// object reference is what stops another seat's declaration from resetting
-// the human's own countdown.
+// A claim window's identity: the (fromSeat, tile, kind) triple stays
+// constant for the window's whole lifetime, but pendingClaim.declarations
+// — and therefore the pendingClaim object reference itself — changes every
+// time ANY seat (including bots) declares within that same window.
 function windowKey(pendingClaim: PendingClaim | undefined): string | null {
   if (!pendingClaim) return null
   return `${pendingClaim.fromSeat}-${pendingClaim.tile}-${pendingClaim.kind}`
 }
 
-export function ClaimPrompt({ state, pendingClaim, claimTimerEnabled, claimTimerMs, onDeclare }: ClaimPromptProps) {
-  const [timeLeftMs, setTimeLeftMs] = useState(claimTimerMs)
+// No timer: claims wait indefinitely for the human's own decision (SPEC.md
+// §8 lists a claim timer as a settings item, but the owner asked for it to
+// be removed entirely — it forced a decision under time pressure rather
+// than letting a learner actually think through their options).
+export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps) {
   const declaredRef = useRef(false)
   const key = windowKey(pendingClaim)
 
+  // Guards against a same-tick double-declaration (e.g. a rapid double
+  // click before the re-render that clears pendingClaim) — the engine
+  // throws if the same seat declares twice against one window.
   useEffect(() => {
     declaredRef.current = false
-    if (key === null || !claimTimerEnabled) return
-    setTimeLeftMs(claimTimerMs)
-    const start = Date.now()
-    const interval = setInterval(() => setTimeLeftMs(Math.max(0, claimTimerMs - (Date.now() - start))), 100)
-    const timeout = setTimeout(() => {
-      if (declaredRef.current) return
-      declaredRef.current = true
-      onDeclare({ kind: 'pass' })
-    }, claimTimerMs)
-    return () => {
-      clearInterval(interval)
-      clearTimeout(timeout)
-    }
-  }, [key, claimTimerEnabled, claimTimerMs, onDeclare])
+  }, [key])
 
   if (!pendingClaim) return null
 
@@ -82,15 +70,6 @@ export function ClaimPrompt({ state, pendingClaim, claimTimerEnabled, claimTimer
       aria-label="Claim this discard"
       className="flex flex-col gap-2 rounded-lg border border-amber-500 bg-neutral-900 p-3"
     >
-      {claimTimerEnabled && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-700">
-          <div
-            data-testid="claim-timer-bar"
-            className="h-full bg-amber-400 transition-[width] duration-100 ease-linear"
-            style={{ width: `${(timeLeftMs / claimTimerMs) * 100}%` }}
-          />
-        </div>
-      )}
       <div className="flex flex-wrap gap-2">
         {options.map((move, index) => (
           <button

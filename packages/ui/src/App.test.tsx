@@ -75,7 +75,7 @@ describe('App', () => {
   it('shows a confirmation modal before discarding when the setting is on, and only commits on confirm', () => {
     window.localStorage.setItem(
       'mcr-mahjong:settings:v1',
-      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: true, claimTimerEnabled: true, claimTimerMs: 8000 }),
+      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: true }),
     )
     render(<App />)
 

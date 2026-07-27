@@ -8,7 +8,6 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={() => {}} />)
     expect(screen.getByRole('radio', { name: 'Normal' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Confirm before discard' })).not.toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Claim decision timer' })).toBeChecked()
   })
 
   it('selecting a bot-speed preset calls onUpdate with the right ms value', () => {
@@ -23,17 +22,5 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     fireEvent.click(screen.getByRole('checkbox', { name: 'Confirm before discard' }))
     expect(onUpdate).toHaveBeenCalledWith({ confirmBeforeDiscard: true })
-  })
-
-  it('disables the timer-duration input when the timer is off', () => {
-    render(<SettingsPanel settings={{ ...DEFAULT_SETTINGS, claimTimerEnabled: false }} onUpdate={() => {}} />)
-    expect(screen.getByLabelText(/Timer duration/)).toBeDisabled()
-  })
-
-  it('changing the timer duration converts seconds to ms', () => {
-    const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
-    fireEvent.change(screen.getByLabelText(/Timer duration/), { target: { value: '5' } })
-    expect(onUpdate).toHaveBeenCalledWith({ claimTimerMs: 5000 })
   })
 })

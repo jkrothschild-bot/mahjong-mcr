@@ -12,9 +12,10 @@ export interface SettingsPanelProps {
   onUpdate: (patch: Partial<Settings>) => void
 }
 
-// Plain form wiring over useSettings — the four M3-relevant settings (bot
-// speed, confirm-before-discard, claim timer). Sound/color-blind
-// palette/tile size are PLAN.md M7 (Polish) scope, not here.
+// Plain form wiring over useSettings — bot speed and confirm-before-
+// discard. Sound/color-blind palette/tile size are PLAN.md M7 (Polish)
+// scope, not here; the claim timer was removed entirely (owner's call —
+// claims now wait indefinitely for the human's decision).
 export function SettingsPanel({ settings, onUpdate }: SettingsPanelProps) {
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-sm">
@@ -42,30 +43,6 @@ export function SettingsPanel({ settings, onUpdate }: SettingsPanelProps) {
           onChange={(e) => onUpdate({ confirmBeforeDiscard: e.target.checked })}
         />
         Confirm before discard
-      </label>
-
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={settings.claimTimerEnabled}
-          onChange={(e) => onUpdate({ claimTimerEnabled: e.target.checked })}
-        />
-        Claim decision timer
-      </label>
-
-      <label className="flex items-center gap-2">
-        Timer duration (seconds)
-        <input
-          type="number"
-          min={1}
-          disabled={!settings.claimTimerEnabled}
-          value={settings.claimTimerMs / 1000}
-          onChange={(e) => {
-            const seconds = Number(e.target.value)
-            if (Number.isFinite(seconds) && seconds > 0) onUpdate({ claimTimerMs: seconds * 1000 })
-          }}
-          className="w-16 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 disabled:opacity-40"
-        />
       </label>
     </div>
   )

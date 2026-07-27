@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildWall,
   emptyHand,
@@ -60,9 +60,7 @@ describe('ClaimPrompt', () => {
       eligibleSeats: [],
       declarations: {},
     })
-    const { container } = render(
-      <ClaimPrompt state={state} pendingClaim={undefined} claimTimerEnabled={false} claimTimerMs={8000} onDeclare={() => {}} />,
-    )
+    const { container } = render(<ClaimPrompt state={state} pendingClaim={undefined} onDeclare={() => {}} />)
     expect(container).toBeEmptyDOMElement()
   })
 
@@ -78,7 +76,7 @@ describe('ClaimPrompt', () => {
     const pendingClaim: PendingClaim = { tile: c5ForDiscard!, fromSeat: 3, kind: 'discard', eligibleSeats: [0], declarations: {} }
     const state = stateWithPendingClaim(hand, pendingClaim)
 
-    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} claimTimerEnabled={false} claimTimerMs={8000} onDeclare={() => {}} />)
+    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={() => {}} />)
 
     expect(screen.getByRole('button', { name: 'Win' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pass' })).toBeInTheDocument()
@@ -91,46 +89,28 @@ describe('ClaimPrompt', () => {
     const state = stateWithPendingClaim(hand, pendingClaim)
     const onDeclare = vi.fn()
 
-    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} claimTimerEnabled={false} claimTimerMs={8000} onDeclare={onDeclare} />)
+    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={onDeclare} />)
     fireEvent.click(screen.getByRole('button', { name: 'Pass' }))
 
     expect(onDeclare).toHaveBeenCalledWith({ kind: 'pass' })
   })
 
-  describe('with the claim timer enabled', () => {
-    beforeEach(() => vi.useFakeTimers())
-    afterEach(() => vi.useRealTimers())
+  it('does not double-declare on a rapid double click', () => {
+    const hand = handWith([...idsFor('B1', 1)])
+    const [c5ForDiscard] = idsFor('C5', 1)
+    const pendingClaim: PendingClaim = { tile: c5ForDiscard!, fromSeat: 3, kind: 'discard', eligibleSeats: [0], declarations: {} }
+    const state = stateWithPendingClaim(hand, pendingClaim)
+    const onDeclare = vi.fn()
 
-    it('auto-declares pass once the timer expires', () => {
-      const hand = handWith([...idsFor('B1', 1)])
-      const [c5ForDiscard] = idsFor('C5', 1)
-      const pendingClaim: PendingClaim = { tile: c5ForDiscard!, fromSeat: 3, kind: 'discard', eligibleSeats: [0], declarations: {} }
-      const state = stateWithPendingClaim(hand, pendingClaim)
-      const onDeclare = vi.fn()
+    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={onDeclare} />)
+    const passButton = screen.getByRole('button', { name: 'Pass' })
+    fireEvent.click(passButton)
+    fireEvent.click(passButton)
 
-      render(<ClaimPrompt state={state} pendingClaim={pendingClaim} claimTimerEnabled claimTimerMs={5000} onDeclare={onDeclare} />)
-      vi.advanceTimersByTime(5000)
-
-      expect(onDeclare).toHaveBeenCalledWith({ kind: 'pass' })
-      expect(onDeclare).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not auto-pass a second time after the human already declared', () => {
-      const hand = handWith([...idsFor('B1', 1)])
-      const [c5ForDiscard] = idsFor('C5', 1)
-      const pendingClaim: PendingClaim = { tile: c5ForDiscard!, fromSeat: 3, kind: 'discard', eligibleSeats: [0], declarations: {} }
-      const state = stateWithPendingClaim(hand, pendingClaim)
-      const onDeclare = vi.fn()
-
-      render(<ClaimPrompt state={state} pendingClaim={pendingClaim} claimTimerEnabled claimTimerMs={5000} onDeclare={onDeclare} />)
-      fireEvent.click(screen.getByRole('button', { name: 'Pass' }))
-      vi.advanceTimersByTime(5000)
-
-      expect(onDeclare).toHaveBeenCalledTimes(1)
-    })
+    expect(onDeclare).toHaveBeenCalledTimes(1)
   })
 
-  it('does not auto-pass when the timer is disabled', () => {
+  it('never auto-declares — waits indefinitely for the human (no claim timer)', () => {
     vi.useFakeTimers()
     const hand = handWith([...idsFor('B1', 1)])
     const [c5ForDiscard] = idsFor('C5', 1)
@@ -138,7 +118,7 @@ describe('ClaimPrompt', () => {
     const state = stateWithPendingClaim(hand, pendingClaim)
     const onDeclare = vi.fn()
 
-    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} claimTimerEnabled={false} claimTimerMs={5000} onDeclare={onDeclare} />)
+    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={onDeclare} />)
     vi.advanceTimersByTime(60_000)
 
     expect(onDeclare).not.toHaveBeenCalled()
