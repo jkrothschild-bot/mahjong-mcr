@@ -30,3 +30,13 @@ export function tileFaceClassName(opts: { highlighted?: boolean; dimmed?: boolea
 export function tileBackClassName(): string {
   return [TILE_BOX_BASE, TILE_BACK_CLASSES].join(' ')
 }
+
+// A bot's concealed hand is never interactive (nothing to tap — the tiles
+// are hidden), so it's exempt from the ≥44px touch-target rule that
+// tileBackClassName's shared TILE_BOX_BASE enforces for real controls. A
+// compact, wrapping back keeps 13-14 tiles from forcing the whole board
+// wider than an iPad viewport (SPEC.md §5a/§5b) the way one un-wrapped row
+// of full-size boxes did.
+export function tileBackCompactClassName(): string {
+  return 'flex h-8 w-6 shrink-0 select-none items-center justify-center rounded border text-xs font-semibold border-indigo-900 bg-indigo-950 text-indigo-200'
+}

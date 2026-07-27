@@ -55,7 +55,7 @@ export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highl
   }
 
   return (
-    <div className="flex items-end gap-1" role="list" aria-label="Your hand">
+    <div className="flex flex-wrap items-end gap-1" role="list" aria-label="Your hand">
       {order.map((id) => (
         <div
           key={id}

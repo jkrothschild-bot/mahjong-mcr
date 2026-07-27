@@ -23,8 +23,18 @@ export interface BoardProps {
 // the other 3 seats are placed going counter-clockwise from there (the
 // direction turn order actually proceeds: 0 -> 1 -> 2 -> 3 -> 0), matching
 // standard 4-player mahjong seating as viewed from above.
+//
+// The human's own seat spans the full board width rather than sharing a
+// single 1/3-width column with the bot seats: a bot's concealed hand only
+// ever needs to show compact backs, but the human's real 13-14 face tiles
+// (plus the sort toolbar and discard button) genuinely need the room — at
+// a single grid column's width (~1/3 of an iPad-landscape board) that row
+// either overflows the viewport horizontally or wraps into several tall
+// rows, both of which fail SPEC.md §5a's "answer within 2 seconds, no
+// scrolling" bar for "what's in my hand" (found via a real Playwright
+// screenshot at the SPEC-mandated 1024x768 iPad viewport, not eyeballed).
 const GRID_CLASS_BY_OFFSET: Record<number, string> = {
-  0: 'row-start-3 col-start-2', // human, bottom
+  0: 'row-start-3 col-start-1 col-span-3', // human, bottom, full width
   1: 'row-start-2 col-start-1', // next in turn order, left
   2: 'row-start-1 col-start-2', // across, top
   3: 'row-start-2 col-start-3', // right
@@ -67,7 +77,7 @@ export function Board({
           const offset = ((player.seat - HUMAN_SEAT + 4) % 4) as 0 | 1 | 2 | 3
           const isHuman = player.seat === HUMAN_SEAT
           return (
-            <div key={player.seat} className={GRID_CLASS_BY_OFFSET[offset]}>
+            <div key={player.seat} className={`min-w-0 ${GRID_CLASS_BY_OFFSET[offset]}`}>
               <Seat
                 seat={player.seat}
                 player={player}
