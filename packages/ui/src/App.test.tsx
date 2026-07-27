@@ -1,37 +1,52 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { startHand, typeIdOfInstance } from '@mahjong-mcr/engine'
+import { typeIdOfInstance } from '@mahjong-mcr/engine'
 import App from './App'
 import { sortByMode } from './hand/handOrder.js'
+import { initLoopState } from './game/useGameLoop.js'
 
 describe('App', () => {
-  it('renders the placeholder board with all four seat winds', () => {
+  it('renders the header and all four seats', () => {
     render(<App />)
 
     expect(screen.getByText('MCR Mahjong Trainer')).toBeInTheDocument()
     expect(screen.getByTestId('board')).toBeInTheDocument()
-    for (const wind of ['E', 'S', 'W', 'N']) {
-      expect(screen.getByText(wind)).toBeInTheDocument()
+    for (const seat of [0, 1, 2, 3]) {
+      expect(screen.getByTestId(`seat-${seat}`)).toBeInTheDocument()
     }
   })
 
-  it('renders the player\'s real 13-tile hand and lets sorting reorder it without touching engine state', () => {
+  it('marks the dealer and current-turn seat identically for every seat (no human-only treatment)', () => {
+    render(<App />)
+    // Hand 1's dealer is seat 0 (== HUMAN_SEAT), and startHand's first
+    // phase is the dealer's discard — so seat 0 opens as both dealer and
+    // current turn.
+    expect(screen.getByTestId('seat-0-dealer')).toBeInTheDocument()
+    expect(screen.getByTestId('seat-0-turn')).toBeInTheDocument()
+    for (const seat of [1, 2, 3]) {
+      expect(screen.queryByTestId(`seat-${seat}-dealer`)).not.toBeInTheDocument()
+      expect(screen.queryByTestId(`seat-${seat}-turn`)).not.toBeInTheDocument()
+    }
+  })
+
+  it('renders the player\'s real 14-tile hand and lets sorting reorder it without touching engine state', () => {
     render(<App />)
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
-    // Seat 0 is dealerSeat in App.tsx's demo deal, so it holds the dealer's
-    // folded-in 14th tile (see game-state.ts's startHand) — 14, not 13.
+    // Seat 0 is dealerSeat in App.tsx's demo match (matchSeed 42, hand 1),
+    // so it holds the dealer's folded-in 14th tile (see game-state.ts's
+    // startHand) — 14, not 13.
     expect(hand.querySelectorAll('[role="listitem"]')).toHaveLength(14)
 
-    // Same seed/params App.tsx uses — the reference hand to compare against.
-    const reference = startHand({ seed: 42, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
-    const referenceTiles = reference.players[0].hand.concealedTiles
+    // Same matchSeed App.tsx uses — the reference hand to compare against.
+    const reference = initLoopState(42)
+    const referenceTiles = reference.gameState.players[0].hand.concealedTiles
 
     fireEvent.click(screen.getByRole('button', { name: 'Suit' }))
 
     // Sorting is purely visual (SPEC.md §5) — the engine-shaped reference
-    // hand for these params is unaffected by anything the UI does.
-    expect(reference.players[0].hand.concealedTiles).toEqual(referenceTiles)
+    // hand is unaffected by anything the UI does.
+    expect(reference.gameState.players[0].hand.concealedTiles).toEqual(referenceTiles)
 
     const renderedLabels = [...hand.querySelectorAll('[role="listitem"]')].map((el) => el.textContent)
     const expectedLabels = sortByMode(referenceTiles, 'suit').map(typeIdOfInstance)

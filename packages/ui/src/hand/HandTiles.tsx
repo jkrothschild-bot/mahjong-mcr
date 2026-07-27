@@ -1,5 +1,6 @@
 import { useState, type PointerEvent } from 'react'
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+import { tileFaceClassName } from '../tiles/tileStyles.js'
 
 export interface HandTilesProps {
   order: readonly TileInstanceId[]
@@ -55,9 +56,7 @@ export function HandTiles({ order, onReorder }: HandTilesProps) {
           onPointerUp={(e) => endDrag(e, id, true)}
           onPointerCancel={(e) => endDrag(e, id, false)}
           style={{ touchAction: 'none' }}
-          className={`flex min-h-11 min-w-11 cursor-grab select-none items-center justify-center rounded-md border border-neutral-500 bg-neutral-100 px-2 py-3 text-sm font-semibold text-neutral-900 ${
-            draggingId === id ? 'opacity-40' : ''
-          }`}
+          className={tileFaceClassName({ dimmed: draggingId === id, extra: 'cursor-grab' })}
         >
           {typeIdOfInstance(id)}
         </div>
