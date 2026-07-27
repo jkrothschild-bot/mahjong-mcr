@@ -49,7 +49,7 @@ export function Board({
   onTileClick,
   onRequestDiscard,
 }: BoardProps) {
-  const { order, sort, reorder } = useHandOrder(state.players[HUMAN_SEAT].hand.concealedTiles)
+  const { order, sort, reorder } = useHandOrder(state.players[HUMAN_SEAT].hand.concealedTiles, state.handNumber)
 
   // Tile inspector (SPEC.md §5): clicking any tile, anywhere on the board,
   // highlights every visible tile of the same type and shows how many
