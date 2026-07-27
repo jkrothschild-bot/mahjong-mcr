@@ -107,4 +107,25 @@ describe('App', () => {
     // The clicked tile itself is one of the "visible copies" being inspected.
     expect(firstTile!.className).toContain('ring-2')
   })
+
+  it('opens and closes the tile-count grid, reflecting real counts from the live hand', () => {
+    render(<App />)
+
+    expect(screen.queryByRole('dialog', { name: 'Tile-count grid' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tile counts' }))
+    const dialog = screen.getByRole('dialog', { name: 'Tile-count grid' })
+    expect(dialog).toBeInTheDocument()
+
+    // Seat 0's opening 14-tile hand includes at least one copy of some tile
+    // type, so that type's grid cell must read fewer than 4 unseen.
+    const reference = initLoopState(42)
+    const [firstHandTile] = reference.gameState.players[0].hand.concealedTiles
+    const heldTypeId = typeIdOfInstance(firstHandTile!)
+    const countEl = screen.getByTestId(`tile-count-${heldTypeId}`).querySelector('.font-semibold')
+    expect(Number(countEl!.textContent)).toBeLessThan(4)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Tile-count grid' })).not.toBeInTheDocument()
+  })
 })

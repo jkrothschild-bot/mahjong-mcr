@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react'
 import { Board } from './board/Board.js'
+import { TileCountGrid } from './board/TileCountGrid.js'
+import { computeUnseenCounts } from './board/unseenCounts.js'
 import { CallOutToast } from './game/CallOutToast.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
+import { HUMAN_SEAT } from './game/humanSeat.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop } from './game/useGameLoop.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
@@ -13,6 +16,7 @@ const ZERO_SCORES = { 0: 0, 1: 0, 2: 0, 3: 0 } as const
 function App() {
   const { settings, update } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const { state, matchState, isHumanTurn, humanPendingClaim, submitHumanMove } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
@@ -31,13 +35,22 @@ function App() {
     <div className="min-h-svh bg-neutral-900 text-neutral-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
         <h1 className="text-xl font-semibold tracking-tight">MCR Mahjong Trainer</h1>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen((open) => !open)}
-          className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
-        >
-          Settings
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setTileCountGridOpen(true)}
+            className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Tile counts
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((open) => !open)}
+            className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Settings
+          </button>
+        </div>
       </header>
 
       {settingsOpen && (
@@ -74,6 +87,12 @@ function App() {
       </main>
 
       <DiscardConfirmModal tileId={pendingConfirmTileId} onConfirm={confirmDiscard} onCancel={cancelDiscard} />
+
+      <TileCountGrid
+        open={tileCountGridOpen}
+        unseenCounts={computeUnseenCounts(state, HUMAN_SEAT)}
+        onClose={() => setTileCountGridOpen(false)}
+      />
     </div>
   )
 }
