@@ -116,8 +116,6 @@ function detectMeldedKong(ctx: HandContext): FanMatch[] {
   return count > 0 ? [{ fanId: 74, count }] : []
 }
 
-const SUIT_PREFIXES: readonly SuitChar[] = ['C', 'D', 'B']
-
 // 75. One Voided Suit — 1 pt. §3.8.1 p.16 / App.1 p.41: "A hand using tiles
 // from exactly two of the three suits (honors allowed freely)." Exactly 2
 // suits represented — a hand using only 1 suit (+ honors) is Half/Full

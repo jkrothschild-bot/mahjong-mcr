@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mahjong-mcr/engine": "*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

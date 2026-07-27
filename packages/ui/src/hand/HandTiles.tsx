@@ -1,0 +1,68 @@
+import { useState, type PointerEvent } from 'react'
+import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+
+export interface HandTilesProps {
+  order: readonly TileInstanceId[]
+  onReorder: (draggedId: TileInstanceId, beforeId: TileInstanceId | null) => void
+}
+
+const END_ZONE_ID = '__end__'
+
+function resolveDropTarget(clientX: number, clientY: number): TileInstanceId | null | undefined {
+  const el = document.elementFromPoint(clientX, clientY)
+  const tileEl = el instanceof Element ? el.closest('[data-tile-id]') : null
+  if (!tileEl) return undefined // not over a valid drop target at all
+  const raw = tileEl.getAttribute('data-tile-id')
+  if (raw === END_ZONE_ID) return null
+  return raw === null ? undefined : Number(raw)
+}
+
+// Pointer-events-based drag, deliberately not native HTML5 drag-and-drop:
+// native DnD has unreliable/absent touch support on iOS Safari, and
+// SPEC.md §2 requires this to work on iPad. Pointer events + pointer
+// capture work correctly for mouse and touch alike. No live drag animation
+// (out of scope for this pass, see CLAUDE.md/PLAN.md) — the tile snaps into
+// its new position on release; sorting and drag both funnel through the
+// same onReorder/order state (useHandOrder), so there's one place hand
+// position changes happen, matching CLAUDE.md's zone-movement rule.
+export function HandTiles({ order, onReorder }: HandTilesProps) {
+  const [draggingId, setDraggingId] = useState<TileInstanceId | null>(null)
+
+  function handlePointerDown(e: PointerEvent<HTMLDivElement>, id: TileInstanceId) {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    setDraggingId(id)
+  }
+
+  function endDrag(e: PointerEvent<HTMLDivElement>, draggedId: TileInstanceId, commit: boolean) {
+    if (commit) {
+      const target = resolveDropTarget(e.clientX, e.clientY)
+      if (target !== undefined && target !== draggedId) {
+        onReorder(draggedId, target)
+      }
+    }
+    setDraggingId(null)
+  }
+
+  return (
+    <div className="flex items-end gap-1" role="list" aria-label="Your hand">
+      {order.map((id) => (
+        <div
+          key={id}
+          data-tile-id={id}
+          data-testid={`hand-tile-${id}`}
+          role="listitem"
+          onPointerDown={(e) => handlePointerDown(e, id)}
+          onPointerUp={(e) => endDrag(e, id, true)}
+          onPointerCancel={(e) => endDrag(e, id, false)}
+          style={{ touchAction: 'none' }}
+          className={`flex min-h-11 min-w-11 cursor-grab select-none items-center justify-center rounded-md border border-neutral-500 bg-neutral-100 px-2 py-3 text-sm font-semibold text-neutral-900 ${
+            draggingId === id ? 'opacity-40' : ''
+          }`}
+        >
+          {typeIdOfInstance(id)}
+        </div>
+      ))}
+      <div data-tile-id={END_ZONE_ID} data-testid="hand-end-zone" className="min-h-11 min-w-6" aria-hidden />
+    </div>
+  )
+}
