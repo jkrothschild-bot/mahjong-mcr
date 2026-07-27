@@ -5,6 +5,7 @@ export interface MeldsProps {
   seat: number
   melds: readonly Meld[]
   selectedTypeId?: string
+  onTileClick?: (id: number) => void
 }
 
 // Renders every meld tile face-up, including concealed kongs. Real-table
@@ -12,7 +13,7 @@ export interface MeldsProps {
 // players* — that doesn't map onto a single-player trainer, where
 // concealment already only matters for scoring (conveyed via fan names on
 // the score screen), not table secrecy. Documented simplification, not a bug.
-export function Melds({ seat, melds, selectedTypeId }: MeldsProps) {
+export function Melds({ seat, melds, selectedTypeId, onTileClick }: MeldsProps) {
   if (melds.length === 0) return null
   return (
     <div aria-label={`Seat ${seat} melds`} className="flex flex-wrap gap-2">
@@ -26,7 +27,11 @@ export function Melds({ seat, melds, selectedTypeId }: MeldsProps) {
                 data-tile-id={id}
                 data-testid={`meld-tile-${meld.id}-${index}`}
                 role="listitem"
-                className={tileFaceClassName({ highlighted: selectedTypeId === typeId })}
+                onClick={onTileClick ? () => onTileClick(id) : undefined}
+                className={tileFaceClassName({
+                  highlighted: selectedTypeId === typeId,
+                  extra: onTileClick ? 'cursor-pointer' : undefined,
+                })}
               >
                 {typeId}
               </div>

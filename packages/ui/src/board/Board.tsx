@@ -1,7 +1,10 @@
-import type { GameState, MatchState, Seat as SeatId } from '@mahjong-mcr/engine'
+import { useState } from 'react'
+import { typeIdOfInstance, type GameState, type MatchState, type Seat as SeatId, type TileTypeId } from '@mahjong-mcr/engine'
 import { useHandOrder } from '../hand/useHandOrder.js'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
 import { Seat } from './Seat.js'
+import { TileInspector } from './TileInspector.js'
+import { computeUnseenCounts } from './unseenCounts.js'
 import { WallCounter } from './WallCounter.js'
 import { WindIndicator } from './WindIndicator.js'
 
@@ -38,11 +41,25 @@ export function Board({
 }: BoardProps) {
   const { order, sort, reorder } = useHandOrder(state.players[HUMAN_SEAT].hand.concealedTiles)
 
+  // Tile inspector (SPEC.md §5): clicking any tile, anywhere on the board,
+  // highlights every visible tile of the same type and shows how many
+  // remain unseen. Owned here (not lifted to App) since it's purely a
+  // board-wide display concern, unlike the discard flow (onTileClick/
+  // onRequestDiscard), which needs to reach the live game state in App.
+  const [selectedTypeId, setSelectedTypeId] = useState<TileTypeId | null>(null)
+  const inspectTile = (id: number) => setSelectedTypeId(typeIdOfInstance(id))
+  const handleHumanHandTileClick = (id: number) => {
+    onTileClick(id)
+    inspectTile(id)
+  }
+  const unseenCounts = computeUnseenCounts(state, HUMAN_SEAT)
+
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-4">
-      <div className="flex gap-4">
+      <div className="flex flex-wrap items-center justify-center gap-4">
         <WindIndicator matchState={matchState} />
         <WallCounter wall={state.wall} />
+        <TileInspector selectedTypeId={selectedTypeId} unseenCounts={unseenCounts} />
       </div>
 
       <div data-testid="board" className="grid w-full grid-cols-3 grid-rows-3 gap-3">
@@ -58,13 +75,15 @@ export function Board({
                 isCurrentTurn={player.seat === state.currentSeat}
                 isHuman={isHuman}
                 matchScore={matchScores[player.seat]}
+                selectedTypeId={selectedTypeId ?? undefined}
                 handOrder={isHuman ? order : undefined}
                 onSortHand={isHuman ? sort : undefined}
                 onReorderHand={isHuman ? reorder : undefined}
                 selectedTileId={isHuman ? selectedTileId : undefined}
-                onTileClick={isHuman ? onTileClick : undefined}
+                onTileClick={isHuman ? handleHumanHandTileClick : undefined}
                 canDiscard={isHuman ? isHumanTurn && selectedTileId !== null : undefined}
                 onRequestDiscard={isHuman ? onRequestDiscard : undefined}
+                onInspectTile={inspectTile}
               />
             </div>
           )

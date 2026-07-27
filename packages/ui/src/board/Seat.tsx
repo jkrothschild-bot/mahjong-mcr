@@ -25,6 +25,9 @@ export interface SeatProps {
   onTileClick?: (id: number) => void
   canDiscard?: boolean
   onRequestDiscard?: () => void
+  // Tile inspector (Phase 6) — fires for any seat's discard/meld tile, and
+  // additionally for the human's own hand tiles (see onTileClick above).
+  onInspectTile?: (id: number) => void
 }
 
 // A player's full slot: identity (wind/dealer/turn), hand-or-backs, melds,
@@ -48,6 +51,7 @@ export function Seat({
   onTileClick,
   canDiscard,
   onRequestDiscard,
+  onInspectTile,
 }: SeatProps) {
   return (
     <section
@@ -78,8 +82,8 @@ export function Seat({
         </span>
       </header>
 
-      <Melds seat={seat} melds={player.hand.melds} selectedTypeId={selectedTypeId} />
-      <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} />
+      <Melds seat={seat} melds={player.hand.melds} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
+      <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
 
       {isHuman ? (
         <div className="flex flex-col gap-2">
@@ -101,6 +105,7 @@ export function Seat({
             onReorder={onReorderHand ?? (() => {})}
             onTileClick={onTileClick}
             selectedTileId={selectedTileId}
+            highlightedTypeId={selectedTypeId}
           />
         </div>
       ) : (

@@ -92,4 +92,19 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', { name: 'Confirm discard' })).not.toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
   })
+
+  it('clicking a tile shows the tile inspector with its name and unseen count', () => {
+    render(<App />)
+
+    expect(screen.queryByTestId('tile-inspector')).not.toBeInTheDocument()
+
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+    fireEvent.click(firstTile!)
+
+    const inspector = screen.getByTestId('tile-inspector')
+    expect(inspector).toHaveTextContent('unseen of 4')
+    // The clicked tile itself is one of the "visible copies" being inspected.
+    expect(firstTile!.className).toContain('ring-2')
+  })
 })

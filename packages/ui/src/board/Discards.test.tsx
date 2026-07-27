@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
 import { Discards } from './Discards.js'
 
@@ -35,5 +35,13 @@ describe('Discards', () => {
     const notHighlighted = items.find((el) => el.textContent === 'C1')!
     expect(highlighted.className).toContain('ring-2')
     expect(notHighlighted.className).not.toContain('ring-2')
+  })
+
+  it('calls onTileClick with the clicked tile id', () => {
+    const [c1] = idsFor('C1', 1)
+    const onTileClick = vi.fn()
+    render(<Discards seat={0} tiles={[c1!]} onTileClick={onTileClick} />)
+    fireEvent.click(screen.getByTestId(`discard-tile-${c1}`))
+    expect(onTileClick).toHaveBeenCalledWith(c1)
   })
 })

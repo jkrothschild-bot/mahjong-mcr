@@ -5,11 +5,12 @@ export interface DiscardsProps {
   seat: number
   tiles: readonly TileInstanceId[]
   selectedTypeId?: string
+  onTileClick?: (id: TileInstanceId) => void
 }
 
 // Fixed 6-column grid, new row after 6 — a hard rule (CLAUDE.md/SPEC.md §5),
 // not a style choice: discards must never overlap, fan, or cascade.
-export function Discards({ seat, tiles, selectedTypeId }: DiscardsProps) {
+export function Discards({ seat, tiles, selectedTypeId, onTileClick }: DiscardsProps) {
   return (
     <div
       role="list"
@@ -24,7 +25,11 @@ export function Discards({ seat, tiles, selectedTypeId }: DiscardsProps) {
             data-tile-id={id}
             data-testid={`discard-tile-${id}`}
             role="listitem"
-            className={tileFaceClassName({ highlighted: selectedTypeId === typeId })}
+            onClick={onTileClick ? () => onTileClick(id) : undefined}
+            className={tileFaceClassName({
+              highlighted: selectedTypeId === typeId,
+              extra: onTileClick ? 'cursor-pointer' : undefined,
+            })}
           >
             {typeId}
           </div>

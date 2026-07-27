@@ -10,6 +10,11 @@ export interface HandTilesProps {
   // tile — used by the discard flow, independent of reordering.
   onTileClick?: (id: TileInstanceId) => void
   selectedTileId?: TileInstanceId | null
+  // Tile inspector (SPEC.md §5): highlights every tile sharing this TYPE,
+  // independent of selectedTileId's exact-instance discard selection —
+  // clicking a discard/meld tile elsewhere on the board can highlight a
+  // matching tile here without it being "selected for discard."
+  highlightedTypeId?: string
 }
 
 const END_ZONE_ID = '__end__'
@@ -31,7 +36,7 @@ function resolveDropTarget(clientX: number, clientY: number): TileInstanceId | n
 // its new position on release; sorting and drag both funnel through the
 // same onReorder/order state (useHandOrder), so there's one place hand
 // position changes happen, matching CLAUDE.md's zone-movement rule.
-export function HandTiles({ order, onReorder, onTileClick, selectedTileId }: HandTilesProps) {
+export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highlightedTypeId }: HandTilesProps) {
   const [draggingId, setDraggingId] = useState<TileInstanceId | null>(null)
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>, id: TileInstanceId) {
@@ -64,7 +69,7 @@ export function HandTiles({ order, onReorder, onTileClick, selectedTileId }: Han
           style={{ touchAction: 'none' }}
           className={tileFaceClassName({
             dimmed: draggingId === id,
-            highlighted: selectedTileId === id,
+            highlighted: selectedTileId === id || highlightedTypeId === typeIdOfInstance(id),
             extra: 'cursor-grab',
           })}
         >
