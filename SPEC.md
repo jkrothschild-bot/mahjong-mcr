@@ -1,4 +1,4 @@
-# MCR Mahjong Trainer — Game Specification (v2)
+# MCR Mahjong Trainer — Game Specification (v5)
 
 ## 1. Purpose
 
@@ -7,7 +7,7 @@ A single-player web game for learning **Chinese Official Mahjong (Mahjong Compet
 1. **Readable for non-Chinese speakers** — no reliance on reading Chinese characters.
 2. **Built-in learning aids** — on-demand hints explaining strategic options and which of the 81 fans (scoring patterns) are within reach.
 3. **Configurable pacing** — bot speed set by the player.
-4. **Clear information display** — visible discards, per-tile discard history, running/potential score.
+4. **Best-in-class clarity and feel** — the interface must be clearer than every existing option the owner has tried (§5a), and must feel like a real table with real tiles, not a flat wireframe (§5c). Both are first-class requirements, not side effects of the functional features.
 
 Out of scope for v1 (planned for later): multiplayer, online accounts, leaderboards, mobile app-store distribution.
 
@@ -30,40 +30,84 @@ Out of scope for v1 (planned for later): multiplayer, online accounts, leaderboa
   - Payment rules: winner receives 8 + fan points from each non-discarder; discarder pays 8 + fan points (per official MCR settlement).
   - Dead-wall/wall-exhaustion draw rules per rulebook.
 
-## 4. Tile design (accessibility-first)
+## 4. Tile design (accessibility-first, and physically believable — see §5c)
 
-Fixed convention, always on — **not a toggle**. Every tile permanently carries a small badge in the top-left corner, matching the style of well-designed existing clients (reference: owner-supplied screenshot of a working example):
+Fixed convention, always on — **not a toggle**. Per the owner's `docs/Mockups` v6 design (adopted as baseline — see §5b/§5c; this is a refinable starting point, not a frozen final answer), suit numerals and wind/dragon letters are **printed directly into the tile face artwork** — never a separate corner badge, HTML overlay, or neighbouring label:
 
-- **Characters (万/wan) suit:** traditional face + small **Arabic numeral** (1–9), top-left.
-- **Dots and Bamboo:** conventional designs (already language-neutral) + small numeral, top-left, for consistency with the other suits.
-- **Winds:** traditional character + small **letter badge (E/S/W/N)**, top-left, always visible — this is the one the player relies on most and must never be hidden behind a settings toggle.
-- **Dragons:** conventional Red/Green/White designs + small letter badge, top-left — following the reference image's convention of **C / F / P** (Chun/red, Faat/green, Pak/white); can read as `R/G/W` instead if that proves clearer once built.
-- **Flowers/Seasons:** numbered, distinct color band, never confusable with playing tiles.
-- Badges must stay legible at the smallest tile size rendered on iPad.
-- The only tile-related toggle is a **style choice** (which of the 2–3 art options below), never an on/off for badges.
-- Tile art: start from an existing open-license SVG tile set (e.g., the FluffyStuff riichi-mahjong-tiles set on GitHub — verify license before shipping) and overlay badges as SVG layers; or generate a custom SVG set. Present 2–3 style options to the owner before finalizing.
+- **Characters (万/wan), Dots, Bamboo:** traditional face with a small Arabic numeral (1–9) baked into the art (red for Characters, blue for Dots, green for Bamboo per v6).
+- **Winds:** traditional character with a small Latin letter (E/S/W/N) baked into the art — this is the one the player relies on most and must never be hidden behind a settings toggle or omitted from an art variant.
+- **Dragons:** conventional Red/Green/White designs with a baked-in letter — v6 uses **C / F / P** (Chun/red, Faat/green, Pak/white); `R/G/W` remains an acceptable alternative if that reads clearer.
+- **Flowers/Seasons:** numbered, distinct color band, never confusable with playing tiles. **Not yet present in the `docs/Mockups/assets` set — confirm these 8 tiles get created before M2/M3 need them (§3 requires all 144 tiles including flowers).**
+- Indices must stay legible at the smallest tile size actually rendered on iPad — verify this directly on-device with the real assets rather than assuming; a baked-in index trades a little guaranteed contrast for looking like a real tile, so it's worth confirming that trade paid off.
+- The only tile-related toggle is a **style choice** between finished art variants, never an on/off for whether an index shows.
+- Tiles render with tactile depth — bevel/highlight, drop shadow, a felt table underneath — not flat rectangles on a flat background; see §5c. `docs/Mockups/mahjong-seated-table-prototype-v6.html` demonstrates this with real raster tile assets over a CSS-built wood-and-felt table; no WebGL, no 3D engine, no change to the stack in PLAN.md §1.
+- Tile art: `docs/Mockups/assets/*.png` is the current asset set — confirm its licensing/origin (owner-generated vs. sourced) before the repo goes public, same as any adopted third-party art would need.
 
 ## 5. Game screen (single main view)
 
 - **Player hand** (bottom): face-up, large. Drag-to-reorder AND one-tap sort buttons — **Suit, Number, Honors, Simples, Odds, Evens** (per reference image; richer than a single "auto-sort"). Sorting is purely visual — never changes engine state.
-- **Discard pools:** each player's discards displayed in tidy rows in front of their position (river style), in discard order, never overlapping.
+- **Discard pools:** each player's discards in a fixed grid (v6: six columns, new row after six), in discard order, **never overlapping, fanning, or cascading** — this is a hard rule, not a style preference, since messy discard rivers were one of the owner's original core complaints about existing clients.
 - **Melds:** exposed chows/pungs/kongs shown beside each player's position; flowers displayed separately.
-- **Tile inspector:** tapping/clicking any tile (in hand or elsewhere) highlights all visible copies of that tile and shows a count: how many are in discards/melds, how many remain unseen.
+- **Wall vs. concealed bot hands:** visually distinct tile backs (v6: pale jade wall stacks, shown two-high, vs. deep midnight-blue concealed bot hands), with clear physical separation between a bot's hand and the nearest wall stack — never rendered so similarly that a player has to guess which is which.
+- **Tile inspector:** tapping/clicking any tile (in hand or elsewhere) highlights all visible copies of that tile and shows a count: how many are in discards/melds, how many remain unseen. (v6 implements this as a toggle plus click-to-select — an acceptable, arguably cleaner variant of "click any tile," confirmed against this requirement in Session 5a.)
 - **Wall counter:** number of tiles left to draw.
 - **Wind indicator:** prevailing wind, seat winds, dealer marker, hand number (e.g., "East 2 of 16").
+- **Turn indicator:** unambiguous at a glance whose turn it is — for every seat, not only the player's own turn. A glow or highlight demonstrated only for the player's turn is not sufficient proof this requirement is met; confirm the bot-turn case renders with equal clarity (see §5a, item 1, and the open gap noted in §5b).
 - **Score panel** (collapsible):
   - Current match scores for all four players.
   - **Live fan tracker for the player's own hand:** which fans are already locked in, which are close (e.g., "1 tile from Mixed Straight, 8 pts"), and current total if the hand were completed now. This is the core learning surface.
 - **Claim prompts:** when a discard can be claimed (chow/pung/kong/win), show clear buttons with a configurable decision timer (or no timer in relaxed mode).
 - **End-of-hand screen:** winning hand laid out, every scored fan listed by official name + points, settlement math shown explicitly.
 
-## 6. Hint system (the key feature)
+### 5a. UI acceptance checklist (information clarity — must satisfy before it's "done")
 
-Invoked by a **Hint button** (never automatic, never shown to bots). Three levels, selectable in settings:
+This is the concrete, testable standard behind "clearer than anything on the market" — the `ux-reviewer` agent (PLAN.md §3) checks new UI against this list directly, and it's the bar the owner judges any layout mockup against before real engine-wiring work starts (see PLAN.md's revised M3). A player who has never seen the game before should be able to answer every one of these **within about two seconds of looking at the screen**, with no clicking required:
 
-1. **Nudge:** "Consider your discard — two of your tiles are nearly useless to the hand." (no specifics)
-2. **Options:** lists 2–3 candidate discards with reasoning: tile efficiency (how many useful draws each keeps), safety (what it might feed opponents), and which fans each direction preserves.
-3. **Tutor:** full analysis — shanten count (tiles-from-ready), best discard, the fan combinations realistically reachable from this hand with their point totals, and whether the hand can reach the 8-point minimum (a critical MCR-specific trap for learners).
+1. Whose turn is it right now?
+2. What is the prevailing wind, and what is my seat wind?
+3. How many tiles are left in the wall?
+4. What's currently in my hand?
+5. What have I discarded so far, and what have my opponents discarded?
+6. What melds (if any) has each player exposed?
+7. What is the current match score for all four players?
+
+And within one click:
+
+8. How many of a given tile are still unseen (tile inspector)?
+9. What are my live options if I ask for a hint?
+
+A design that requires hunting, hovering, or opening a menu to answer 1–7 does not meet the bar, no matter how visually polished it is otherwise.
+
+### 5b. Reference material and mockup history
+
+- The owner's own screenshots of mahjong clients already tried (the good and the bad) are treated as primary design input, not just inspiration — specific elements from them get evaluated against §5a/§5c and either adopted or explicitly rejected with a reason, rather than the spec re-describing "a good UI" in the abstract. Keep these in `docs/design/references/` with a short note per image on what's specifically good or bad.
+- **Current baseline (v6):** `docs/Mockups/mahjong-seated-table-prototype-v6.html` + `docs/Mockups/mahjong-visual-design-spec-v6.md` + `docs/Mockups/assets/*.png`, owner-authored. This is a refinable working baseline for Session 5a, not a finished, untouchable artifact — every functional requirement in §5/§5a still applies regardless of what v6 already happens to show. Earlier internal mockups (`ui-mockup.html` v1/v2, and `docs/Mockups/Archive/` v3–v5) remain as history/reference but are superseded by v6 for the tactile table/tile rendering approach.
+- **Open gaps to resolve in Session 5a, not silently drop:**
+  1. Sort toolbar (Suit/Number/Honors/Simples/Odds/Evens) — present in the owner's reference screenshot and required by §5, not shown in v6; confirm it gets added.
+  2. Turn indicator for bot seats, not just the player's own turn (see §5 above).
+  3. Touch-target size after v6's CSS-transform scale-down — verify ≥44px on a real iPad, not just assumed from the desktop layout.
+  4. Tile art asset licensing/origin for `docs/Mockups/assets` (§4).
+  5. Missing flower/season tile assets (§4).
+
+### 5c. Visual fidelity bar ("feels like a real table," not just "shows the right information")
+
+Clarity (§5a) and physical believability are tracked as two separate, both-required bars. A screen can pass §5a and still fail here if it reads as a flat wireframe rather than a real game. Concretely:
+
+- Tiles read as physical objects with thickness and light on them — bevel/highlight on the face, a shadow that grounds them on the table — not flat colored rectangles.
+- The table itself has a felt surface and a bordering wood rail, not a flat solid-color background.
+- Picking up / selecting a hand tile has a tactile lift response (the tile visibly rises toward the player), not just a color change.
+- **v6 already clears this bar** — real tile-face assets over a layered CSS wood-and-felt table, no WebGL, no 3D engine, no change to the React/Vite stack in PLAN.md §1 — and is judged against the owner's own reference screenshots (§5b) as the quality floor it needs to match or beat, not an abstract "looks nice."
+- Consequence for sequencing: because this is a look-and-feel concern that affects the whole board at once, it was resolved together with the layout, not deferred to a later "tile art" pass. Session 6 narrows to finishing/choosing face-art details (missing flower tiles, any style refinement) now that the tactile rendering approach is already settled.
+
+## 6. Hint system / Strategy Coach (the key feature)
+
+**On-demand only, hidden by default** — the coach panel does not appear until the player taps Hint, and is never shown for bots. This was an explicit decision: an always-visible co-pilot (as v6's mockup shows it by default) risks becoming a crutch the player never weans off; gating it behind a deliberate action forces the player to commit to a read of the hand first.
+
+Content is organized as v6's tabbed panel (Best move / Hand plan / Tile safety), which maps onto the original three depth levels rather than replacing them:
+
+- **Best move tab ≈ Nudge + Options:** the recommended discard with a one-line reason is the shallow read; the numbered "why this is the strongest move" reasoning and "other reasonable choices" below it are the deeper options-level detail, both available as soon as the tab is open — no extra click needed to go from nudge to reasoning once the player has chosen to ask.
+- **Hand plan tab ≈ Tutor:** current hand shape, primary route, shanten-equivalent structure, and what would change the plan — full analysis, including whether the hand can reach the 8-point minimum (a critical MCR-specific trap for learners).
+- **Tile safety tab:** visible-copy evidence and defensive reasoning for the selected tile (reuses the tile-inspector counts from §5, and doubles as the defense/danger indicator from §9).
 
 Additional learning aids:
 
@@ -90,7 +134,7 @@ Features common to the stronger mahjong clients on the market, or general traine
 - **Ready-hand / waits display:** once your hand is one tile from complete, show exactly which tile(s) complete it and the resulting fan value for each — the single highest-value addition for a learner beyond what was originally scoped, since "am I even close, and to what" is the question new MCR players struggle with most.
 - **Tile-count grid:** a small reference panel listing all 34 tile types with how many of each remain unseen (visible in discards/melds subtracted from 4) — turns the tile-inspector idea into an always-available overview rather than a click-one-at-a-time lookup.
 - **Full match replay ("kifu") with scrubber:** record every draw/discard/claim; after a hand (or match) ends, step back through it move by move, not just a 2–3-line post-hand summary. This is the core study loop in serious mahjong clients and is worth more long-term than live hints.
-- **"Ask about this position" export:** a button that turns the current hand + visible board state into a clean, structured text (or image) summary — built specifically to replace the screenshot-into-Claude/ChatGPT workaround already in use. Two versions worth considering: (a) a copy-to-clipboard structured summary for pasting into any AI chat, and (b) later, an optional built-in "ask an AI" panel that sends that same structured summary to an LLM directly, so the workaround becomes a feature.
+- **"Ask about this position" export:** a button that turns the current hand + visible board state into a clean, structured text (or image) summary — built specifically to replace the screenshot-into-Claude/ChatGPT workaround already in use. Kept as a copy/export-only feature (no live in-app API call) — see PLAN.md's cost discussion.
 - **Defense/danger indicator:** a subtle per-tile risk rating in hand based on what's visible (e.g., an opponent showing two pungs in one suit, a tile no one has discarded late in the hand) — teaches the defensive half of strategy, which the hint system otherwise under-serves.
 - **Scenario/practice mode:** start from a specific preset hand (e.g., "two away from Mixed Triple Chow") instead of always a random deal — turns the fan encyclopedia from reference material into hands-on drills.
 - **Confirm-before-discard toggle:** optional tap-to-confirm before a discard commits, to prevent misclick regret — small thing, matters a lot for a beginner still reading tiles carefully.
@@ -101,7 +145,7 @@ Features common to the stronger mahjong clients on the market, or general traine
 ## 10. Non-functional requirements
 
 - **Correctness is the top requirement.** The scoring engine must be validated against independent references (see PLAN.md §Testing): official rulebook worked examples + cross-checking against an existing open-source MCR fan calculator (e.g., PyMahjongGB) over large numbers of generated hands.
-- Game engine is a **pure, UI-independent TypeScript module** (deterministic given a seeded RNG) — enables headless testing, replay, and a future server version.
+- Game engine is a **pure, UI-independent TypeScript module** (deterministic given a seeded RNG) — enables headless testing, replay, and a future server version. Visual polish (§5c) lives entirely in packages/ui and never leaks into the engine.
 - Full game state serializable: save/resume a game, replay a hand, export a hand position (useful for asking questions about a position later — see §9).
 - Load time < 3s on typical broadband; works offline after first load (PWA nice-to-have, not required in v1).
 - No personal data collected; no backend.
@@ -111,3 +155,8 @@ Features common to the stronger mahjong clients on the market, or general traine
 - Local multiplayer / online multiplayer (engine's purity + serializable state keeps this door open).
 - Accounts, stats history, difficulty ladder, other rulesets (riichi, Hong Kong).
 - App-store packaging.
+
+## 12. Movements
+Hand ordering: The order of tiles in a player's hand is user-controlled. Players can rearrange their own tiles at any time (drag-and-drop or tap-to-swap). The game must never auto-sort a hand without the player's action; a "sort hand" button may be offered as an explicit action. Hand order is local presentation state only — it does not affect game logic and is not visible to other players.
+
+Tile transitions (deferred, architecture required now): Visual animations for tile movement (wall → hand on draw, hand → discard, claimed tile → meld) are a post-MVP feature. However, the rendering layer must represent tiles as persistent objects with positions, so transitions between zones can be animated later without rework.
