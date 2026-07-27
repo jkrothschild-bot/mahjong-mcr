@@ -1,18 +1,34 @@
+import { useState } from 'react'
 import { Board } from './board/Board.js'
 import { useGameLoop } from './game/useGameLoop.js'
+import { SettingsPanel } from './settings/SettingsPanel.js'
+import { useSettings } from './settings/useSettings.js'
 
 const ZERO_SCORES = { 0: 0, 1: 0, 2: 0, 3: 0 } as const
 
 function App() {
-  // Bot speed is hardcoded for now — Phase 3 (settings module) makes this
-  // configurable per SPEC.md §7's Instant/Fast/Normal/Relaxed presets.
-  const { state, matchState } = useGameLoop({ matchSeed: 42, botSpeedMs: 800 })
+  const { settings, update } = useSettings()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { state, matchState } = useGameLoop({ matchSeed: 42, botSpeedMs: settings.botSpeedMs })
 
   return (
     <div className="min-h-svh bg-neutral-900 text-neutral-100 flex flex-col">
-      <header className="px-4 py-3 border-b border-neutral-700">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
         <h1 className="text-xl font-semibold tracking-tight">MCR Mahjong Trainer</h1>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen((open) => !open)}
+          className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+        >
+          Settings
+        </button>
       </header>
+
+      {settingsOpen && (
+        <div className="px-4 pt-3">
+          <SettingsPanel settings={settings} onUpdate={update} />
+        </div>
+      )}
 
       <main className="flex-1 flex flex-col items-center justify-center gap-6 p-4">
         {/* Real per-hand match scoring lands in Phase 8 (end-of-hand score
