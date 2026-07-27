@@ -122,4 +122,24 @@ describe('HandTiles', () => {
 
     expect(onReorder).not.toHaveBeenCalled()
   })
+
+  it('calls onTileClick with the clicked tile id', () => {
+    const [c1] = idsFor('C1', 1)
+    const [c2] = idsFor('C2', 1)
+    const onTileClick = vi.fn()
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} onTileClick={onTileClick} />)
+
+    fireEvent.click(screen.getByTestId(`hand-tile-${c2}`))
+
+    expect(onTileClick).toHaveBeenCalledWith(c2)
+  })
+
+  it('highlights the selected tile', () => {
+    const [c1] = idsFor('C1', 1)
+    const [c2] = idsFor('C2', 1)
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} selectedTileId={c2} />)
+
+    expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-2')
+    expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-2')
+  })
 })

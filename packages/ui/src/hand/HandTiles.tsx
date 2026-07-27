@@ -5,6 +5,11 @@ import { tileFaceClassName } from '../tiles/tileStyles.js'
 export interface HandTilesProps {
   order: readonly TileInstanceId[]
   onReorder: (draggedId: TileInstanceId, beforeId: TileInstanceId | null) => void
+  // Optional: a plain tap/click (as opposed to a drag with real pointer
+  // movement, which browsers don't synthesize a click event for) selects a
+  // tile — used by the discard flow, independent of reordering.
+  onTileClick?: (id: TileInstanceId) => void
+  selectedTileId?: TileInstanceId | null
 }
 
 const END_ZONE_ID = '__end__'
@@ -26,7 +31,7 @@ function resolveDropTarget(clientX: number, clientY: number): TileInstanceId | n
 // its new position on release; sorting and drag both funnel through the
 // same onReorder/order state (useHandOrder), so there's one place hand
 // position changes happen, matching CLAUDE.md's zone-movement rule.
-export function HandTiles({ order, onReorder }: HandTilesProps) {
+export function HandTiles({ order, onReorder, onTileClick, selectedTileId }: HandTilesProps) {
   const [draggingId, setDraggingId] = useState<TileInstanceId | null>(null)
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>, id: TileInstanceId) {
@@ -55,8 +60,13 @@ export function HandTiles({ order, onReorder }: HandTilesProps) {
           onPointerDown={(e) => handlePointerDown(e, id)}
           onPointerUp={(e) => endDrag(e, id, true)}
           onPointerCancel={(e) => endDrag(e, id, false)}
+          onClick={onTileClick ? () => onTileClick(id) : undefined}
           style={{ touchAction: 'none' }}
-          className={tileFaceClassName({ dimmed: draggingId === id, extra: 'cursor-grab' })}
+          className={tileFaceClassName({
+            dimmed: draggingId === id,
+            highlighted: selectedTileId === id,
+            extra: 'cursor-grab',
+          })}
         >
           {typeIdOfInstance(id)}
         </div>

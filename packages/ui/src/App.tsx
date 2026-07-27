@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Board } from './board/Board.js'
 import { CallOutToast } from './game/CallOutToast.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
+import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
+import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop } from './game/useGameLoop.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
@@ -11,9 +13,18 @@ const ZERO_SCORES = { 0: 0, 1: 0, 2: 0, 3: 0 } as const
 function App() {
   const { settings, update } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { state, matchState, humanPendingClaim, submitHumanMove } = useGameLoop({
+  const { state, matchState, isHumanTurn, humanPendingClaim, submitHumanMove } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
+  })
+
+  const onSubmitDiscard = useCallback(
+    (tile: number) => submitHumanMove({ kind: 'discard', tile }),
+    [submitHumanMove],
+  )
+  const { selectedTileId, selectTile, pendingConfirmTileId, requestDiscard, confirmDiscard, cancelDiscard } = useDiscardFlow({
+    confirmBeforeDiscard: settings.confirmBeforeDiscard,
+    onSubmitDiscard,
   })
 
   return (
@@ -43,7 +54,15 @@ function App() {
         {/* Real per-hand match scoring lands in Phase 8 (end-of-hand score
             screen) — PlayerState.score is never updated by the engine
             itself, so until settlement is wired in, every seat shows 0. */}
-        <Board state={state} matchState={matchState} matchScores={ZERO_SCORES} />
+        <Board
+          state={state}
+          matchState={matchState}
+          matchScores={ZERO_SCORES}
+          isHumanTurn={isHumanTurn}
+          selectedTileId={selectedTileId}
+          onTileClick={selectTile}
+          onRequestDiscard={requestDiscard}
+        />
 
         <ClaimPrompt
           state={state}
@@ -53,6 +72,8 @@ function App() {
           onDeclare={submitHumanMove}
         />
       </main>
+
+      <DiscardConfirmModal tileId={pendingConfirmTileId} onConfirm={confirmDiscard} onCancel={cancelDiscard} />
     </div>
   )
 }

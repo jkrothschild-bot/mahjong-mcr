@@ -9,6 +9,10 @@ export interface BoardProps {
   state: GameState
   matchState: MatchState
   matchScores: Record<SeatId, number>
+  isHumanTurn: boolean
+  selectedTileId: number | null
+  onTileClick: (id: number) => void
+  onRequestDiscard: () => void
 }
 
 // Physical seat position never changes hand-to-hand (unlike wind labels,
@@ -23,7 +27,15 @@ const GRID_CLASS_BY_OFFSET: Record<number, string> = {
   3: 'row-start-2 col-start-3', // right
 }
 
-export function Board({ state, matchState, matchScores }: BoardProps) {
+export function Board({
+  state,
+  matchState,
+  matchScores,
+  isHumanTurn,
+  selectedTileId,
+  onTileClick,
+  onRequestDiscard,
+}: BoardProps) {
   const { order, sort, reorder } = useHandOrder(state.players[HUMAN_SEAT].hand.concealedTiles)
 
   return (
@@ -49,6 +61,10 @@ export function Board({ state, matchState, matchScores }: BoardProps) {
                 handOrder={isHuman ? order : undefined}
                 onSortHand={isHuman ? sort : undefined}
                 onReorderHand={isHuman ? reorder : undefined}
+                selectedTileId={isHuman ? selectedTileId : undefined}
+                onTileClick={isHuman ? onTileClick : undefined}
+                canDiscard={isHuman ? isHumanTurn && selectedTileId !== null : undefined}
+                onRequestDiscard={isHuman ? onRequestDiscard : undefined}
               />
             </div>
           )

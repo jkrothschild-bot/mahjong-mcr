@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { emptyHand, TILE_TYPE_BY_ID, typeIdOfInstance, type PlayerState, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
 import { Seat } from './Seat.js'
@@ -61,5 +61,46 @@ describe('Seat', () => {
     const p = player({ seat: 1 })
     render(<Seat seat={1} player={p} isDealer={false} isCurrentTurn={false} isHuman={false} matchScore={1500} />)
     expect(screen.getByTestId('seat-1-score')).toHaveTextContent('1500')
+  })
+
+  it('disables "Discard selected" until canDiscard is true, and wires it to onRequestDiscard', () => {
+    const p = player({ seat: 0, hand: { ...emptyHand(), concealedTiles: idsFor('C1', 1) } })
+    const onRequestDiscard = vi.fn()
+    const { rerender } = render(
+      <Seat
+        seat={0}
+        player={p}
+        isDealer={false}
+        isCurrentTurn
+        isHuman
+        matchScore={0}
+        handOrder={p.hand.concealedTiles}
+        onSortHand={vi.fn()}
+        onReorderHand={vi.fn()}
+        canDiscard={false}
+        onRequestDiscard={onRequestDiscard}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Discard selected' })).toBeDisabled()
+
+    rerender(
+      <Seat
+        seat={0}
+        player={p}
+        isDealer={false}
+        isCurrentTurn
+        isHuman
+        matchScore={0}
+        handOrder={p.hand.concealedTiles}
+        onSortHand={vi.fn()}
+        onReorderHand={vi.fn()}
+        canDiscard
+        onRequestDiscard={onRequestDiscard}
+      />,
+    )
+    const button = screen.getByRole('button', { name: 'Discard selected' })
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+    expect(onRequestDiscard).toHaveBeenCalled()
   })
 })

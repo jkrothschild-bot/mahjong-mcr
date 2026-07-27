@@ -52,4 +52,44 @@ describe('App', () => {
     const expectedLabels = sortByMode(referenceTiles, 'suit').map(typeIdOfInstance)
     expect(renderedLabels).toEqual(expectedLabels)
   })
+
+  it('lets the human select a hand tile and discard it, moving it into their discard pile', () => {
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'Discard selected' })).toBeDisabled()
+
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+    const discardedLabel = firstTile!.textContent
+
+    fireEvent.click(firstTile!)
+    const discardButton = screen.getByRole('button', { name: 'Discard selected' })
+    expect(discardButton).toBeEnabled()
+    fireEvent.click(discardButton)
+
+    const discards = screen.getByRole('list', { name: 'Seat 0 discards' })
+    expect(discards.querySelectorAll('[role="listitem"]')).toHaveLength(1)
+    expect(discards).toHaveTextContent(discardedLabel!)
+  })
+
+  it('shows a confirmation modal before discarding when the setting is on, and only commits on confirm', () => {
+    window.localStorage.setItem(
+      'mcr-mahjong:settings:v1',
+      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: true, claimTimerEnabled: true, claimTimerMs: 8000 }),
+    )
+    render(<App />)
+
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+    fireEvent.click(firstTile!)
+    fireEvent.click(screen.getByRole('button', { name: 'Discard selected' }))
+
+    expect(screen.getByRole('dialog', { name: 'Confirm discard' })).toBeInTheDocument()
+    // Not committed yet — the modal intercepted it.
+    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(screen.queryByRole('dialog', { name: 'Confirm discard' })).not.toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
+  })
 })

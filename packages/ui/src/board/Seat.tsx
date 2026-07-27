@@ -20,6 +20,11 @@ export interface SeatProps {
   handOrder?: readonly number[]
   onSortHand?: (mode: SortMode) => void
   onReorderHand?: (draggedId: number, beforeId: number | null) => void
+  // Only used when isHuman — the discard flow (Phase 5).
+  selectedTileId?: number | null
+  onTileClick?: (id: number) => void
+  canDiscard?: boolean
+  onRequestDiscard?: () => void
 }
 
 // A player's full slot: identity (wind/dealer/turn), hand-or-backs, melds,
@@ -39,6 +44,10 @@ export function Seat({
   handOrder,
   onSortHand,
   onReorderHand,
+  selectedTileId,
+  onTileClick,
+  canDiscard,
+  onRequestDiscard,
 }: SeatProps) {
   return (
     <section
@@ -74,8 +83,25 @@ export function Seat({
 
       {isHuman ? (
         <div className="flex flex-col gap-2">
-          {onSortHand && <SortToolbar onSort={onSortHand} />}
-          <HandTiles order={handOrder ?? []} onReorder={onReorderHand ?? (() => {})} />
+          <div className="flex flex-wrap items-center gap-2">
+            {onSortHand && <SortToolbar onSort={onSortHand} />}
+            {onRequestDiscard && (
+              <button
+                type="button"
+                disabled={!canDiscard}
+                onClick={onRequestDiscard}
+                className="min-h-11 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400 disabled:cursor-not-allowed disabled:border-neutral-600 disabled:bg-neutral-700 disabled:text-neutral-400"
+              >
+                Discard selected
+              </button>
+            )}
+          </div>
+          <HandTiles
+            order={handOrder ?? []}
+            onReorder={onReorderHand ?? (() => {})}
+            onTileClick={onTileClick}
+            selectedTileId={selectedTileId}
+          />
         </div>
       ) : (
         <div role="list" aria-label={`Seat ${seat} concealed tiles`} className="flex gap-1">
