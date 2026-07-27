@@ -54,3 +54,22 @@ export function tileBackClassName(): string {
 export function tileBackCompactClassName(): string {
   return 'flex h-8 w-6 shrink-0 select-none items-center justify-center rounded border text-xs font-semibold border-indigo-900 bg-indigo-950 text-indigo-200'
 }
+
+// A discard river's job is to show what's already been played, not to
+// invite interaction the way a hand tile does — its click-to-inspect
+// (SPEC.md §5's tile inspector) is a secondary bonus on top of that, not
+// the reason it exists. That earns it the same compact-and-exempt-from-
+// 44px treatment as tileBackCompactClassName above, sized a touch wider to
+// keep 2-character labels (WE, DR, C5) legible. A discard river that grows
+// to 10+ tiles at full hand-tile size was consuming a lot of vertical
+// space across every seat's panel.
+export function tileFaceCompactClassName(opts: { highlighted?: boolean; extra?: string } = {}): string {
+  return [
+    'flex h-8 w-7 shrink-0 select-none items-center justify-center rounded border text-xs font-semibold',
+    TILE_FACE_CLASSES,
+    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
+    opts.extra ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}

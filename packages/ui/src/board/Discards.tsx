@@ -1,5 +1,5 @@
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
-import { tileFaceClassName } from '../tiles/tileStyles.js'
+import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 
 export interface DiscardsProps {
   seat: number
@@ -26,7 +26,7 @@ export function Discards({ seat, tiles, selectedTypeId, onTileClick }: DiscardsP
             data-testid={`discard-tile-${id}`}
             role="listitem"
             onClick={onTileClick ? () => onTileClick(id) : undefined}
-            className={tileFaceClassName({
+            className={tileFaceCompactClassName({
               highlighted: selectedTypeId === typeId,
               extra: onTileClick ? 'cursor-pointer' : undefined,
             })}
