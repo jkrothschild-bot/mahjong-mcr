@@ -149,6 +149,41 @@ describe('useGameLoop', () => {
     expect(stoppedForHuman || handOver).toBe(true)
   })
 
+  it('auto-draws for the human on their second turn, so a second discard does not throw', () => {
+    // Regression test: legalMoves' 'awaitingDraw' phase has exactly one
+    // move ({kind:'draw'}) for whichever seat is currentSeat, including the
+    // human — but the bot-scheduling effect used to filter HUMAN_SEAT out
+    // of every phase, so nobody ever drew for the human on their second+
+    // turn. The UI still reported isHumanTurn === true (a stale bug) and
+    // let a tile be selected and discarded, which threw
+    // "Illegal move discard in awaitingDraw phase" in moves.ts.
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20 }))
+
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+
+    for (let i = 0; i < 60 && result.current.state.phase !== 'handEnded' && !result.current.isHumanTurn; i++) {
+      act(() => {
+        vi.advanceTimersByTime(20)
+      })
+    }
+
+    if (result.current.state.phase === 'handEnded') return // rare: hand ended before the human's next turn
+
+    expect(result.current.isHumanTurn).toBe(true)
+    expect(result.current.state.phase).toBe('awaitingDiscard')
+    expect(result.current.state.currentSeat).toBe(HUMAN_SEAT)
+
+    const [nextTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    expect(() => {
+      act(() => {
+        result.current.submitHumanMove({ kind: 'discard', tile: nextTile! })
+      })
+    }).not.toThrow()
+  })
+
   it('startNextHand rotates the dealer per MCR (unconditional rotation)', () => {
     const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20 }))
     expect(result.current.matchState.dealerSeat).toBe(0)

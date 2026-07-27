@@ -105,12 +105,22 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
 
   useEffect(() => {
     if (gameState.phase === 'handEnded') return
-    const botSeats = pendingSeatsNeedingDecision(gameState).filter((seat) => seat !== HUMAN_SEAT)
-    const timers = botSeats.map((seat) =>
-      setTimeout(() => {
-        const move = chooseBotMove(gameState, seat)
-        dispatch({ type: 'apply', seat, move })
-      }, params.botSpeedMs),
+    // A draw is never a real decision (legalMoves' 'awaitingDraw' case is
+    // always exactly [{kind:'draw'}], for every seat including the human) —
+    // it's auto-dispatched immediately, same as a bot's move, just with no
+    // artificial delay. Only the human's genuine decisions (discard, claim
+    // declarations) wait for explicit input via submitHumanMove.
+    const autoSeats = pendingSeatsNeedingDecision(gameState).filter(
+      (seat) => seat !== HUMAN_SEAT || gameState.phase === 'awaitingDraw',
+    )
+    const timers = autoSeats.map((seat) =>
+      setTimeout(
+        () => {
+          const move = chooseBotMove(gameState, seat)
+          dispatch({ type: 'apply', seat, move })
+        },
+        seat === HUMAN_SEAT ? 0 : params.botSpeedMs,
+      ),
     )
     return () => {
       timers.forEach(clearTimeout)
@@ -118,8 +128,13 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
   }, [gameState, params.botSpeedMs])
 
   const pendingSeats = pendingSeatsNeedingDecision(gameState)
-  const isHumanTurn =
-    (gameState.phase === 'awaitingDraw' || gameState.phase === 'awaitingDiscard') && gameState.currentSeat === HUMAN_SEAT
+  // 'awaitingDraw' is deliberately excluded here even though it's the
+  // human's currentSeat — there's no decision to make in that phase (see
+  // the auto-draw effect above), so treating it as "your turn" let the
+  // discard button render active before the mandatory draw had happened,
+  // throwing when submitted (moves.ts rejects 'discard' during
+  // 'awaitingDraw').
+  const isHumanTurn = gameState.phase === 'awaitingDiscard' && gameState.currentSeat === HUMAN_SEAT
   const isHumanClaimTurn =
     (gameState.phase === 'awaitingClaims' || gameState.phase === 'awaitingRobKongClaims') &&
     pendingSeats.includes(HUMAN_SEAT)
