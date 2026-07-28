@@ -6,6 +6,10 @@ export interface ScoreScreenProps {
   state: GameState
   matchScores: Record<Seat, number>
   onNextHand: () => void
+  // SPEC.md §6: "linked from... the end-of-hand screen (tap a fan name →
+  // see its definition)." Optional so ScoreScreen still works standalone
+  // (e.g. in tests) without wiring up the encyclopedia.
+  onFanClick?: (fanId: number) => void
 }
 
 const ALL_SEATS: readonly Seat[] = [0, 1, 2, 3]
@@ -26,7 +30,7 @@ function formatSigned(amount: number): string {
 // flower points are winner.hand.flowers.length * FAN_REGISTRY[81].points —
 // both derived, not hardcoded — so this can never drift from the scoring
 // engine as new fans/rulings land.
-export function ScoreScreen({ state, matchScores, onNextHand }: ScoreScreenProps) {
+export function ScoreScreen({ state, matchScores, onNextHand, onFanClick }: ScoreScreenProps) {
   if (state.phase !== 'handEnded' || !state.result) return null
   const { result } = state
 
@@ -43,7 +47,7 @@ export function ScoreScreen({ state, matchScores, onNextHand }: ScoreScreenProps
             <p className="text-sm text-neutral-400">The wall ran out — this hand is a draw.</p>
           </div>
         ) : (
-          <WinDetails state={state} />
+          <WinDetails state={state} onFanClick={onFanClick} />
         )}
 
         <div className="flex flex-col gap-1 border-t border-neutral-700 pt-3">
@@ -68,7 +72,7 @@ export function ScoreScreen({ state, matchScores, onNextHand }: ScoreScreenProps
   )
 }
 
-function WinDetails({ state }: { state: GameState }) {
+function WinDetails({ state, onFanClick }: { state: GameState; onFanClick?: (fanId: number) => void }) {
   const result = state.result!
   const winnerSeat = result.winnerSeats![0]!
   const outcome = deriveHandOutcome(state)
@@ -87,10 +91,17 @@ function WinDetails({ state }: { state: GameState }) {
           const meta = FAN_REGISTRY[match.fanId]!
           return (
             <li key={match.fanId} role="listitem" className="flex justify-between">
-              <span>
-                {meta.name}
-                {match.count > 1 ? ` x${match.count}` : ''}
-              </span>
+              {onFanClick ? (
+                <button type="button" onClick={() => onFanClick(match.fanId)} className="text-left underline decoration-dotted hover:text-amber-300">
+                  {meta.name}
+                  {match.count > 1 ? ` x${match.count}` : ''}
+                </button>
+              ) : (
+                <span>
+                  {meta.name}
+                  {match.count > 1 ? ` x${match.count}` : ''}
+                </span>
+              )}
               <span className="font-mono">{meta.points * match.count}</span>
             </li>
           )

@@ -21,13 +21,13 @@ const state = startHand({ seed: 1, handNumber: 1, prevailingWind: 'east', dealer
 describe('HintPanel', () => {
   it('opens on the Best move tab by default, with real content', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
-    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} />)
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
     expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('switches to the Hand plan and Tile safety tabs on click', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
-    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} />)
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
 
     fireEvent.click(screen.getByRole('tab', { name: 'Hand plan' }))
     expect(screen.getByRole('tab', { name: 'Hand plan' })).toHaveAttribute('aria-selected', 'true')
@@ -42,7 +42,7 @@ describe('HintPanel', () => {
   it('shows a safety rating on the Tile safety tab once a tile is selected', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
     render(
-      <HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId="C5" onClose={() => {}} />,
+      <HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId="C5" onClose={() => {}} onOpenEncyclopedia={() => {}} />,
     )
     fireEvent.click(screen.getByRole('tab', { name: 'Tile safety' }))
     expect(screen.getByTestId('tile-safety-rating')).toBeInTheDocument()
@@ -51,8 +51,27 @@ describe('HintPanel', () => {
   it('calls onClose when the Close button is clicked', () => {
     const onClose = vi.fn()
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
-    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={onClose} />)
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={onClose} onOpenEncyclopedia={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('calls onOpenEncyclopedia when the Fan encyclopedia link is clicked', () => {
+    const onOpenEncyclopedia = vi.fn()
+    const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
+    render(
+      <HintPanel
+        hand={hand}
+        prevailingWind="east"
+        seatWind="east"
+        state={state}
+        forSeat={0}
+        selectedTypeId={null}
+        onClose={() => {}}
+        onOpenEncyclopedia={onOpenEncyclopedia}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Fan encyclopedia' }))
+    expect(onOpenEncyclopedia).toHaveBeenCalledOnce()
   })
 })

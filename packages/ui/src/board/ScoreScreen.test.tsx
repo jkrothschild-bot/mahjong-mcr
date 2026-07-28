@@ -120,6 +120,19 @@ describe('ScoreScreen', () => {
     expect(screen.getByTestId('score-screen-match-score-1')).toHaveTextContent('-8')
   })
 
+  it('calls onFanClick with the fan id when a fan name is clicked (only when the prop is provided)', () => {
+    const state = selfDrawWinState()
+    const { rerender } = render(<ScoreScreen state={state} matchScores={ZERO_SCORES} onNextHand={() => {}} />)
+    // Without onFanClick, fan names render as plain text, not buttons.
+    expect(screen.getByRole('list', { name: 'Fan breakdown' }).querySelector('button')).not.toBeInTheDocument()
+
+    const onFanClick = vi.fn()
+    rerender(<ScoreScreen state={state} matchScores={ZERO_SCORES} onNextHand={() => {}} onFanClick={onFanClick} />)
+    const firstFanButton = screen.getByRole('list', { name: 'Fan breakdown' }).querySelector('button')!
+    fireEvent.click(firstFanButton)
+    expect(onFanClick).toHaveBeenCalledWith(expect.any(Number))
+  })
+
   it('calls onNextHand when the button is clicked', () => {
     const onNextHand = vi.fn()
     const state = selfDrawWinState()

@@ -10,6 +10,7 @@ import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop } from './game/useGameLoop.js'
+import { FanEncyclopedia } from './hints/FanEncyclopedia.js'
 import { HintPanel } from './hints/HintPanel.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
@@ -19,6 +20,12 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
+  const [encyclopediaFanId, setEncyclopediaFanId] = useState<number | undefined>(undefined)
+  const [encyclopediaOpen, setEncyclopediaOpen] = useState(false)
+  const openEncyclopedia = (fanId?: number) => {
+    setEncyclopediaFanId(fanId)
+    setEncyclopediaOpen(true)
+  }
   // Tile inspector (SPEC.md §5): lifted here (not owned inside Board) so the
   // Hint panel's Tile Safety tab (M5) can share the exact same selection.
   const [selectedTypeId, setSelectedTypeId] = useState<TileTypeId | null>(null)
@@ -69,6 +76,13 @@ function App() {
           </button>
           <button
             type="button"
+            onClick={() => openEncyclopedia()}
+            className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Fan encyclopedia
+          </button>
+          <button
+            type="button"
             onClick={() => setSettingsOpen((open) => !open)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
@@ -111,6 +125,7 @@ function App() {
             forSeat={HUMAN_SEAT}
             selectedTypeId={selectedTypeId}
             onClose={() => setHintOpen(false)}
+            onOpenEncyclopedia={() => openEncyclopedia()}
           />
         )}
 
@@ -133,7 +148,9 @@ function App() {
         onClose={() => setTileCountGridOpen(false)}
       />
 
-      <ScoreScreen state={state} matchScores={matchScores} onNextHand={startNextHand} />
+      <ScoreScreen state={state} matchScores={matchScores} onNextHand={startNextHand} onFanClick={openEncyclopedia} />
+
+      {encyclopediaOpen && <FanEncyclopedia initialFanId={encyclopediaFanId} onClose={() => setEncyclopediaOpen(false)} />}
     </div>
   )
 }

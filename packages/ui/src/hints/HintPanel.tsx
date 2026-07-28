@@ -12,6 +12,7 @@ export interface HintPanelProps {
   forSeat: Seat
   selectedTypeId: TileTypeId | null
   onClose: () => void
+  onOpenEncyclopedia: () => void
 }
 
 type HintTab = 'bestMove' | 'handPlan' | 'tileSafety'
@@ -33,7 +34,7 @@ const TABS: { id: HintTab; label: string }[] = [
 // more), which breaks SPEC.md §5a's no-scrolling rule. A modal keeps the
 // board's own layout completely unaffected regardless of how much content
 // later phases add to these tabs.
-export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, selectedTypeId, onClose }: HintPanelProps) {
+export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, selectedTypeId, onClose, onOpenEncyclopedia }: HintPanelProps) {
   const [tab, setTab] = useState<HintTab>('bestMove')
 
   return (
@@ -47,13 +48,22 @@ export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, sele
       >
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-indigo-300">Strategy Coach</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
-          >
-            Close
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onOpenEncyclopedia}
+              className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+            >
+              Fan encyclopedia
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div role="tablist" aria-label="Hint depth" className="flex gap-1">
