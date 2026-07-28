@@ -8,7 +8,9 @@ import {
   type MatchState,
   type Move,
   type PendingClaim,
+  type RecordedMove,
   type Seat,
+  type StartHandParams,
 } from '@mahjong-mcr/engine'
 import { chooseBotMove } from './botAgent.js'
 import { deriveHandOutcome } from './deriveScoreContext.js'
@@ -18,6 +20,17 @@ import { pendingSeatsNeedingDecision } from './pendingSeats.js'
 
 const ZERO_MATCH_SCORES: Record<Seat, number> = { 0: 0, 1: 0, 2: 0, 3: 0 }
 
+// One hand's worth of replay material (M6, SPEC.md §9's "full match replay
+// with a scrubber"): the exact params startHand needs to re-deal this hand,
+// plus every (seat, Move) applied to it since, in order. Together with
+// engine/replay.ts's replayToIndex, this reconstructs the exact GameState
+// at any point in the hand — no need to parse the Action log back into
+// Moves (see replay.ts's own doc comment for why that's the wrong layer).
+export interface HandMoveLog {
+  startParams: StartHandParams
+  moves: RecordedMove[]
+}
+
 interface LoopState {
   gameState: GameState
   matchState: MatchState
@@ -25,25 +38,40 @@ interface LoopState {
   // game-state.ts) — the UI owns match-total bookkeeping itself, in memory
   // only, by accumulating each hand's settlement payments as it ends.
   matchScores: Record<Seat, number>
+  // Every hand played so far this session, in order — in-memory only, not
+  // persisted across reloads (matching MatchState's own existing posture).
+  matchMoveLogs: HandMoveLog[]
 }
 
 type LoopAction = { type: 'apply'; seat: Seat; move: Move } | { type: 'startNextHand' }
 
-function beginHandFrom(matchState: MatchState): Pick<LoopState, 'gameState' | 'matchState'> {
+interface BegunHand {
+  gameState: GameState
+  matchState: MatchState
+  startParams: StartHandParams
+}
+
+function beginHandFrom(matchState: MatchState): BegunHand {
   const { seed, matchState: begun } = beginHand(matchState)
-  const gameState = startHand({
+  const startParams: StartHandParams = {
     seed,
     handNumber: begun.matchHandNumber,
     prevailingWind: begun.prevailingWind,
     dealerSeat: begun.dealerSeat,
-  })
-  return { gameState, matchState: begun }
+  }
+  return { gameState: startHand(startParams), matchState: begun, startParams }
 }
 
 // Exported for direct testing of the match/hand-boundary wiring without a
 // full startMatch call.
 export function initLoopState(matchSeed: number): LoopState {
-  return { ...beginHandFrom(startMatch(matchSeed)), matchScores: ZERO_MATCH_SCORES }
+  const begun = beginHandFrom(startMatch(matchSeed))
+  return {
+    gameState: begun.gameState,
+    matchState: begun.matchState,
+    matchScores: ZERO_MATCH_SCORES,
+    matchMoveLogs: [{ startParams: begun.startParams, moves: [] }],
+  }
 }
 
 // Folds the ending hand's settlement (if any — an exhaustive draw pays out
@@ -61,13 +89,28 @@ export function applySettlement(endedGameState: GameState, scores: Record<Seat, 
 
 function loopReducer(state: LoopState, action: LoopAction): LoopState {
   switch (action.type) {
-    case 'apply':
-      return { ...state, gameState: gameReducer(state.gameState, action) }
-    case 'startNextHand':
+    case 'apply': {
+      const nextGameState = gameReducer(state.gameState, action)
+      // gameReducer is a no-op once the hand has ended (a stale bot timer
+      // can fire in the same tick the hand ends from an unrelated
+      // dispatch — see gameReducer's own comment) — reference-equal in
+      // that case, since applyMove otherwise always returns a new object.
+      // Don't log a move that didn't actually happen.
+      if (nextGameState === state.gameState) return state
+      const logs = state.matchMoveLogs.slice()
+      const current = logs[logs.length - 1]!
+      logs[logs.length - 1] = { ...current, moves: [...current.moves, { seat: action.seat, move: action.move }] }
+      return { ...state, gameState: nextGameState, matchMoveLogs: logs }
+    }
+    case 'startNextHand': {
+      const begun = beginHandFrom(advanceMatch(state.matchState))
       return {
-        ...beginHandFrom(advanceMatch(state.matchState)),
+        gameState: begun.gameState,
+        matchState: begun.matchState,
         matchScores: applySettlement(state.gameState, state.matchScores),
+        matchMoveLogs: [...state.matchMoveLogs, { startParams: begun.startParams, moves: [] }],
       }
+    }
   }
 }
 
@@ -75,6 +118,9 @@ export interface UseGameLoopResult {
   state: GameState
   matchState: MatchState
   matchScores: Record<Seat, number>
+  // Every hand played so far this session — M6's replay scrubber reads
+  // this directly (see HandMoveLog's own doc comment).
+  matchMoveLogs: HandMoveLog[]
   // Set only when HUMAN_SEAT itself must declare against a pending claim —
   // undefined the rest of the time, including while bots are still
   // declaring in the same window.
@@ -108,7 +154,7 @@ export interface UseGameLoopParams {
 // separate, purely client-side concern layered on top of whatever this
 // hook exposes as the human's hand.
 export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
-  const [{ gameState, matchState, matchScores }, dispatch] = useReducer(
+  const [{ gameState, matchState, matchScores, matchMoveLogs }, dispatch] = useReducer(
     loopReducer,
     params.matchSeed,
     initLoopState,
@@ -176,6 +222,7 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     state: gameState,
     matchState,
     matchScores,
+    matchMoveLogs,
     humanPendingClaim: isHumanClaimTurn ? gameState.pendingClaim : undefined,
     hasPendingBotMove: pendingBotSeat !== undefined,
     advanceOneBotMove,

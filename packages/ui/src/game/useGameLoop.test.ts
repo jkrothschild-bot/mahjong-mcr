@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyMove } from '@mahjong-mcr/engine'
+import { applyMove, replayToIndex } from '@mahjong-mcr/engine'
 import {
   TILE_TYPE_BY_ID,
   emptyHand,
@@ -103,6 +103,18 @@ describe('initLoopState', () => {
     const b = initLoopState(42)
     expect(a.gameState.players[0].hand.concealedTiles).toEqual(b.gameState.players[0].hand.concealedTiles)
   })
+
+  it('starts with exactly one empty move log entry for hand 1', () => {
+    const { matchMoveLogs, gameState } = initLoopState(42)
+    expect(matchMoveLogs).toHaveLength(1)
+    expect(matchMoveLogs[0]!.moves).toEqual([])
+    expect(matchMoveLogs[0]!.startParams).toEqual({
+      seed: gameState.seed,
+      handNumber: gameState.handNumber,
+      prevailingWind: gameState.prevailingWind,
+      dealerSeat: gameState.dealerSeat,
+    })
+  })
 })
 
 describe('useGameLoop', () => {
@@ -182,6 +194,53 @@ describe('useGameLoop', () => {
         result.current.submitHumanMove({ kind: 'discard', tile: nextTile! })
       })
     }).not.toThrow()
+  })
+
+  it("records every applied move into the current hand's move log, replayable back to the exact live state", () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
+
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+    for (let i = 0; i < 10; i++) {
+      act(() => {
+        vi.advanceTimersByTime(20)
+      })
+    }
+
+    expect(result.current.matchMoveLogs).toHaveLength(1)
+    const log = result.current.matchMoveLogs[0]!
+    expect(log.moves.length).toBeGreaterThan(0)
+    expect(replayToIndex(log.startParams, log.moves, log.moves.length)).toEqual(result.current.state)
+  })
+
+  it('startNextHand pushes a fresh, empty move-log entry for the new hand', () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
+
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+    const movesInHand1 = result.current.matchMoveLogs[0]!.moves.length
+    expect(movesInHand1).toBeGreaterThan(0)
+
+    act(() => {
+      result.current.startNextHand()
+    })
+
+    expect(result.current.matchMoveLogs).toHaveLength(2)
+    expect(result.current.matchMoveLogs[0]!.moves).toHaveLength(movesInHand1) // hand 1's log is untouched
+    expect(result.current.matchMoveLogs[1]!.moves).toEqual([])
+    expect(result.current.matchMoveLogs[1]!.startParams).toEqual({
+      seed: result.current.state.seed,
+      handNumber: result.current.state.handNumber,
+      prevailingWind: result.current.state.prevailingWind,
+      dealerSeat: result.current.state.dealerSeat,
+    })
   })
 
   it('startNextHand rotates the dealer per MCR (unconditional rotation)', () => {
