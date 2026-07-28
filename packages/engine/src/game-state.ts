@@ -73,15 +73,17 @@ export interface StartHandParams {
   dealerSeat: Seat
 }
 
-// Deals a fresh hand: 13 tiles to each seat in turn order starting from the
-// dealer, then the dealer's 14th tile folded into the deal itself (so the
-// dealer's first move is a discard, not a draw). Every logical tile dealt
-// goes through drawWithFlowerReplacement, so a flower dealt out during the
-// deal is correctly replaced and bucketed rather than silently ending up in
-// the concealed hand.
-export function startHand(params: StartHandParams): GameState {
+// Deals a fresh hand from an already-built wall: 13 tiles to each seat in
+// turn order starting from the dealer, then the dealer's 14th tile folded
+// into the deal itself (so the dealer's first move is a discard, not a
+// draw). Every logical tile dealt goes through drawWithFlowerReplacement,
+// so a flower dealt out during the deal is correctly replaced and bucketed
+// rather than silently ending up in the concealed hand. Exported (not just
+// used by startHand below) so scenario.ts's practice-mode hand builder can
+// deal from a purpose-built wall (a specific hand for one seat, the rest
+// shuffled) without duplicating this loop.
+export function dealHandFromWall(wall: Wall, params: StartHandParams): GameState {
   const { seed, handNumber, prevailingWind, dealerSeat } = params
-  let wall = buildWall(seed)
   const hands: [Hand, Hand, Hand, Hand] = [emptyHand(), emptyHand(), emptyHand(), emptyHand()]
   const dealtHandsForLog: Record<Seat, TileInstanceId[]> = { 0: [], 1: [], 2: [], 3: [] }
 
@@ -131,4 +133,8 @@ export function startHand(params: StartHandParams): GameState {
     phase: 'awaitingDiscard',
     actionLog: [dealAction],
   }
+}
+
+export function startHand(params: StartHandParams): GameState {
+  return dealHandFromWall(buildWall(params.seed), params)
 }
