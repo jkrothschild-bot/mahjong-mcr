@@ -220,6 +220,25 @@ corrected to match. See each item's status.
       it's scored via `settlement.ts`'s separate `flowerPoints`, never as a `basicPoints`
       fan match.
 
+## Non-rulebook additions (explicitly NOT sourced from mcr_EN.pdf)
+
+15. **Shanten calculator (M4, `packages/engine/src/shanten.ts`)** — the three formulas
+    below are standard mahjong-theory results (shanten-calculation literature), not derived
+    from or citable to `mcr_EN.pdf`, which never discusses "how close to winning" as a
+    structural concept. Recorded here explicitly so they are never later mistaken for a
+    rulebook-sourced rule the way every other entry in this file is:
+    - **Standard shape (4 sets + pair)**: `shanten = 8 - 2*(melds + S) - T - P`, where `S` =
+      complete sets, `T` = partial sets (taatsu), capped so `melds + S + T <= 4`, and `P` = 1
+      if a pair is reserved as the head. Verified against this repo's own `tenpaiWaitingOnC5`
+      fixture and a battery of hand-built cases spanning shanten -1 through the theoretical
+      max of 8.
+    - **Seven Pairs**: `shanten = 6 - pairs + max(0, 7 - kinds)`.
+    - **Thirteen Orphans**: `shanten = 13 - kinds - hasPair`.
+    All three are cross-checked computationally against the already-rulebook-validated
+    `isWinningHand` (M1) via a property test (`shanten <= -1 <=> isWinningHand`), so while the
+    *formulas* are borrowed theory, their *behavior* is still validated against this project's
+    ground truth, not just against each other.
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).

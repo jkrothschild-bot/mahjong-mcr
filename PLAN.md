@@ -37,7 +37,7 @@ mahjong-mcr/
 
 **M3 — Playable UI (week 3–5, overlaps M2):** board layout, hand sorting (drag + the full sort toolbar — Suit/Number/Honors/Simples/Odds/Evens, per your reference screenshot), discard rivers, claim buttons with call-out animations/sound ("West ponged your 5-dot"), bot speed control, tile inspector, tile-count grid (all 34 types, unseen counts), confirm-before-discard toggle, end-of-hand score screen. First version you can actually play.
 
-**M4 — Shanten, bots & waits (week 5–6):** shanten calculator, tile-efficiency evaluator, 3 competent bots, step mode, and the **ready-hand/waits display** (once one tile from complete, show exactly what completes it and the resulting fan value) — this reuses the shanten engine directly, so it belongs in the same milestone rather than being bolted on later.
+**M4 — Shanten, bots & waits (week 5–6) — complete:** shanten calculator, tile-efficiency evaluator, 3 competent bots, step mode, and the **ready-hand/waits display** (once one tile from complete, show exactly what completes it and the resulting fan value) — this reuses the shanten engine directly, so it belongs in the same milestone rather than being bolted on later.
 
 **M5 — Hints, fan tracker & defense (week 6–8):** 3-level hint system, live fan tracker panel, fan encyclopedia, and a basic **defense/danger indicator** per tile (reuses the M4 evaluator plus visible-tile counts from M3).
 
