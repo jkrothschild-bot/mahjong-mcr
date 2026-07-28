@@ -70,14 +70,14 @@ export function Board({
   const justDrawnTileId = isHumanTurn ? (state.lastDrawnTile ?? null) : null
 
   return (
-    <div className="flex w-full max-w-5xl flex-col items-center gap-4">
-      <div className="flex flex-wrap items-center justify-center gap-4">
+    <div className="flex w-full max-w-5xl flex-col items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <WindIndicator matchState={matchState} />
         <WallCounter wall={state.wall} />
         <TileInspector selectedTypeId={selectedTypeId} unseenCounts={unseenCounts} />
       </div>
 
-      <div data-testid="board" className="grid w-full grid-cols-3 grid-rows-3 gap-3">
+      <div data-testid="board" className="grid w-full grid-cols-3 grid-rows-3 gap-2">
         {state.players.map((player) => {
           const offset = ((player.seat - HUMAN_SEAT + 4) % 4) as 0 | 1 | 2 | 3
           const isHuman = player.seat === HUMAN_SEAT

@@ -67,7 +67,7 @@ export function Seat({
     <section
       data-testid={`seat-${seat}`}
       aria-label={`Seat ${seat}${isHuman ? ' (you)' : ''}`}
-      className={`flex min-w-0 flex-col gap-2 rounded-lg border p-3 ${
+      className={`flex min-w-0 flex-col gap-1 rounded-lg border p-2 ${
         isCurrentTurn ? 'border-emerald-400 bg-emerald-950/40' : 'border-neutral-700 bg-neutral-900'
       }`}
     >
@@ -97,7 +97,7 @@ export function Seat({
       <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
 
       {isHuman ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           {prevailingWind && <WaitsPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
           <div className="flex flex-wrap items-center gap-2">
             {onSortHand && <SortToolbar onSort={onSortHand} />}

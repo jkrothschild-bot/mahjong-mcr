@@ -73,7 +73,7 @@ function App() {
         <CallOutToast state={state} />
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center gap-6 p-4">
+      <main className="flex-1 flex flex-col items-center justify-start gap-2 p-2">
         <Board
           state={state}
           matchState={matchState}

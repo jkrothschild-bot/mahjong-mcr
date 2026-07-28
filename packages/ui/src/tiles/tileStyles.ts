@@ -8,7 +8,7 @@
 // image; text-sm/font-semibold still matter for the text fallback
 // (flowers/seasons — no art yet).
 export const TILE_BOX_BASE =
-  'flex h-14 w-11 shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold'
+  'flex h-[5.75rem] w-[3.75rem] shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold'
 
 export const TILE_FACE_CLASSES = 'border-neutral-500 bg-neutral-100 text-neutral-900'
 
@@ -53,7 +53,7 @@ export function tileFaceClassName(
 // (SPEC.md §5a/§5b) the way one un-wrapped row of full-size boxes did.
 export function tileBackCompactClassName(): string {
   return [
-    'flex h-8 w-6 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
+    'flex h-11 w-8 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
     TILE_BACK_CLASSES,
   ].join(' ')
 }
@@ -68,7 +68,7 @@ export function tileBackCompactClassName(): string {
 // space across every seat's panel.
 export function tileFaceCompactClassName(opts: { highlighted?: boolean; extra?: string } = {}): string {
   return [
-    'flex h-8 w-7 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
+    'flex h-11 w-9 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
     TILE_FACE_CLASSES,
     opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
     opts.extra ?? '',
