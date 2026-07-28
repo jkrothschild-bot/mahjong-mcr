@@ -4,7 +4,7 @@ import { typeIdOfInstance, type TileInstanceId, type TileTypeId } from './tiles.
 // Fixed order over the 34 standard tile types — used for the "lowest
 // nonzero type" pruning trick in the backtracking search below, and for
 // deterministic iteration when trying pair candidates.
-const ORDERED_STANDARD_TYPE_IDS: readonly TileTypeId[] = [
+export const ORDERED_STANDARD_TYPE_IDS: readonly TileTypeId[] = [
   'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
   'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9',
   'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9',
@@ -25,7 +25,7 @@ export function groupConcealedByType(tiles: readonly TileInstanceId[]): Record<T
 // only up to rank 7 (7-8-9 is the highest possible run). Winds ("WE" etc.)
 // and dragons ("DR" etc.) never match this pattern, so no special-casing
 // for honors is needed beyond this regex.
-function chowNeighbors(typeId: TileTypeId): [TileTypeId, TileTypeId] | null {
+export function chowNeighbors(typeId: TileTypeId): [TileTypeId, TileTypeId] | null {
   const match = /^([CDB])([1-9])$/.exec(typeId)
   if (!match) return null
   const suit = match[1]!
@@ -143,7 +143,7 @@ export function isSevenPairs(concealedTiles: readonly TileInstanceId[], melds: r
 // never include a meld: any pung/kong of a required type would need 3-4
 // physical copies of it while still needing all 13 *other* distinct types
 // represented as well, which doesn't fit in a 14-tile hand.
-const THIRTEEN_ORPHAN_TYPE_IDS: readonly TileTypeId[] = [
+export const THIRTEEN_ORPHAN_TYPE_IDS: readonly TileTypeId[] = [
   'C1', 'C9', 'D1', 'D9', 'B1', 'B9', 'WE', 'WS', 'WW', 'WN', 'DR', 'DG', 'DW',
 ]
 
