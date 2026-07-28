@@ -39,7 +39,7 @@ mahjong-mcr/
 
 **M4 — Shanten, bots & waits (week 5–6) — complete:** shanten calculator, tile-efficiency evaluator, 3 competent bots, step mode, and the **ready-hand/waits display** (once one tile from complete, show exactly what completes it and the resulting fan value) — this reuses the shanten engine directly, so it belongs in the same milestone rather than being bolted on later.
 
-**M5 — Hints, fan tracker & defense (week 6–8):** 3-level hint system, live fan tracker panel, fan encyclopedia, and a basic **defense/danger indicator** per tile (reuses the M4 evaluator plus visible-tile counts from M3).
+**M5 — Hints, fan tracker & defense (week 6–8) — complete:** 3-level hint system, live fan tracker panel, fan encyclopedia, and a basic **defense/danger indicator** per tile (reuses the M4 evaluator plus visible-tile counts from M3). Also closed a real gap found during this milestone: `moves.ts` now enforces the §3.9.1.1 8-point minimum to declare Hu, which nothing previously checked.
 
 **M6 — Replay, practice mode & export (week 8–10):** full match replay ("kifu") with a scrubber built on M1's serializable state; scenario/practice mode (load a preset hand instead of a random deal); the **"ask about this position" export** (structured text/image summary — the built-in replacement for pasting screenshots into an AI chat); session stats (win rate, deal-in rate, fans completed over time).
 

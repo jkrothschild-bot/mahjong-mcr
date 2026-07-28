@@ -220,6 +220,19 @@ corrected to match. See each item's status.
       it's scored via `settlement.ts`'s separate `flowerPoints`, never as a `basicPoints`
       fan match.
 
+15. **8-point win-legality gate now enforced (M5) — cross-references item #7.** §3.9.1.1
+    (p.18), exact quote: "when all its associated Fan are added, they must total at least 8
+    points or more." Item #7 already confirmed flower points are excluded from this check;
+    what was still missing, until M5, was the check itself — `moves.ts` only ever verified
+    *structural* completeness (`isWinningHand`), never the point total, so a hand scoring 1-7
+    points (Chicken Hand's 8-point fallback, fan 43, only fires when a hand would otherwise
+    score exactly 0 named fans — not when it scores some small amount under 8) could be, and
+    was, declared a legal win. Fixed via `scoring/derive-context.ts`'s
+    `buildProspectiveScoreHandParams`/`MINIMUM_POINTS_TO_WIN`, wired into `moves.ts` at both
+    advisory sites (`legalDiscardPhaseMoves`, `computeClaimOptionsForSeat`) and as a safety-net
+    throw in `finalizeWin`. Proven with a fixture scoring exactly 4 points (Dragon Pung +
+    Concealed Hand) that used to pass and is now correctly rejected.
+
 ## Non-rulebook additions (explicitly NOT sourced from mcr_EN.pdf)
 
 15. **Shanten calculator (M4, `packages/engine/src/shanten.ts`)** — the three formulas
@@ -239,6 +252,18 @@ corrected to match. See each item's status.
     *formulas* are borrowed theory, their *behavior* is still validated against this project's
     ground truth, not just against each other.
 
+16. **Defense/danger indicator (M5, `packages/engine/src/defense.ts`) — deliberately NOT
+    rulebook-sourced, and not meant to be.** SPEC.md §9 frames this as a teaching heuristic
+    ("teaches the defensive half of strategy"), not a rules mechanic, so `assessTileSafety`'s
+    three signals (every opponent already discarded a tile → low risk; an opponent with 2+
+    exposed melds concentrated in that tile's suit → high risk; nobody having discarded it yet
+    this deep into the hand → medium/"untested") are common cross-variant mahjong strategy
+    conventions, not MCR rules. In particular, the classic "genbutsu" safety read (a tile an
+    opponent already discarded can't complete their hand) is a Japanese-mahjong furiten
+    convention — MCR's own furiten status is genuinely unconfirmed in the available rulebook
+    text (never addressed anywhere in `mcr_EN.pdf`), so this is presented in the UI as a
+    heuristic signal, not a guarantee.
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).
@@ -247,3 +272,6 @@ corrected to match. See each item's status.
   differs from Greater only in allowing fewer than 7 honors (compensated by more suit tiles).
 - Appendix 4 (seat/table rotation detail) is missing from the available PDF — if a more
   complete copy ever turns up, re-verify item #4 (dealer rotation) against it specifically.
+- Fan encyclopedia (M5, `scoring/encyclopedia.ts`) example hands: v1 ships id/name/points/rule
+  text only, no worked example hands per fan — constructing 81 valid, correctly-scored
+  examples is a substantially larger task, tracked here rather than folded into M5.
