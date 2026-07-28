@@ -3,7 +3,7 @@ import type { Hand } from '../hand.js'
 import type { Seat } from '../meld.js'
 import { applyMove, legalMoves, type Move } from '../moves.js'
 import { calculateShanten } from '../shanten.js'
-import { evaluateDiscards } from '../tile-efficiency.js'
+import { evaluateDiscards, type DiscardEvaluation } from '../tile-efficiency.js'
 import { typeIdOfInstance, type TileInstanceId } from '../tiles.js'
 import { isHonorTypeId, isTerminalTypeId } from '../scoring/set-helpers.js'
 import { ORDERED_STANDARD_TYPE_IDS } from '../win-detection.js'
@@ -29,14 +29,16 @@ export const BOT_PRESETS: Record<'efficient' | 'balanced' | 'conservative', BotP
   conservative: { claimThreshold: 'onlyImproving', declineMarginalChows: true },
 }
 
-// Deterministic min-shanten discard: among the tiles achieving the lowest
-// resultingShanten, prefer the one with the most ukeire (keeps the hand
-// most flexible), then prefer discarding a honor/terminal over a simple
-// (least flexible tiles go first when otherwise tied), then a fixed type
-// order — matching the placeholder bot's own "deterministic, snapshot-
+// Deterministic min-shanten discard ranking: among the tiles achieving the
+// lowest resultingShanten, prefer the one with the most ukeire (keeps the
+// hand most flexible), then prefer discarding a honor/terminal over a
+// simple (least flexible tiles go first when otherwise tied), then a fixed
+// type order — matching the placeholder bot's own "deterministic, snapshot-
 // testable" design philosophy, just no longer dumb about which tile.
-export function chooseDiscard(hand: Hand): TileInstanceId {
-  const evaluations = evaluateDiscards(hand)
+// Shared by chooseDiscard (bots, below) and computeBestMoveHint (hints.ts,
+// M5) so the hint's "recommended discard" and "other reasonable choices"
+// can never disagree with what a bot would actually do with the same hand.
+export function rankDiscards(evaluations: DiscardEvaluation[]): DiscardEvaluation[] {
   const minShanten = Math.min(...evaluations.map((e) => e.resultingShanten))
   const atMin = evaluations.filter((e) => e.resultingShanten === minShanten)
 
@@ -50,7 +52,11 @@ export function chooseDiscard(hand: Hand): TileInstanceId {
     return ORDERED_STANDARD_TYPE_IDS.indexOf(aType) - ORDERED_STANDARD_TYPE_IDS.indexOf(bType)
   })
 
-  return atMin[0]!.tile
+  return atMin
+}
+
+export function chooseDiscard(hand: Hand): TileInstanceId {
+  return rankDiscards(evaluateDiscards(hand))[0]!.tile
 }
 
 // Evaluates every non-pass claim option (never a kong — see below) by
