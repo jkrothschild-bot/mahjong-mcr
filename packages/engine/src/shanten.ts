@@ -19,9 +19,9 @@ import {
 // scores -1 ("agari"), and a hand one tile away (tenpai) scores 0.
 //
 // Closed form: with S = complete sets found in the concealed tiles, T =
-// partial sets (taatsu) found (capped so melds.length + S + T <= 4), and P
+// partial sets (taatsu) found (capped so meldCount + S + T <= 4), and P
 // = 1 if a pair is reserved as head else 0:
-//   shanten = 8 - 2*(melds.length + S) - T - P
+//   shanten = 8 - 2*(meldCount + S) - T - P
 //
 // Every candidate head-pair choice (including "reserve none") must be tried
 // and the minimum taken — a pair can either be the head (free) or a taatsu
@@ -29,25 +29,32 @@ import {
 // better split. Verified against moves.test.ts's tenpaiWaitingOnC5 fixture:
 // chow(D4-6)+chow(B7-9)+pung(DW×3) = S=3, C3-C4 taatsu = T=1 (cap 0+3+1=4),
 // C9·C9 reserved as head = P=1 -> shanten = 8-2*3-1-1 = 0 (tenpai on C5). ✓
-export function standardShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
-  const n = 4 - melds.length
+//
+// Takes a counts record directly (rather than TileInstanceId[]) so
+// tile-efficiency.ts can probe "what if I drew one more of type X" by
+// bumping a single count, without ever fabricating instance IDs.
+export function standardShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): number {
+  const n = 4 - meldCount
   if (n < 0) return Infinity
 
-  const baseCounts = groupConcealedByType(concealedTiles)
   let best = Infinity
 
   // Baseline: no pair reserved as head at all.
-  best = Math.min(best, 8 - 2 * melds.length - searchBlocks({ ...baseCounts }, n))
+  best = Math.min(best, 8 - 2 * meldCount - searchBlocks({ ...counts }, n))
 
   // Try reserving each type with >=2 copies as the head pair.
   for (const type of ORDERED_STANDARD_TYPE_IDS) {
-    if ((baseCounts[type] ?? 0) < 2) continue
-    const counts = { ...baseCounts }
-    counts[type]! -= 2
-    best = Math.min(best, 8 - 2 * melds.length - searchBlocks(counts, n) - 1)
+    if ((counts[type] ?? 0) < 2) continue
+    const withoutHead = { ...counts }
+    withoutHead[type]! -= 2
+    best = Math.min(best, 8 - 2 * meldCount - searchBlocks(withoutHead, n) - 1)
   }
 
   return best
+}
+
+export function standardShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
+  return standardShantenFromCounts(groupConcealedByType(concealedTiles), melds.length)
 }
 
 function partialChowNeighbors(typeId: TileTypeId): TileTypeId[] {
@@ -132,13 +139,16 @@ function searchBlocks(counts: Record<TileTypeId, number>, budget: number): numbe
 // correction — often missed in naive write-ups — penalizes a hand that
 // doesn't even have 7 distinct kinds yet to ever form 7 distinct pairs
 // from. Only valid with zero melds (matches isSevenPairs' own restriction).
-export function sevenPairsShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
-  if (melds.length !== 0) return Infinity
-  const counts = groupConcealedByType(concealedTiles)
-  const values = Object.values(counts)
+export function sevenPairsShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): number {
+  if (meldCount !== 0) return Infinity
+  const values = Object.values(counts).filter((count) => count > 0)
   const kinds = values.length
   const pairs = values.filter((count) => count >= 2).length
   return 6 - pairs + Math.max(0, 7 - kinds)
+}
+
+export function sevenPairsShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
+  return sevenPairsShantenFromCounts(groupConcealedByType(concealedTiles), melds.length)
 }
 
 // Thirteen Orphans shanten. `kinds` = how many of the 13 required terminal/
@@ -146,9 +156,8 @@ export function sevenPairsShanten(concealedTiles: readonly TileInstanceId[], mel
 // types has >=2 copies. Only valid with zero melds (matches
 // isThirteenOrphans' own restriction — see its comment for why a meld can
 // never structurally fit this shape).
-export function thirteenOrphansShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
-  if (melds.length !== 0) return Infinity
-  const counts = groupConcealedByType(concealedTiles)
+export function thirteenOrphansShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): number {
+  if (meldCount !== 0) return Infinity
   let kinds = 0
   let hasPair = false
   for (const type of THIRTEEN_ORPHAN_TYPE_IDS) {
@@ -159,6 +168,10 @@ export function thirteenOrphansShanten(concealedTiles: readonly TileInstanceId[]
   return 13 - kinds - (hasPair ? 1 : 0)
 }
 
+export function thirteenOrphansShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
+  return thirteenOrphansShantenFromCounts(groupConcealedByType(concealedTiles), melds.length)
+}
+
 export interface ShantenResult {
   shanten: number
   shape: 'standard' | 'sevenPairs' | 'thirteenOrphans'
@@ -167,11 +180,15 @@ export interface ShantenResult {
 // The minimum shanten across all three recognized structural shapes (the
 // same three win-detection.ts's isWinningHand checks) — ties broken toward
 // 'standard' since it's the most common case, for deterministic output.
-export function calculateShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): ShantenResult {
+export function calculateShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): ShantenResult {
   const candidates: ShantenResult[] = [
-    { shanten: standardShanten(concealedTiles, melds), shape: 'standard' },
-    { shanten: sevenPairsShanten(concealedTiles, melds), shape: 'sevenPairs' },
-    { shanten: thirteenOrphansShanten(concealedTiles, melds), shape: 'thirteenOrphans' },
+    { shanten: standardShantenFromCounts(counts, meldCount), shape: 'standard' },
+    { shanten: sevenPairsShantenFromCounts(counts, meldCount), shape: 'sevenPairs' },
+    { shanten: thirteenOrphansShantenFromCounts(counts, meldCount), shape: 'thirteenOrphans' },
   ]
   return candidates.reduce((best, candidate) => (candidate.shanten < best.shanten ? candidate : best))
+}
+
+export function calculateShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): ShantenResult {
+  return calculateShantenFromCounts(groupConcealedByType(concealedTiles), melds.length)
 }
