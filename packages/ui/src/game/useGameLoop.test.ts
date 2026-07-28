@@ -30,17 +30,17 @@ function handWith(concealedTiles: number[]): Hand {
   return { ...emptyHand(), concealedTiles }
 }
 
+// Two dragon pungs (rather than one dragon pung + a plain chow) so this
+// clears moves.ts's 8-point win-legality minimum on a self-draw win.
 function tenpaiWaitingOnC5(): number[] {
   return [
     ...idsFor('C3', 1),
     ...idsFor('C4', 1),
-    ...idsFor('D4', 1),
-    ...idsFor('D5', 1),
-    ...idsFor('D6', 1),
     ...idsFor('B7', 1),
     ...idsFor('B8', 1),
     ...idsFor('B9', 1),
     ...idsFor('DW', 3),
+    ...idsFor('DG', 3),
     ...idsFor('C9', 2),
   ]
 }

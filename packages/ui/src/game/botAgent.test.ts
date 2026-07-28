@@ -83,14 +83,15 @@ describe('chooseBotMove', () => {
   })
 
   it('takes a win claim over pung/chow when all are on offer', () => {
-    // Seat 1 holds 2 concealed C5s — pung(C5,C5,+discarded C5) + chow(D4,D5,D6)
-    // + chow(B7,B8,B9) + pung(DW,DW,DW) + pair(C9,C9) is a complete hand, so
+    // Seat 1 holds 2 concealed C5s — pung(C5,C5,+discarded C5) + chow(B7,B8,B9)
+    // + pung(DW,DW,DW) + pung(DG,DG,DG) + pair(C9,C9) is a complete hand, so
     // the discarded 3rd C5 is both pung-able AND win-able; win must be chosen.
+    // Two dragon pungs (rather than one dragon pung + a plain chow) so this
+    // clears moves.ts's 8-point win-legality minimum on a discard win.
     const winningIfC5 = [
       ...idsFor('C5', 2),
-      ...idsFor('D4', 1), ...idsFor('D5', 1), ...idsFor('D6', 1),
       ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1),
-      ...idsFor('DW', 3), ...idsFor('C9', 2),
+      ...idsFor('DW', 3), ...idsFor('DG', 3), ...idsFor('C9', 2),
     ]
     const [c5ForDiscard] = idsFor('C5', 3).slice(2) // a 3rd C5 instance, distinct from the 2 already in hand
     const hands: [Hand, Hand, Hand, Hand] = [emptyHand(), handWith(winningIfC5), emptyHand(), emptyHand()]

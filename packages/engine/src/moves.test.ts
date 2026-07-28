@@ -44,18 +44,22 @@ function baseState(hands: [Hand, Hand, Hand, Hand], opts: { currentSeat?: Seat; 
 }
 
 // A 13-tile hand that completes into a standard win when C5 is appended:
-// chow(C3,C4,+C5) + chow(D4,D5,D6) + chow(B7,B8,B9) + pung(DW,DW,DW) + pair(C9,C9).
+// chow(C3,C4,+C5) + chow(B7,B8,B9) + pung(DW,DW,DW) + pung(DG,DG,DG) + pair(C9,C9).
+// Two dragon pungs (rather than one dragon pung + a plain chow) so this
+// clears the moves.ts 8-point win-legality minimum on a discard win (Two
+// Dragon Pungs 6 + Concealed Hand 2 + Two Concealed Pungs 2 + One Voided
+// Suit 1 = 11 pts, verified via scoreHand) — the original one-dragon-pung
+// version only scored 4 (Dragon Pung 2 + Concealed Hand 2), which the gate
+// now correctly rejects.
 function tenpaiWaitingOnC5(): number[] {
   return [
     ...idsFor('C3', 1),
     ...idsFor('C4', 1),
-    ...idsFor('D4', 1),
-    ...idsFor('D5', 1),
-    ...idsFor('D6', 1),
     ...idsFor('B7', 1),
     ...idsFor('B8', 1),
     ...idsFor('B9', 1),
     ...idsFor('DW', 3),
+    ...idsFor('DG', 3),
     ...idsFor('C9', 2),
   ]
 }
@@ -172,5 +176,79 @@ describe('robbing the kong', () => {
     expect(state.pendingClaim).toBeUndefined()
     expect(state.players[0]!.hand.melds[0]!.kind).toBe('kong')
     expect(state.players[0]!.hand.melds[0]!.kongSource).toBe('concealed')
+  })
+})
+
+// M5: §3.9.1.1 requires a hand to be worth 8+ points (excluding Flowers) to
+// declare Hu. Chicken Hand's 8-point fallback (fan 43) only fires when a
+// hand would otherwise score exactly 0 named fans — a hand with SOME small
+// named fans totaling less than 8 is neither 0 nor >= 8, and was accepted
+// as a legal win before this gate existed.
+describe('8-point win-legality minimum (§3.9.1.1)', () => {
+  // Dragon Pung (2) + Concealed Hand (2) on a discard win = 4 pts.
+  function underEightHandWaitingOnC5(): number[] {
+    return [
+      ...idsFor('C3', 1),
+      ...idsFor('C4', 1),
+      ...idsFor('D4', 1),
+      ...idsFor('D5', 1),
+      ...idsFor('D6', 1),
+      ...idsFor('B7', 1),
+      ...idsFor('B8', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('DW', 3),
+      ...idsFor('C9', 2),
+    ]
+  }
+
+  it('does not offer selfDrawWin when the hand would score under 8 points, and rejects a direct declaration', () => {
+    const c5 = idsFor('C5', 1)[0]!
+    const hands: [Hand, Hand, Hand, Hand] = [
+      handWith([...underEightHandWaitingOnC5(), c5]), // Fully Concealed Hand (4) + Dragon Pung (2) on self-draw = 6 pts
+      handWith([]),
+      handWith([]),
+      handWith([]),
+    ]
+    let state = baseState(hands, { currentSeat: 0 })
+    state = { ...state, lastDrawnTile: c5 }
+
+    expect(legalMoves(state, 0).some((m) => m.kind === 'selfDrawWin')).toBe(false)
+    expect(() => applyMove(state, 0, { kind: 'selfDrawWin' })).toThrow(/8-point minimum/)
+  })
+
+  it('still offers selfDrawWin once the hand reaches 8 points', () => {
+    const c5 = idsFor('C5', 1)[0]!
+    const hands: [Hand, Hand, Hand, Hand] = [
+      handWith([...tenpaiWaitingOnC5(), c5]), // 11 pts, see tenpaiWaitingOnC5's own comment
+      handWith([]),
+      handWith([]),
+      handWith([]),
+    ]
+    let state = baseState(hands, { currentSeat: 0 })
+    state = { ...state, lastDrawnTile: c5 }
+
+    expect(legalMoves(state, 0).some((m) => m.kind === 'selfDrawWin')).toBe(true)
+    state = applyMove(state, 0, { kind: 'selfDrawWin' })
+    expect(state.result?.outcome).toBe('win')
+  })
+
+  it('excludes a discard-claim win under 8 points from the claim window, without disturbing other seats’ real claims', () => {
+    const c5 = idsFor('C5', 4)
+    const hands: [Hand, Hand, Hand, Hand] = [
+      handWith([c5[0]!]), // seat 0: discarder
+      handWith([]),
+      handWith([c5[1]!, c5[2]!]), // seat 2: pung-eligible, opens the claim window
+      handWith(underEightHandWaitingOnC5()), // seat 3: would structurally win on C5, but only for 4 pts
+    ]
+    let state = baseState(hands, { currentSeat: 0 })
+    state = applyMove(state, 0, { kind: 'discard', tile: c5[0]! })
+
+    expect(state.phase).toBe('awaitingClaims')
+    expect(state.pendingClaim?.eligibleSeats).toEqual([2])
+    expect(legalMoves(state, 3)).toEqual([])
+
+    state = applyMove(state, 2, { kind: 'pung' })
+    expect(state.phase).toBe('awaitingDiscard')
+    expect(state.currentSeat).toBe(2)
   })
 })

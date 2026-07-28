@@ -10,6 +10,27 @@ import { groupConcealedByType, isWinningHand } from './win-detection.js'
 import { typeIdOf, typeIdOfInstance, typeOf, type Rank, type TileInstanceId, type TileTypeId } from './tiles.js'
 import type { GameState, HandResult, PendingClaim, PlayerState } from './game-state.js'
 import { allDeclared, resolvePendingClaim, type ResolvedClaim } from './claims.js'
+import { buildProspectiveScoreHandParams } from './scoring/derive-context.js'
+import { scoreHand } from './scoring/score-hand.js'
+
+// §3.9.1.1: a hand must be worth at least this many points (excluding
+// Flower Tiles, §3.11.6.6) to legally declare Hu. Chicken Hand (fan 43,
+// docs/rules/decisions.md) only guarantees this floor when a hand would
+// otherwise score exactly 0 named fans — a hand with SOME small named fans
+// totaling less than this is neither 0 nor >= 8, and was, until this check
+// existed, silently accepted as a legal win. See decisions.md's entry on
+// this fix for the fixture that proves it.
+const MINIMUM_POINTS_TO_WIN = 8
+
+function wouldMeetMinimumToWin(
+  state: GameState,
+  seat: Seat,
+  winMethod: 'selfDraw' | 'discard' | 'robKong',
+  winningTile: TileInstanceId,
+): boolean {
+  const params = buildProspectiveScoreHandParams(state, seat, winMethod, winningTile)
+  return scoreHand(params).basicPoints >= MINIMUM_POINTS_TO_WIN
+}
 
 export type Move =
   | { kind: 'draw' }
@@ -52,7 +73,13 @@ function legalDiscardPhaseMoves(state: GameState, seat: Seat): Move[] {
   const hand = state.players[seat].hand
   const moves: Move[] = []
 
-  if (isWinningHand(hand.concealedTiles, hand.melds)) moves.push({ kind: 'selfDrawWin' })
+  if (
+    isWinningHand(hand.concealedTiles, hand.melds) &&
+    state.lastDrawnTile !== undefined &&
+    wouldMeetMinimumToWin(state, seat, 'selfDraw', state.lastDrawnTile)
+  ) {
+    moves.push({ kind: 'selfDrawWin' })
+  }
 
   const counts = groupConcealedByType(hand.concealedTiles)
   for (const [typeId, count] of Object.entries(counts)) {
@@ -90,7 +117,10 @@ function computeClaimOptionsForSeat(
   const hand = state.players[seat].hand
   const options: Move[] = []
 
-  if (isWinningHand([...hand.concealedTiles, tile], hand.melds)) options.push({ kind: 'win' })
+  if (isWinningHand([...hand.concealedTiles, tile], hand.melds)) {
+    const winMethod = windowKind === 'addedKongRob' ? 'robKong' : 'discard'
+    if (wouldMeetMinimumToWin(state, seat, winMethod, tile)) options.push({ kind: 'win' })
+  }
 
   if (windowKind === 'addedKongRob') {
     return options // only a win claim is ever relevant for a rob-kong window
@@ -268,6 +298,15 @@ function finalizeWin(
   winMethod: 'selfDraw' | 'discard' | 'robKong',
   loserSeat?: Seat,
 ): GameState {
+  // Safety net, not just advisory filtering: legalDiscardPhaseMoves and
+  // computeClaimOptionsForSeat already keep an under-8 win from ever being
+  // OFFERED, but applyDiscardPhaseMove's 'selfDrawWin' branch (the only one
+  // of the three win paths that doesn't first pass through a validated
+  // claim declaration) trusts its caller otherwise — this re-check ensures
+  // finalizeWin itself can never complete an illegal win regardless of path.
+  if (!wouldMeetMinimumToWin(state, winnerSeat, winMethod, winTile)) {
+    throw new Error(`Seat ${winnerSeat}'s hand does not meet the ${MINIMUM_POINTS_TO_WIN}-point minimum to declare Hu (§3.9.1.1)`)
+  }
   const winAction: Action = {
     seq: state.actionLog.length,
     seat: winnerSeat,

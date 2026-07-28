@@ -30,19 +30,19 @@ function handWith(concealedTiles: number[], melds: Meld[] = [], flowers: number[
 }
 
 // A 13-tile hand that completes into a standard win when C5 is appended:
-// chow(C3,C4,+C5) + chow(D4,D5,D6) + chow(B7,B8,B9) + pung(DW,DW,DW) + pair(C9,C9).
-// Mirrors moves.test.ts's identical fixture.
+// chow(C3,C4,+C5) + chow(B7,B8,B9) + pung(DW,DW,DW) + pung(DG,DG,DG) + pair(C9,C9).
+// Mirrors moves.test.ts's identical fixture. Two dragon pungs (rather than
+// one dragon pung + a plain chow) so this clears moves.ts's 8-point
+// win-legality minimum on a discard/self-draw win.
 function tenpaiWaitingOnC5(): number[] {
   return [
     ...idsFor('C3', 1),
     ...idsFor('C4', 1),
-    ...idsFor('D4', 1),
-    ...idsFor('D5', 1),
-    ...idsFor('D6', 1),
     ...idsFor('B7', 1),
     ...idsFor('B8', 1),
     ...idsFor('B9', 1),
     ...idsFor('DW', 3),
+    ...idsFor('DG', 3),
     ...idsFor('C9', 2),
   ]
 }

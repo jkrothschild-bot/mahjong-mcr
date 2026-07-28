@@ -65,12 +65,13 @@ describe('ClaimPrompt', () => {
   })
 
   it('renders a button for every legal option, including pass', () => {
-    // Seat 0 holds 2 C5s — can pung (or win) the discarded 3rd.
+    // Seat 0 holds 2 C5s — can pung (or win) the discarded 3rd. Two dragon
+    // pungs (rather than one dragon pung + a plain chow) so this clears
+    // moves.ts's 8-point win-legality minimum on a discard win.
     const hand = handWith([
       ...idsFor('C5', 2),
-      ...idsFor('D4', 1), ...idsFor('D5', 1), ...idsFor('D6', 1),
       ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1),
-      ...idsFor('DW', 3), ...idsFor('C9', 2),
+      ...idsFor('DW', 3), ...idsFor('DG', 3), ...idsFor('C9', 2),
     ])
     const [c5ForDiscard] = idsFor('C5', 3).slice(2)
     const pendingClaim: PendingClaim = { tile: c5ForDiscard!, fromSeat: 3, kind: 'discard', eligibleSeats: [0], declarations: {} }

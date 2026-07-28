@@ -201,7 +201,12 @@ describe('chooseMove — full headless simulation', () => {
 
       expect(handsReachedEnd).toBe(SEED_COUNT)
     },
-    30_000,
+    // M5's 8-point win-legality gate (moves.ts) adds a scoreHand call to
+    // every already-structurally-winning hand check — measured ~30-33s for
+    // this sweep (was ~24s before), close enough to the old 30s bound to be
+    // flaky rather than actually correctness-affected. Bumped with margin
+    // rather than shrinking SEED_COUNT (see the comment above it).
+    45_000,
   )
 
   it(
