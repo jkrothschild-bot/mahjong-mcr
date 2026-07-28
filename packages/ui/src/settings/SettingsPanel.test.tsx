@@ -23,4 +23,13 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Confirm before discard' }))
     expect(onUpdate).toHaveBeenCalledWith({ confirmBeforeDiscard: true })
   })
+
+  it('toggling step mode calls onUpdate', () => {
+    const onUpdate = vi.fn()
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    const checkbox = screen.getByRole('checkbox', { name: /Step mode/ })
+    expect(checkbox).not.toBeChecked()
+    fireEvent.click(checkbox)
+    expect(onUpdate).toHaveBeenCalledWith({ stepMode: true })
+  })
 })

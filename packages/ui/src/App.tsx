@@ -16,9 +16,20 @@ function App() {
   const { settings, update } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
-  const { state, matchState, matchScores, isHumanTurn, humanPendingClaim, submitHumanMove, startNextHand } = useGameLoop({
+  const {
+    state,
+    matchState,
+    matchScores,
+    isHumanTurn,
+    humanPendingClaim,
+    submitHumanMove,
+    startNextHand,
+    hasPendingBotMove,
+    advanceOneBotMove,
+  } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
+    stepMode: settings.stepMode,
   })
 
   const onSubmitDiscard = useCallback(
@@ -74,6 +85,16 @@ function App() {
         />
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
+
+        {settings.stepMode && hasPendingBotMove && (
+          <button
+            type="button"
+            onClick={advanceOneBotMove}
+            className="min-h-11 rounded-md border border-sky-400 bg-sky-500 px-6 text-sm font-semibold text-neutral-900 hover:bg-sky-400"
+          >
+            Next
+          </button>
+        )}
       </main>
 
       <DiscardConfirmModal tileId={pendingConfirmTileId} onConfirm={confirmDiscard} onCancel={cancelDiscard} />

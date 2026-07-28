@@ -44,6 +44,11 @@ export function SettingsPanel({ settings, onUpdate }: SettingsPanelProps) {
         />
         Confirm before discard
       </label>
+
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={settings.stepMode} onChange={(e) => onUpdate({ stepMode: e.target.checked })} />
+        Step mode (advance bots one decision at a time)
+      </label>
     </div>
   )
 }

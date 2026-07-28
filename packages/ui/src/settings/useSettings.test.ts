@@ -17,7 +17,7 @@ describe('loadSettings', () => {
   })
 
   it('round-trips a fully valid settings object', () => {
-    const settings = { botSpeedMs: 3000, confirmBeforeDiscard: true }
+    const settings = { botSpeedMs: 3000, confirmBeforeDiscard: true, stepMode: true }
     expect(loadSettings(serializeSettings(settings))).toEqual(settings)
   })
 

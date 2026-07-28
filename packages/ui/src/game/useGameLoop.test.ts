@@ -114,7 +114,7 @@ describe('useGameLoop', () => {
   })
 
   it('does not auto-play the human seat\'s own pending decision', () => {
-    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 50 }))
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 50, stepMode: false }))
     // Hand 1's dealer is seat 0 === HUMAN_SEAT, so it opens on the human's turn.
     expect(result.current.isHumanTurn).toBe(true)
     const stateBefore = result.current.state
@@ -127,7 +127,7 @@ describe('useGameLoop', () => {
   })
 
   it('keeps advancing via bots until the human must act again or the hand ends', () => {
-    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20 }))
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
     expect(result.current.state.currentSeat).toBe(HUMAN_SEAT)
 
     const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
@@ -157,7 +157,7 @@ describe('useGameLoop', () => {
     // turn. The UI still reported isHumanTurn === true (a stale bug) and
     // let a tile be selected and discarded, which threw
     // "Illegal move discard in awaitingDraw phase" in moves.ts.
-    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20 }))
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
 
     const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
     act(() => {
@@ -185,7 +185,7 @@ describe('useGameLoop', () => {
   })
 
   it('startNextHand rotates the dealer per MCR (unconditional rotation)', () => {
-    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20 }))
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
     expect(result.current.matchState.dealerSeat).toBe(0)
 
     act(() => {
@@ -195,5 +195,74 @@ describe('useGameLoop', () => {
     expect(result.current.matchState.matchHandNumber).toBe(2)
     expect(result.current.matchState.dealerSeat).toBe(1)
     expect(result.current.state.handNumber).toBe(2)
+  })
+
+  it('step mode: a bot\'s real decision does not auto-dispatch even after a long wait', () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: true }))
+
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+    // It's now a bot's turn (draw auto-resolves regardless of step mode,
+    // but the following discard/claim should NOT auto-dispatch).
+    const stateAfterHumanDiscard = result.current.state
+
+    act(() => {
+      vi.advanceTimersByTime(10_000)
+    })
+
+    // A draw is not a real decision, so it may have auto-advanced past
+    // 'awaitingDraw' — but the bot should now be stuck waiting on its own
+    // genuine decision (discard/claim), never auto-resolving it.
+    expect(result.current.hasPendingBotMove).toBe(true)
+    expect(result.current.state).not.toBe(stateAfterHumanDiscard) // the draw did happen
+  })
+
+  it('step mode: advanceOneBotMove dispatches exactly one pending bot decision', () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: true }))
+
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+    act(() => {
+      vi.advanceTimersByTime(10_000) // let the bot's own draw resolve, if any
+    })
+    expect(result.current.hasPendingBotMove).toBe(true)
+    const before = result.current.state
+
+    act(() => {
+      result.current.advanceOneBotMove()
+    })
+
+    expect(result.current.state).not.toBe(before)
+    expect(result.current.state.actionLog.length).toBeGreaterThan(before.actionLog.length)
+  })
+
+  it('step mode still auto-resolves the human\'s own mandatory draw', () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: true }))
+    expect(result.current.isHumanTurn).toBe(true)
+
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+    // Drive the bots (one advanceOneBotMove call per pending decision) until
+    // it's the human's turn again or the hand ends.
+    for (let i = 0; i < 60 && result.current.state.phase !== 'handEnded' && !result.current.isHumanTurn; i++) {
+      act(() => {
+        vi.advanceTimersByTime(20) // draws still auto-resolve
+      })
+      if (result.current.hasPendingBotMove) {
+        act(() => {
+          result.current.advanceOneBotMove()
+        })
+      }
+    }
+
+    if (result.current.state.phase === 'handEnded') return
+    expect(result.current.isHumanTurn).toBe(true)
+    expect(result.current.state.phase).toBe('awaitingDiscard') // not stuck on 'awaitingDraw'
   })
 })

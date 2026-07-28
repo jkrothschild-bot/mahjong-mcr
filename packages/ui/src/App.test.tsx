@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { typeIdOfInstance } from '@mahjong-mcr/engine'
 import App from './App'
 import { sortByMode } from './hand/handOrder.js'
@@ -91,6 +91,38 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(screen.queryByRole('dialog', { name: 'Confirm discard' })).not.toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
+  })
+
+  it('step mode: shows a "Next" button once a bot has a real decision pending, and clicking it advances the board', () => {
+    vi.useFakeTimers()
+    window.localStorage.setItem(
+      'mcr-mahjong:settings:v1',
+      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: false, stepMode: true }),
+    )
+    render(<App />)
+
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+    fireEvent.click(firstTile!)
+    fireEvent.click(screen.getByRole('button', { name: 'Discard selected' }))
+
+    // Let any pending (non-decision) draws auto-resolve; the bot's own
+    // discard/claim decision should NOT auto-resolve under step mode.
+    act(() => {
+      vi.advanceTimersByTime(10_000)
+    })
+
+    const nextButton = screen.getByRole('button', { name: 'Next' })
+    const board = screen.getByTestId('board')
+    const boardBefore = board.innerHTML
+
+    fireEvent.click(nextButton)
+
+    expect(board.innerHTML).not.toBe(boardBefore)
+
+    vi.useRealTimers()
   })
 
   it('clicking a tile shows the tile inspector with its name and unseen count', () => {
