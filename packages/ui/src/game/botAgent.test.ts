@@ -105,7 +105,7 @@ describe('chooseBotMove', () => {
     expect(chooseBotMove(state, 1)).toEqual({ kind: 'win' })
   })
 
-  it('takes the first non-pass claim option when no win is available', () => {
+  it('takes the only qualifying claim option when no win is available', () => {
     const hand = handWith([...idsFor('C5', 2), ...idsFor('B1', 1)])
     const [c5ForDiscard] = idsFor('C5', 3).slice(2)
     const hands: [Hand, Hand, Hand, Hand] = [emptyHand(), hand, emptyHand(), emptyHand()]
@@ -116,7 +116,12 @@ describe('chooseBotMove', () => {
       eligibleSeats: [1],
       declarations: {},
     }
-    const state = baseState(hands, { phase: 'awaitingClaims', currentSeat: 0, pendingClaim })
+    let state = baseState(hands, { phase: 'awaitingClaims', currentSeat: 0, pendingClaim })
+    // The real policy actually applies the candidate move (via applyMove) to
+    // check its resulting shanten, unlike the old placeholder — so, unlike
+    // before, the discarder's `discards` must genuinely contain the claimed
+    // tile (matching what a real 'discard' move would have produced).
+    state = { ...state, players: [{ ...state.players[0], discards: [c5ForDiscard!] }, state.players[1], state.players[2], state.players[3]] }
     expect(chooseBotMove(state, 1)).toEqual({ kind: 'pung' })
   })
 
@@ -140,5 +145,38 @@ describe('chooseBotMove', () => {
     const hands: [Hand, Hand, Hand, Hand] = [hand, emptyHand(), emptyHand(), emptyHand()]
     const state = baseState(hands, { phase: 'awaitingDiscard', currentSeat: 0 })
     expect(chooseBotMove(state, 0)).toEqual(chooseBotMove(state, 0))
+  })
+
+  it('assigns different seats different presets, so their claim decisions can genuinely diverge', () => {
+    // Same shanten-neutral-pung fixture verified in the engine's
+    // bots/policy.test.ts: pung(DW×3)+pung(DG×3) + taatsu(C3,C4) +
+    // taatsu(D3,D4) + pair(C9,C9) reserved as head + 1 filler. Claiming the
+    // pung consumes the reserved head pair while the vacated budget slot
+    // can only re-admit one of the two other taatsu — net shanten
+    // unchanged (1->1). seat3 (conservative) should decline it; seat1
+    // (efficient) should take it.
+    const concealed = [
+      ...idsFor('DW', 3),
+      ...idsFor('DG', 3),
+      ...idsFor('C3', 1),
+      ...idsFor('C4', 1),
+      ...idsFor('D3', 1),
+      ...idsFor('D4', 1),
+      ...idsFor('C9', 2),
+      ...idsFor('WN', 1),
+    ]
+    const [c9third] = idsFor('C9', 3).slice(2)
+
+    function stateForClaimant(claimantSeat: Seat): GameState {
+      const hands: [Hand, Hand, Hand, Hand] = [emptyHand(), emptyHand(), emptyHand(), emptyHand()]
+      hands[claimantSeat] = handWith(concealed)
+      const pendingClaim: PendingClaim = { tile: c9third!, fromSeat: 0, kind: 'discard', eligibleSeats: [claimantSeat], declarations: {} }
+      let state = baseState(hands, { phase: 'awaitingClaims', currentSeat: 0, pendingClaim })
+      state = { ...state, players: [{ ...state.players[0], discards: [c9third!] }, state.players[1], state.players[2], state.players[3]] }
+      return state
+    }
+
+    expect(chooseBotMove(stateForClaimant(1), 1)).toEqual({ kind: 'pung' }) // efficient
+    expect(chooseBotMove(stateForClaimant(3), 3)).toEqual({ kind: 'pass' }) // conservative
   })
 })
