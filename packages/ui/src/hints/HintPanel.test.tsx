@@ -19,17 +19,18 @@ function handWith(concealedTiles: TileInstanceId[]): Hand {
 describe('HintPanel', () => {
   it('opens on the Best move tab by default, with real content', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
-    render(<HintPanel hand={hand} onClose={() => {}} />)
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" onClose={() => {}} />)
     expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('switches to the Hand plan and Tile safety tabs on click', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
-    render(<HintPanel hand={hand} onClose={() => {}} />)
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" onClose={() => {}} />)
 
     fireEvent.click(screen.getByRole('tab', { name: 'Hand plan' }))
     expect(screen.getByRole('tab', { name: 'Hand plan' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByText(/shanten/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tile safety' }))
     expect(screen.getByRole('tab', { name: 'Tile safety' })).toHaveAttribute('aria-selected', 'true')
@@ -38,7 +39,7 @@ describe('HintPanel', () => {
   it('calls onClose when the Close button is clicked', () => {
     const onClose = vi.fn()
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
-    render(<HintPanel hand={hand} onClose={onClose} />)
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledOnce()
   })

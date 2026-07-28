@@ -1,4 +1,5 @@
 import type { PlayerState, Seat as SeatId, Wind } from '@mahjong-mcr/engine'
+import { FanTrackerPanel } from '../hand/FanTrackerPanel.js'
 import { HandTiles } from '../hand/HandTiles.js'
 import { SortToolbar } from '../hand/SortToolbar.js'
 import { WaitsPanel } from '../hand/WaitsPanel.js'
@@ -98,6 +99,7 @@ export function Seat({
 
       {isHuman ? (
         <div className="flex flex-col gap-1">
+          {prevailingWind && <FanTrackerPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
           {prevailingWind && <WaitsPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
           <div className="flex flex-wrap items-center gap-2">
             {onSortHand && <SortToolbar onSort={onSortHand} />}

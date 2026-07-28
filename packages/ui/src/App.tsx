@@ -95,7 +95,14 @@ function App() {
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
 
-        {hintOpen && <HintPanel hand={state.players[HUMAN_SEAT].hand} onClose={() => setHintOpen(false)} />}
+        {hintOpen && (
+          <HintPanel
+            hand={state.players[HUMAN_SEAT].hand}
+            prevailingWind={state.prevailingWind}
+            seatWind={state.players[HUMAN_SEAT].seatWind}
+            onClose={() => setHintOpen(false)}
+          />
+        )}
 
         {settings.stepMode && hasPendingBotMove && (
           <button

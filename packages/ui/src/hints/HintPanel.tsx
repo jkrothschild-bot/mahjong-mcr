@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import type { Hand } from '@mahjong-mcr/engine'
+import type { Hand, Wind } from '@mahjong-mcr/engine'
 import { BestMoveTab } from './BestMoveTab.js'
+import { HandPlanTab } from './HandPlanTab.js'
 
 export interface HintPanelProps {
   hand: Hand
+  prevailingWind: Wind
+  seatWind: Wind
   onClose: () => void
 }
 
@@ -19,8 +22,8 @@ const TABS: { id: HintTab; label: string }[] = [
 // Hint (CLAUDE.md — never automatic, never shown for bots). The three tabs
 // map onto the original nudge/options/tutor depth levels; Hand Plan and
 // Tile Safety are placeholders here and get real content in the next two
-// phases (computeHandPlan / assessTileSafety are already built, just not
-// wired into this shell yet).
+// phases (assessTileSafety is already built, just not wired into this
+// shell yet).
 //
 // Rendered as a modal overlay (same pattern as TileCountGrid/ScoreScreen),
 // not inline in the board's normal flow — an inline panel here pushed the
@@ -29,7 +32,7 @@ const TABS: { id: HintTab; label: string }[] = [
 // more), which breaks SPEC.md §5a's no-scrolling rule. A modal keeps the
 // board's own layout completely unaffected regardless of how much content
 // later phases add to these tabs.
-export function HintPanel({ hand, onClose }: HintPanelProps) {
+export function HintPanel({ hand, prevailingWind, seatWind, onClose }: HintPanelProps) {
   const [tab, setTab] = useState<HintTab>('bestMove')
 
   return (
@@ -71,7 +74,7 @@ export function HintPanel({ hand, onClose }: HintPanelProps) {
 
         <div role="tabpanel">
           {tab === 'bestMove' && <BestMoveTab hand={hand} />}
-          {tab === 'handPlan' && <p className="text-sm text-neutral-400">Coming soon.</p>}
+          {tab === 'handPlan' && <HandPlanTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />}
           {tab === 'tileSafety' && <p className="text-sm text-neutral-400">Coming soon.</p>}
         </div>
       </div>
