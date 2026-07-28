@@ -1,6 +1,11 @@
 import type { Meld } from './meld.js'
 import type { TileInstanceId, TileTypeId } from './tiles.js'
-import { chowNeighbors, groupConcealedByType, ORDERED_STANDARD_TYPE_IDS } from './win-detection.js'
+import {
+  chowNeighbors,
+  groupConcealedByType,
+  ORDERED_STANDARD_TYPE_IDS,
+  THIRTEEN_ORPHAN_TYPE_IDS,
+} from './win-detection.js'
 
 // Standard-shape shanten (four sets + one pair). Model the hand as 5 blocks:
 // 4 "set" blocks + 1 "head" block, with the following per-block cost budget
@@ -118,4 +123,55 @@ function searchBlocks(counts: Record<TileTypeId, number>, budget: number): numbe
   counts[lowest]! += 1
 
   return best
+}
+
+// Seven Pairs shanten. `pairs` = distinct types with count >= 2 (a
+// 4-of-a-kind still counts as only 1 pair, matching win-detection.ts's own
+// isSevenPairs comment: "four of the same tile does not count as two
+// pairs"); `kinds` = distinct types present at all. The max(0, 7-kinds)
+// correction — often missed in naive write-ups — penalizes a hand that
+// doesn't even have 7 distinct kinds yet to ever form 7 distinct pairs
+// from. Only valid with zero melds (matches isSevenPairs' own restriction).
+export function sevenPairsShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
+  if (melds.length !== 0) return Infinity
+  const counts = groupConcealedByType(concealedTiles)
+  const values = Object.values(counts)
+  const kinds = values.length
+  const pairs = values.filter((count) => count >= 2).length
+  return 6 - pairs + Math.max(0, 7 - kinds)
+}
+
+// Thirteen Orphans shanten. `kinds` = how many of the 13 required terminal/
+// honor types are present (>=1 copy); `hasPair` = 1 if any of those 13
+// types has >=2 copies. Only valid with zero melds (matches
+// isThirteenOrphans' own restriction — see its comment for why a meld can
+// never structurally fit this shape).
+export function thirteenOrphansShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): number {
+  if (melds.length !== 0) return Infinity
+  const counts = groupConcealedByType(concealedTiles)
+  let kinds = 0
+  let hasPair = false
+  for (const type of THIRTEEN_ORPHAN_TYPE_IDS) {
+    const count = counts[type] ?? 0
+    if (count >= 1) kinds++
+    if (count >= 2) hasPair = true
+  }
+  return 13 - kinds - (hasPair ? 1 : 0)
+}
+
+export interface ShantenResult {
+  shanten: number
+  shape: 'standard' | 'sevenPairs' | 'thirteenOrphans'
+}
+
+// The minimum shanten across all three recognized structural shapes (the
+// same three win-detection.ts's isWinningHand checks) — ties broken toward
+// 'standard' since it's the most common case, for deterministic output.
+export function calculateShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): ShantenResult {
+  const candidates: ShantenResult[] = [
+    { shanten: standardShanten(concealedTiles, melds), shape: 'standard' },
+    { shanten: sevenPairsShanten(concealedTiles, melds), shape: 'sevenPairs' },
+    { shanten: thirteenOrphansShanten(concealedTiles, melds), shape: 'thirteenOrphans' },
+  ]
+  return candidates.reduce((best, candidate) => (candidate.shanten < best.shanten ? candidate : best))
 }

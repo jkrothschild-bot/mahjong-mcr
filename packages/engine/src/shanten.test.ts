@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Meld } from './meld.js'
-import { standardShanten } from './shanten.js'
+import { calculateShanten, sevenPairsShanten, standardShanten, thirteenOrphansShanten } from './shanten.js'
+import { isWinningHand } from './win-detection.js'
+import { mulberry32 } from './rng.js'
+import { playRandomHand } from './testing/random-agent.js'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileTypeId } from './tiles.js'
 
 // Same idsFor helper convention used across the engine's other test files.
@@ -133,5 +136,243 @@ describe('standardShanten', () => {
     ]
     expect(concealed.length + meld.tiles.length).toBe(13)
     expect(standardShanten(concealed, [meld])).toBe(0)
+  })
+})
+
+describe('sevenPairsShanten', () => {
+  it('scores -1 (agari) for 7 complete distinct pairs', () => {
+    const concealed = [
+      ...idsFor('C1', 2),
+      ...idsFor('C4', 2),
+      ...idsFor('C7', 2),
+      ...idsFor('D1', 2),
+      ...idsFor('D4', 2),
+      ...idsFor('D7', 2),
+      ...idsFor('B1', 2),
+    ]
+    expect(concealed.length).toBe(14)
+    expect(sevenPairsShanten(concealed, [])).toBe(-1)
+  })
+
+  it('scores 0 (tenpai) for 6 pairs plus a single of a 7th distinct kind', () => {
+    const concealed = [
+      ...idsFor('C1', 2),
+      ...idsFor('C4', 2),
+      ...idsFor('C7', 2),
+      ...idsFor('D1', 2),
+      ...idsFor('D4', 2),
+      ...idsFor('D7', 2),
+      ...idsFor('B1', 1),
+    ]
+    expect(concealed.length).toBe(13)
+    expect(sevenPairsShanten(concealed, [])).toBe(0)
+  })
+
+  it('applies the "not enough distinct kinds" correction (max(0, 7-kinds))', () => {
+    // Only 4 distinct kinds total (13 tiles) — even with lots of
+    // duplication, there aren't enough different kinds to ever reach 7
+    // distinct pairs, so the shanten should be worse than a naive 6-pairs
+    // reading would suggest.
+    const concealed = [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('C4', 1)]
+    expect(concealed.length).toBe(13)
+    // pairs=3 (C1,C2,C3 each count as exactly 1 pair despite 4 copies), kinds=4
+    // shanten = 6 - 3 + max(0, 7-4) = 6
+    expect(sevenPairsShanten(concealed, [])).toBe(6)
+  })
+
+  it('is never valid (+Infinity) with any meld present, matching isSevenPairs\' own restriction', () => {
+    const meld = exposedPung('0-0', 'WE')
+    expect(sevenPairsShanten([...idsFor('C1', 2)], [meld])).toBe(Infinity)
+  })
+})
+
+describe('thirteenOrphansShanten', () => {
+  it('scores -1 (agari) for a complete hand: 12 singles + 1 pair among the 13 required types', () => {
+    const concealed = [
+      ...idsFor('C1', 2),
+      ...idsFor('C9', 1),
+      ...idsFor('D1', 1),
+      ...idsFor('D9', 1),
+      ...idsFor('B1', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('WE', 1),
+      ...idsFor('WS', 1),
+      ...idsFor('WW', 1),
+      ...idsFor('WN', 1),
+      ...idsFor('DR', 1),
+      ...idsFor('DG', 1),
+      ...idsFor('DW', 1),
+    ]
+    expect(concealed.length).toBe(14)
+    expect(thirteenOrphansShanten(concealed, [])).toBe(-1)
+  })
+
+  it('scores 0 (tenpai) for the classic 13-way wait: all 13 types as singles, no pair', () => {
+    const concealed = [
+      ...idsFor('C1', 1),
+      ...idsFor('C9', 1),
+      ...idsFor('D1', 1),
+      ...idsFor('D9', 1),
+      ...idsFor('B1', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('WE', 1),
+      ...idsFor('WS', 1),
+      ...idsFor('WW', 1),
+      ...idsFor('WN', 1),
+      ...idsFor('DR', 1),
+      ...idsFor('DG', 1),
+      ...idsFor('DW', 1),
+    ]
+    expect(concealed.length).toBe(13)
+    expect(thirteenOrphansShanten(concealed, [])).toBe(0)
+  })
+
+  it('scores 0 (tenpai) for an ordinary kokushi tenpai: 12 distinct types, one doubled', () => {
+    const concealed = [
+      ...idsFor('C1', 2),
+      ...idsFor('C9', 1),
+      ...idsFor('D1', 1),
+      ...idsFor('D9', 1),
+      ...idsFor('B1', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('WE', 1),
+      ...idsFor('WS', 1),
+      ...idsFor('WW', 1),
+      ...idsFor('WN', 1),
+      ...idsFor('DR', 1),
+      ...idsFor('DG', 1),
+    ]
+    expect(concealed.length).toBe(13)
+    expect(thirteenOrphansShanten(concealed, [])).toBe(0)
+  })
+
+  it('scores worse the fewer of the 13 required kinds are present', () => {
+    const concealed = [
+      ...idsFor('C1', 1),
+      ...idsFor('C9', 1),
+      ...idsFor('D1', 1),
+      ...idsFor('D9', 1),
+      ...idsFor('B1', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('WE', 1),
+      ...idsFor('WS', 1),
+      ...idsFor('WW', 1),
+      ...idsFor('WN', 1),
+      ...idsFor('C5', 3), // filler, not one of the 13 required types
+    ]
+    expect(concealed.length).toBe(13)
+    // kinds=10, hasPair=false -> shanten = 13 - 10 - 0 = 3
+    expect(thirteenOrphansShanten(concealed, [])).toBe(3)
+  })
+
+  it('is never valid (+Infinity) with any meld present, matching isThirteenOrphans\' own restriction', () => {
+    const meld = exposedPung('0-0', 'WE')
+    expect(thirteenOrphansShanten([...idsFor('C1', 1)], [meld])).toBe(Infinity)
+  })
+})
+
+describe('calculateShanten', () => {
+  it('picks the standard shape when it is the best (a normal chow/pung hand)', () => {
+    const concealed = [
+      ...idsFor('C3', 1),
+      ...idsFor('C4', 1),
+      ...idsFor('D4', 1),
+      ...idsFor('D5', 1),
+      ...idsFor('D6', 1),
+      ...idsFor('B7', 1),
+      ...idsFor('B8', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('DW', 3),
+      ...idsFor('C9', 2),
+    ]
+    const result = calculateShanten(concealed, [])
+    expect(result).toEqual({ shanten: 0, shape: 'standard' })
+  })
+
+  it('picks Seven Pairs when it beats the standard shape (a pairs-heavy hand)', () => {
+    const concealed = [
+      ...idsFor('C1', 2),
+      ...idsFor('C4', 2),
+      ...idsFor('C7', 2),
+      ...idsFor('D1', 2),
+      ...idsFor('D4', 2),
+      ...idsFor('D7', 2),
+      ...idsFor('B1', 1),
+    ]
+    expect(concealed.length).toBe(13)
+    const result = calculateShanten(concealed, [])
+    expect(result).toEqual({ shanten: 0, shape: 'sevenPairs' })
+  })
+
+  it('picks Thirteen Orphans when it beats the standard shape (an orphans-heavy hand)', () => {
+    const concealed = [
+      ...idsFor('C1', 2),
+      ...idsFor('C9', 1),
+      ...idsFor('D1', 1),
+      ...idsFor('D9', 1),
+      ...idsFor('B1', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('WE', 1),
+      ...idsFor('WS', 1),
+      ...idsFor('WW', 1),
+      ...idsFor('WN', 1),
+      ...idsFor('DR', 1),
+      ...idsFor('DG', 1),
+    ]
+    const result = calculateShanten(concealed, [])
+    expect(result).toEqual({ shanten: 0, shape: 'thirteenOrphans' })
+  })
+
+  // Ties the new code back to the already-trusted M1 win-detection logic
+  // rather than asserting only against itself: a hand is "won" (shanten
+  // <= -1) if and only if isWinningHand agrees, sampled across many seeded
+  // random hands, reusing the existing playRandomHand harness rather than
+  // building new hand-generation infrastructure. Uniform-random play almost
+  // never organically produces a natural win within a single hand (see
+  // property.test.ts's own note on this) — this test's job is checking for
+  // false positives/negatives across many *non-winning* intermediate hands;
+  // the next test below covers the winning case explicitly and directly.
+  it('agrees with isWinningHand across many sampled non-winning hands (no false positives/negatives)', () => {
+    const SEED_COUNT = 30
+    let sampledNonWins = 0
+
+    for (let seed = 0; seed < SEED_COUNT; seed++) {
+      const agentRng = mulberry32(seed * 104729 + 11)
+      playRandomHand({
+        seed,
+        handNumber: 1,
+        prevailingWind: 'east',
+        dealerSeat: 0,
+        agentRng,
+        onMove: (seat, _move, state) => {
+          const player = state.players[seat]
+          const isWin = isWinningHand(player.hand.concealedTiles, player.hand.melds)
+          const shanten = calculateShanten(player.hand.concealedTiles, player.hand.melds).shanten
+          if (!isWin) sampledNonWins++
+          expect(shanten <= -1).toBe(isWin)
+        },
+      })
+    }
+
+    expect(sampledNonWins).toBeGreaterThan(0)
+  })
+
+  it('agrees with isWinningHand for an explicit, guaranteed-complete hand', () => {
+    const concealed = [
+      ...idsFor('C3', 1),
+      ...idsFor('C4', 1),
+      ...idsFor('C5', 1),
+      ...idsFor('D4', 1),
+      ...idsFor('D5', 1),
+      ...idsFor('D6', 1),
+      ...idsFor('B7', 1),
+      ...idsFor('B8', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('DW', 3),
+      ...idsFor('C9', 2),
+    ]
+    expect(concealed.length).toBe(14)
+    expect(isWinningHand(concealed, [])).toBe(true)
+    expect(calculateShanten(concealed, []).shanten).toBe(-1)
   })
 })
