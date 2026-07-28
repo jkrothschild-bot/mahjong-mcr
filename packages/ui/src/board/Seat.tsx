@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { PlayerState, Seat as SeatId, Wind } from '@mahjong-mcr/engine'
 import { FanTrackerPanel } from '../hand/FanTrackerPanel.js'
 import { HandTiles } from '../hand/HandTiles.js'
@@ -64,6 +65,33 @@ export function Seat({
   onInspectTile,
   prevailingWind,
 }: SeatProps) {
+  // Flowers + melds + discards grow without bound over a hand (a seat can
+  // rack up dozens of discards, several melds, before the wall empties) —
+  // no fixed tile size makes an unbounded amount of this fit in the fixed
+  // board layout SPEC.md §5a's no-scrolling rule requires. Found via real
+  // extended play: even a SINGLE extra row appearing (one flower reveal,
+  // one meld) was enough to push the whole board past the iPad viewport
+  // with zero margin to spare — the original "fits at a fresh deal" tuning
+  // had no slack for anything appearing beyond that exact starting state.
+  // A bot seat's entire post-header content (flowers/melds/discards/
+  // concealed backs together) is capped to one shared, scrollable region so
+  // its total footprint can never grow past a fixed budget, regardless of
+  // what accumulates inside it — this keeps the six-column/no-overlap
+  // discard rule (a hard rule) and the current tile sizes (an explicit user
+  // preference) both intact while guaranteeing the page itself never needs
+  // to scroll. The human's own interactive hand (toolbar + tiles) is
+  // deliberately NOT included in its cap — that must stay fully visible and
+  // clickable; only the human's own flowers/melds/discards share this
+  // treatment with the bot seats.
+  const growingContentRef = useRef<HTMLDivElement>(null)
+  const flowerCount = player.hand.flowers.length
+  const meldCount = player.hand.melds.length
+  const discardCount = player.discards.length
+  useEffect(() => {
+    const el = growingContentRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [flowerCount, meldCount, discardCount])
+
   return (
     <section
       data-testid={`seat-${seat}`}
@@ -93,43 +121,51 @@ export function Seat({
         </span>
       </header>
 
-      <Flowers seat={seat} tiles={player.hand.flowers} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
-      <Melds seat={seat} melds={player.hand.melds} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
-      <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
-
       {isHuman ? (
-        <div className="flex flex-col gap-1">
-          {prevailingWind && <FanTrackerPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
-          {prevailingWind && <WaitsPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
-          <div className="flex flex-wrap items-center gap-2">
-            {onSortHand && <SortToolbar onSort={onSortHand} />}
-            {onRequestDiscard && (
-              <button
-                type="button"
-                disabled={!canDiscard}
-                onClick={onRequestDiscard}
-                className="min-h-11 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400 disabled:cursor-not-allowed disabled:border-neutral-600 disabled:bg-neutral-700 disabled:text-neutral-400"
-              >
-                Discard selected
-              </button>
-            )}
+        <>
+          <div ref={growingContentRef} className="flex max-h-24 flex-col gap-1 overflow-y-auto overflow-x-hidden">
+            <Flowers seat={seat} tiles={player.hand.flowers} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
+            <Melds seat={seat} melds={player.hand.melds} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
+            <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
           </div>
-          <HandTiles
-            order={handOrder ?? []}
-            onReorder={onReorderHand ?? (() => {})}
-            onTileClick={onTileClick}
-            selectedTileId={selectedTileId}
-            highlightedTypeId={selectedTypeId}
-            justDrawnTileId={justDrawnTileId}
-          />
-        </div>
-      ) : (
-        <div role="list" aria-label={`Seat ${seat} concealed tiles`} className="flex flex-wrap gap-1">
-          {player.hand.concealedTiles.map((_, index) => (
-            <div key={index} data-testid={`seat-${seat}-back-${index}`} role="listitem" className={tileBackCompactClassName()}>
-              <img src={botBackImageSrc()} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+          <div className="flex flex-col gap-1">
+            {prevailingWind && <FanTrackerPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
+            {prevailingWind && <WaitsPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
+            <div className="flex flex-wrap items-center gap-2">
+              {onSortHand && <SortToolbar onSort={onSortHand} />}
+              {onRequestDiscard && (
+                <button
+                  type="button"
+                  disabled={!canDiscard}
+                  onClick={onRequestDiscard}
+                  className="min-h-11 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400 disabled:cursor-not-allowed disabled:border-neutral-600 disabled:bg-neutral-700 disabled:text-neutral-400"
+                >
+                  Discard selected
+                </button>
+              )}
             </div>
-          ))}
+            <HandTiles
+              order={handOrder ?? []}
+              onReorder={onReorderHand ?? (() => {})}
+              onTileClick={onTileClick}
+              selectedTileId={selectedTileId}
+              highlightedTypeId={selectedTypeId}
+              justDrawnTileId={justDrawnTileId}
+            />
+          </div>
+        </>
+      ) : (
+        <div ref={growingContentRef} className="flex max-h-32 flex-col gap-1 overflow-y-auto overflow-x-hidden">
+          <Flowers seat={seat} tiles={player.hand.flowers} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
+          <Melds seat={seat} melds={player.hand.melds} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
+          <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
+          <div role="list" aria-label={`Seat ${seat} concealed tiles`} className="flex flex-wrap gap-1">
+            {player.hand.concealedTiles.map((_, index) => (
+              <div key={index} data-testid={`seat-${seat}-back-${index}`} role="listitem" className={tileBackCompactClassName()}>
+                <img src={botBackImageSrc()} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>

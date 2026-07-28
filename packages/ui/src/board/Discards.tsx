@@ -10,14 +10,15 @@ export interface DiscardsProps {
 }
 
 // Fixed 6-column grid, new row after 6 — a hard rule (CLAUDE.md/SPEC.md §5),
-// not a style choice: discards must never overlap, fan, or cascade.
+// not a style choice: discards must never overlap, fan, or cascade. A long
+// hand's discard river still grows without bound (a seat can rack up dozens
+// of discards before the wall empties) — the outer Seat.tsx caps and scrolls
+// the combined flowers/melds/discards region so that growth can never push
+// the page itself past the iPad viewport (found via real extended play:
+// see Seat.tsx's own comment on this).
 export function Discards({ seat, tiles, selectedTypeId, onTileClick }: DiscardsProps) {
   return (
-    <div
-      role="list"
-      aria-label={`Seat ${seat} discards`}
-      className="grid grid-cols-6 gap-1"
-    >
+    <div role="list" aria-label={`Seat ${seat} discards`} className="grid grid-cols-6 gap-1">
       {tiles.map((id) => {
         const typeId = typeIdOfInstance(id)
         return (

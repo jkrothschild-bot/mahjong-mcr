@@ -76,7 +76,15 @@ export function Board({
         <TileInspector selectedTypeId={selectedTypeId} unseenCounts={unseenCounts} />
       </div>
 
-      <div data-testid="board" className="grid w-full grid-cols-3 grid-rows-3 gap-2">
+      {/* grid-rows-[auto_auto_auto], not Tailwind's grid-rows-3 (equal 1fr
+          tracks) — with 1fr rows, the instant one seat's content (e.g. the
+          human's own hand row) needs more height than the others, ALL THREE
+          rows stretch to match it, multiplying the wasted space by 3 and
+          alone accounting for the majority of a real page-overflow bug
+          found via extended live play (see Seat.tsx's own comment on the
+          rest of that investigation). auto sizes each row to its own
+          content instead. */}
+      <div data-testid="board" className="grid w-full grid-cols-3 grid-rows-[auto_auto_auto] gap-2">
         {state.players.map((player) => {
           const offset = ((player.seat - HUMAN_SEAT + 4) % 4) as 0 | 1 | 2 | 3
           const isHuman = player.seat === HUMAN_SEAT
