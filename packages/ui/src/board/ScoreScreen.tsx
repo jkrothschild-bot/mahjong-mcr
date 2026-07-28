@@ -10,6 +10,10 @@ export interface ScoreScreenProps {
   // see its definition)." Optional so ScoreScreen still works standalone
   // (e.g. in tests) without wiring up the encyclopedia.
   onFanClick?: (fanId: number) => void
+  // SPEC.md §9's replay scrubber: "after a hand (or match) ends, step back
+  // through it move by move." Optional for the same standalone-testing
+  // reason as onFanClick above.
+  onReviewHand?: () => void
 }
 
 const ALL_SEATS: readonly Seat[] = [0, 1, 2, 3]
@@ -30,7 +34,7 @@ function formatSigned(amount: number): string {
 // flower points are winner.hand.flowers.length * FAN_REGISTRY[81].points —
 // both derived, not hardcoded — so this can never drift from the scoring
 // engine as new fans/rulings land.
-export function ScoreScreen({ state, matchScores, onNextHand, onFanClick }: ScoreScreenProps) {
+export function ScoreScreen({ state, matchScores, onNextHand, onFanClick, onReviewHand }: ScoreScreenProps) {
   if (state.phase !== 'handEnded' || !state.result) return null
   const { result } = state
 
@@ -60,13 +64,24 @@ export function ScoreScreen({ state, matchScores, onNextHand, onFanClick }: Scor
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={onNextHand}
-          className="min-h-11 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400"
-        >
-          Next hand
-        </button>
+        <div className="flex gap-2">
+          {onReviewHand && (
+            <button
+              type="button"
+              onClick={onReviewHand}
+              className="min-h-11 flex-1 rounded-md border border-neutral-600 px-4 text-sm font-semibold hover:bg-neutral-700"
+            >
+              Review this hand
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onNextHand}
+            className="min-h-11 flex-1 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400"
+          >
+            Next hand
+          </button>
+        </div>
       </div>
     </div>
   )

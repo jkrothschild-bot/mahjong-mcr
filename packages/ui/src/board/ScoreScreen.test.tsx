@@ -133,6 +133,17 @@ describe('ScoreScreen', () => {
     expect(onFanClick).toHaveBeenCalledWith(expect.any(Number))
   })
 
+  it('only shows "Review this hand" when onReviewHand is provided, and calls it when clicked', () => {
+    const state = selfDrawWinState()
+    const { rerender } = render(<ScoreScreen state={state} matchScores={ZERO_SCORES} onNextHand={() => {}} />)
+    expect(screen.queryByRole('button', { name: 'Review this hand' })).not.toBeInTheDocument()
+
+    const onReviewHand = vi.fn()
+    rerender(<ScoreScreen state={state} matchScores={ZERO_SCORES} onNextHand={() => {}} onReviewHand={onReviewHand} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Review this hand' }))
+    expect(onReviewHand).toHaveBeenCalledTimes(1)
+  })
+
   it('calls onNextHand when the button is clicked', () => {
     const onNextHand = vi.fn()
     const state = selfDrawWinState()

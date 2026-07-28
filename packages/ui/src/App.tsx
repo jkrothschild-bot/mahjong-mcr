@@ -9,9 +9,10 @@ import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
-import { useGameLoop } from './game/useGameLoop.js'
+import { useGameLoop, type HandMoveLog } from './game/useGameLoop.js'
 import { FanEncyclopedia } from './hints/FanEncyclopedia.js'
 import { HintPanel } from './hints/HintPanel.js'
+import { ReplayView } from './replay/ReplayView.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
 
@@ -20,6 +21,13 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
+  // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
+  // reference) — the live match keeps advancing in the background while
+  // Replay is open (nothing pauses useGameLoop's bot timers), so scrubbing
+  // against the live array would show the "of N" move total shifting under
+  // the user as bots keep playing. Freezing it at open-time keeps the
+  // scrubber stable for whatever hand(s) existed at that moment.
+  const [replaySnapshot, setReplaySnapshot] = useState<HandMoveLog[] | null>(null)
   const [encyclopediaFanId, setEncyclopediaFanId] = useState<number | undefined>(undefined)
   const [encyclopediaOpen, setEncyclopediaOpen] = useState(false)
   const openEncyclopedia = (fanId?: number) => {
@@ -34,6 +42,7 @@ function App() {
     state,
     matchState,
     matchScores,
+    matchMoveLogs,
     isHumanTurn,
     humanPendingClaim,
     submitHumanMove,
@@ -45,6 +54,7 @@ function App() {
     botSpeedMs: settings.botSpeedMs,
     stepMode: settings.stepMode,
   })
+  const openReplay = () => setReplaySnapshot(matchMoveLogs)
 
   const onSubmitDiscard = useCallback(
     (tile: number) => submitHumanMove({ kind: 'discard', tile }),
@@ -80,6 +90,13 @@ function App() {
             className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Fan encyclopedia
+          </button>
+          <button
+            type="button"
+            onClick={openReplay}
+            className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Replay
           </button>
           <button
             type="button"
@@ -148,9 +165,17 @@ function App() {
         onClose={() => setTileCountGridOpen(false)}
       />
 
-      <ScoreScreen state={state} matchScores={matchScores} onNextHand={startNextHand} onFanClick={openEncyclopedia} />
+      <ScoreScreen
+        state={state}
+        matchScores={matchScores}
+        onNextHand={startNextHand}
+        onFanClick={openEncyclopedia}
+        onReviewHand={openReplay}
+      />
 
       {encyclopediaOpen && <FanEncyclopedia initialFanId={encyclopediaFanId} onClose={() => setEncyclopediaOpen(false)} />}
+
+      {replaySnapshot && <ReplayView handMoveLogs={replaySnapshot} onClose={() => setReplaySnapshot(null)} />}
     </div>
   )
 }

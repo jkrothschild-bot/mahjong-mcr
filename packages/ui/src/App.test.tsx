@@ -173,4 +173,18 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
   })
+
+  it('opens and closes the replay view, showing hand 1 with the initial deal at move 0', () => {
+    render(<App />)
+
+    expect(screen.queryByTestId('replay-view')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replay' }))
+    expect(screen.getByTestId('replay-view')).toBeInTheDocument()
+    expect(screen.getByTestId('replay-hand-indicator')).toHaveTextContent('Hand 1 of 1')
+    expect(screen.getByTestId('replay-move-indicator')).toHaveTextContent('Move 0 of 0')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByTestId('replay-view')).not.toBeInTheDocument()
+  })
 })
