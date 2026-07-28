@@ -11,8 +11,9 @@
 // valid completion."
 import { describe, expect, it } from 'vitest'
 import { playRandomHand } from './testing/random-agent.js'
-import { startHand, type GameState } from './game-state.js'
+import { startHand, type GameState, type StartHandParams } from './game-state.js'
 import { applyMove, type Move } from './moves.js'
+import { replayToIndex, type RecordedMove } from './replay.js'
 import { isWinningHand } from './win-detection.js'
 import { buildWall } from './wall.js'
 import { mulberry32 } from './rng.js'
@@ -102,21 +103,18 @@ describe('property: replay determinism', () => {
   it('replaying the exact same (seat, move) sequence from the same seed reproduces the final state', () => {
     for (let seed = 0; seed < 20; seed++) {
       const agentRng = mulberry32(seed * 13 + 3)
-      const history: { seat: Seat; move: Move }[] = []
+      const startParams: StartHandParams = { seed, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 }
+      const history: RecordedMove[] = []
       const final = playRandomHand({
-        seed,
-        handNumber: 1,
-        prevailingWind: 'east',
-        dealerSeat: 0,
+        ...startParams,
         agentRng,
         onMove: (seat, move) => history.push({ seat, move }),
       })
 
-      let replay = startHand({ seed, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
-      for (const { seat, move } of history) {
-        replay = applyMove(replay, seat, move)
-      }
-      expect(replay).toEqual(final)
+      // M6's replay.ts extracts this exact loop (startHand once, then
+      // applyMove in order) as replayToIndex — reused here rather than
+      // hand-rolled, now that it exists.
+      expect(replayToIndex(startParams, history, history.length)).toEqual(final)
     }
   })
 
