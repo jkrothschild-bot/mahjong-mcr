@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { chooseDiscard, rankDiscards } from './bots/policy.js'
-import { computeBestMoveHint } from './hints.js'
+import { computeBestMoveHint, computeHandPlan } from './hints.js'
 import { emptyHand, type Hand } from './hand.js'
+import type { Meld } from './meld.js'
 import { evaluateDiscards } from './tile-efficiency.js'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from './tiles.js'
 
@@ -69,5 +70,74 @@ describe('computeBestMoveHint', () => {
 
   it('returns null for an empty hand', () => {
     expect(computeBestMoveHint(handWith([]))).toBeNull()
+  })
+})
+
+describe('computeHandPlan', () => {
+  it('pre-tenpai: empty waits, null reach-minimum flags, no locked-in fans without melds', () => {
+    const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBeGreaterThan(0)
+    expect(plan.waits).toEqual([])
+    expect(plan.bestCaseReachesMinimum).toBeNull()
+    expect(plan.worstCaseReachesMinimum).toBeNull()
+    expect(plan.lockedInFans).toEqual([])
+  })
+
+  it('pre-tenpai: an exposed dragon pung is already locked in (fan 59)', () => {
+    const dragonPung: Meld = {
+      id: '0-0',
+      kind: 'pung',
+      exposure: 'exposed',
+      tiles: idsFor('DW', 3),
+      ownerSeat: 0,
+    }
+    const hand: Hand = { ...emptyHand(), concealedTiles: [...idsFor('C1', 1), ...idsFor('C4', 1)], melds: [dragonPung] }
+    const plan = computeHandPlan(hand)
+    expect(plan.waits).toEqual([])
+    expect(plan.lockedInFans).toContainEqual({ fanId: 59, count: 1 })
+  })
+
+  it('tenpai, every wait reaches 8+: both reach-minimum flags are true', () => {
+    // Two dragon pungs (11+ pts either way) — same shape verified elsewhere
+    // this session for the 8-point win-legality gate's fixtures.
+    const concealed = [
+      ...idsFor('C3', 1),
+      ...idsFor('C4', 1),
+      ...idsFor('B7', 1),
+      ...idsFor('B8', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('DW', 3),
+      ...idsFor('DG', 3),
+      ...idsFor('C9', 2),
+    ]
+    const plan = computeHandPlan(handWith(concealed), { prevailingWind: 'east', seatWind: 'north' })
+    expect(plan.shanten.shanten).toBe(0)
+    expect(plan.waits.length).toBeGreaterThan(0)
+    expect(plan.bestCaseReachesMinimum).toBe(true)
+    expect(plan.worstCaseReachesMinimum).toBe(true)
+    // Two Dragon Pungs (54) applies to every wait/method — genuinely locked in.
+    expect(plan.lockedInFans).toContainEqual({ fanId: 54, count: 1 })
+  })
+
+  it('tenpai with a mixed-value shanpon wait: bestCase true, worstCase false (the 8-point trap)', () => {
+    // Shanpon on C9 or DG. C9-discard scores 7 (under the minimum); every
+    // other combination (C9-selfDraw, DG-discard, DG-selfDraw) reaches 8+.
+    // Verified computationally via scoreHand directly, not hand-derived.
+    const concealed = [
+      ...idsFor('D4', 1),
+      ...idsFor('D5', 1),
+      ...idsFor('D6', 1),
+      ...idsFor('B7', 1),
+      ...idsFor('B8', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('DW', 3),
+      ...idsFor('C9', 2),
+      ...idsFor('DG', 2),
+    ]
+    const plan = computeHandPlan(handWith(concealed), { prevailingWind: 'east', seatWind: 'north' })
+    expect(plan.shanten.shanten).toBe(0)
+    expect(plan.bestCaseReachesMinimum).toBe(true)
+    expect(plan.worstCaseReachesMinimum).toBe(false)
   })
 })

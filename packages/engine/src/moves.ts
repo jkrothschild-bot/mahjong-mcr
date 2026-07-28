@@ -10,17 +10,8 @@ import { groupConcealedByType, isWinningHand } from './win-detection.js'
 import { typeIdOf, typeIdOfInstance, typeOf, type Rank, type TileInstanceId, type TileTypeId } from './tiles.js'
 import type { GameState, HandResult, PendingClaim, PlayerState } from './game-state.js'
 import { allDeclared, resolvePendingClaim, type ResolvedClaim } from './claims.js'
-import { buildProspectiveScoreHandParams } from './scoring/derive-context.js'
+import { buildProspectiveScoreHandParams, MINIMUM_POINTS_TO_WIN } from './scoring/derive-context.js'
 import { scoreHand } from './scoring/score-hand.js'
-
-// §3.9.1.1: a hand must be worth at least this many points (excluding
-// Flower Tiles, §3.11.6.6) to legally declare Hu. Chicken Hand (fan 43,
-// docs/rules/decisions.md) only guarantees this floor when a hand would
-// otherwise score exactly 0 named fans — a hand with SOME small named fans
-// totaling less than this is neither 0 nor >= 8, and was, until this check
-// existed, silently accepted as a legal win. See decisions.md's entry on
-// this fix for the fixture that proves it.
-const MINIMUM_POINTS_TO_WIN = 8
 
 function wouldMeetMinimumToWin(
   state: GameState,

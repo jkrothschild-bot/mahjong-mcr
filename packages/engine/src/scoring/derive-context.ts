@@ -5,6 +5,13 @@ import { typeIdOfInstance, type TileInstanceId } from '../tiles.js'
 import type { Seat } from '../meld.js'
 import type { ScoreHandParams } from './score-hand.js'
 
+// §3.9.1.1: a hand must be worth at least this many points (excluding
+// Flower Tiles, §3.11.6.6) to legally declare Hu. Shared between moves.ts's
+// win-legality gate and hints.ts's Hand Plan tab (the "can this hand reach
+// the 8-point minimum" trap SPEC.md §6 calls out) so both always agree on
+// the same threshold.
+export const MINIMUM_POINTS_TO_WIN = 8
+
 // Win-circumstance derivation (isLastTileOfWall, wonOnKongReplacement, etc.)
 // used to be UI-only (packages/ui/src/game/deriveScoreContext.ts), computed
 // only AFTER a hand had already ended (state.result set). M5 needs the same
