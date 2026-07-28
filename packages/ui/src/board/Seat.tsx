@@ -5,6 +5,7 @@ import type { SortMode } from '../hand/handOrder.js'
 import { botBackImageSrc } from '../tiles/tileImages.js'
 import { tileBackCompactClassName } from '../tiles/tileStyles.js'
 import { Discards } from './Discards.js'
+import { Flowers } from './Flowers.js'
 import { Melds } from './Melds.js'
 
 const WIND_LETTER: Record<PlayerState['seatWind'], string> = { east: 'E', south: 'S', west: 'W', north: 'N' }
@@ -87,6 +88,7 @@ export function Seat({
         </span>
       </header>
 
+      <Flowers seat={seat} tiles={player.hand.flowers} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
       <Melds seat={seat} melds={player.hand.melds} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
       <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
 
