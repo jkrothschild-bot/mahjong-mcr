@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { typeIdOfInstance, type GameState, type MatchState, type Seat as SeatId, type TileTypeId } from '@mahjong-mcr/engine'
+import type { GameState, MatchState, Seat as SeatId, TileTypeId } from '@mahjong-mcr/engine'
 import { useHandOrder } from '../hand/useHandOrder.js'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
 import { Seat } from './Seat.js'
@@ -16,6 +15,11 @@ export interface BoardProps {
   selectedTileId: number | null
   onTileClick: (id: number) => void
   onRequestDiscard: () => void
+  // Tile inspector (SPEC.md §5): lifted to App (not owned here) so the Hint
+  // panel's Tile Safety tab (M5) can share the exact same selection instead
+  // of maintaining an independent one.
+  selectedTypeId: TileTypeId | null
+  onInspectTile: (id: number) => void
 }
 
 // Physical seat position never changes hand-to-hand (unlike wind labels,
@@ -48,19 +52,14 @@ export function Board({
   selectedTileId,
   onTileClick,
   onRequestDiscard,
+  selectedTypeId,
+  onInspectTile,
 }: BoardProps) {
   const { order, sort, reorder } = useHandOrder(state.players[HUMAN_SEAT].hand.concealedTiles, state.handNumber)
 
-  // Tile inspector (SPEC.md §5): clicking any tile, anywhere on the board,
-  // highlights every visible tile of the same type and shows how many
-  // remain unseen. Owned here (not lifted to App) since it's purely a
-  // board-wide display concern, unlike the discard flow (onTileClick/
-  // onRequestDiscard), which needs to reach the live game state in App.
-  const [selectedTypeId, setSelectedTypeId] = useState<TileTypeId | null>(null)
-  const inspectTile = (id: number) => setSelectedTypeId(typeIdOfInstance(id))
   const handleHumanHandTileClick = (id: number) => {
     onTileClick(id)
-    inspectTile(id)
+    onInspectTile(id)
   }
   const unseenCounts = computeUnseenCounts(state, HUMAN_SEAT)
 
@@ -99,7 +98,7 @@ export function Board({
                 canDiscard={isHuman ? isHumanTurn && selectedTileId !== null : undefined}
                 onRequestDiscard={isHuman ? onRequestDiscard : undefined}
                 justDrawnTileId={isHuman ? justDrawnTileId : undefined}
-                onInspectTile={inspectTile}
+                onInspectTile={onInspectTile}
                 prevailingWind={isHuman ? state.prevailingWind : undefined}
               />
             </div>

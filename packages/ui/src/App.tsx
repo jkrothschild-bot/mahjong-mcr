@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { typeIdOfInstance, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
 import { TileCountGrid } from './board/TileCountGrid.js'
@@ -18,6 +19,10 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
+  // Tile inspector (SPEC.md §5): lifted here (not owned inside Board) so the
+  // Hint panel's Tile Safety tab (M5) can share the exact same selection.
+  const [selectedTypeId, setSelectedTypeId] = useState<TileTypeId | null>(null)
+  const inspectTile = (id: number) => setSelectedTypeId(typeIdOfInstance(id))
   const {
     state,
     matchState,
@@ -91,6 +96,8 @@ function App() {
           selectedTileId={selectedTileId}
           onTileClick={selectTile}
           onRequestDiscard={requestDiscard}
+          selectedTypeId={selectedTypeId}
+          onInspectTile={inspectTile}
         />
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
@@ -100,6 +107,9 @@ function App() {
             hand={state.players[HUMAN_SEAT].hand}
             prevailingWind={state.prevailingWind}
             seatWind={state.players[HUMAN_SEAT].seatWind}
+            state={state}
+            forSeat={HUMAN_SEAT}
+            selectedTypeId={selectedTypeId}
             onClose={() => setHintOpen(false)}
           />
         )}

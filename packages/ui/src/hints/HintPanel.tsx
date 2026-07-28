@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import type { Hand, Wind } from '@mahjong-mcr/engine'
+import type { GameState, Hand, Seat, TileTypeId, Wind } from '@mahjong-mcr/engine'
 import { BestMoveTab } from './BestMoveTab.js'
 import { HandPlanTab } from './HandPlanTab.js'
+import { TileSafetyTab } from './TileSafetyTab.js'
 
 export interface HintPanelProps {
   hand: Hand
   prevailingWind: Wind
   seatWind: Wind
+  state: GameState
+  forSeat: Seat
+  selectedTypeId: TileTypeId | null
   onClose: () => void
 }
 
@@ -20,10 +24,7 @@ const TABS: { id: HintTab; label: string }[] = [
 
 // SPEC.md §6's Strategy Coach: on-demand only, hidden until the player taps
 // Hint (CLAUDE.md — never automatic, never shown for bots). The three tabs
-// map onto the original nudge/options/tutor depth levels; Hand Plan and
-// Tile Safety are placeholders here and get real content in the next two
-// phases (assessTileSafety is already built, just not wired into this
-// shell yet).
+// map onto the original nudge/options/tutor depth levels.
 //
 // Rendered as a modal overlay (same pattern as TileCountGrid/ScoreScreen),
 // not inline in the board's normal flow — an inline panel here pushed the
@@ -32,7 +33,7 @@ const TABS: { id: HintTab; label: string }[] = [
 // more), which breaks SPEC.md §5a's no-scrolling rule. A modal keeps the
 // board's own layout completely unaffected regardless of how much content
 // later phases add to these tabs.
-export function HintPanel({ hand, prevailingWind, seatWind, onClose }: HintPanelProps) {
+export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, selectedTypeId, onClose }: HintPanelProps) {
   const [tab, setTab] = useState<HintTab>('bestMove')
 
   return (
@@ -75,7 +76,7 @@ export function HintPanel({ hand, prevailingWind, seatWind, onClose }: HintPanel
         <div role="tabpanel">
           {tab === 'bestMove' && <BestMoveTab hand={hand} />}
           {tab === 'handPlan' && <HandPlanTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />}
-          {tab === 'tileSafety' && <p className="text-sm text-neutral-400">Coming soon.</p>}
+          {tab === 'tileSafety' && <TileSafetyTab state={state} forSeat={forSeat} selectedTypeId={selectedTypeId} />}
         </div>
       </div>
     </div>

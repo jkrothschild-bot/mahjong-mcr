@@ -25,6 +25,8 @@ describe('Board', () => {
         selectedTileId={null}
         onTileClick={() => {}}
         onRequestDiscard={() => {}}
+        selectedTypeId={null}
+        onInspectTile={() => {}}
       />,
     )
 
@@ -43,6 +45,8 @@ describe('Board', () => {
         selectedTileId={null}
         onTileClick={() => {}}
         onRequestDiscard={() => {}}
+        selectedTypeId={null}
+        onInspectTile={() => {}}
       />,
     )
 
