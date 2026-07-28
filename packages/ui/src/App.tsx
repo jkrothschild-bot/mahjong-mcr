@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { typeIdOfInstance, type ScenarioPreset, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
@@ -18,6 +18,8 @@ import { PracticeView } from './practice/PracticeView.js'
 import { ReplayView } from './replay/ReplayView.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
+import { StatsPanel } from './stats/StatsPanel.js'
+import { useSessionStats } from './stats/useSessionStats.js'
 
 function App() {
   const { settings, update } = useSettings()
@@ -27,6 +29,8 @@ function App() {
   const [exportOpen, setExportOpen] = useState(false)
   const [practicePickerOpen, setPracticePickerOpen] = useState(false)
   const [practicePreset, setPracticePreset] = useState<ScenarioPreset | null>(null)
+  const [statsOpen, setStatsOpen] = useState(false)
+  const { stats, recordHandResult } = useSessionStats()
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
   // Replay is open (nothing pauses useGameLoop's bot timers), so scrubbing
@@ -61,6 +65,19 @@ function App() {
     stepMode: settings.stepMode,
   })
   const openReplay = () => setReplaySnapshot(matchMoveLogs)
+
+  // Folds a finished hand's result into session stats exactly once: a ref
+  // (not state) tracking the last (seed, handNumber) recorded, since this is
+  // a persistence side effect and must live outside loopReducer — reducers
+  // stay pure (see useGameLoop.ts's own such comment about applySettlement).
+  const lastRecordedHandRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (state.phase !== 'handEnded') return
+    const key = `${state.seed}-${state.handNumber}`
+    if (lastRecordedHandRef.current === key) return
+    lastRecordedHandRef.current = key
+    recordHandResult(state, HUMAN_SEAT)
+  }, [state, recordHandResult])
 
   const onSubmitDiscard = useCallback(
     (tile: number) => submitHumanMove({ kind: 'discard', tile }),
@@ -117,6 +134,13 @@ function App() {
             className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Practice
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatsOpen(true)}
+            className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Stats
           </button>
           <button
             type="button"
@@ -217,6 +241,8 @@ function App() {
           onExit={() => setPracticePreset(null)}
         />
       )}
+
+      <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
     </div>
   )
 }

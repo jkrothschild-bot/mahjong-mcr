@@ -40,9 +40,15 @@ describe('PracticeView', () => {
     // poll by actually attempting a selection each tick and checking whether
     // the Discard button unlocks — avoids racing the phase transition
     // between 'awaitingDraw' (seat-0-turn already shows) and 'awaitingDiscard'.
+    // The seed is randomized per PracticeView mount, so an early bot discard
+    // may sometimes be legally claimable by the human (e.g. a C2/C5 for this
+    // preset's two-sided wait) — always Pass on any claim prompt so the test
+    // doesn't stall waiting on a declaration it never makes.
     let discardBtn = screen.getByRole('button', { name: 'Discard selected' })
     for (let i = 0; i < 60 && discardBtn.hasAttribute('disabled'); i++) {
       if (screen.queryByRole('dialog', { name: 'Practice hand result' })) return // rare: hand ended first
+      const passBtn = screen.queryByRole('button', { name: 'Pass' })
+      if (passBtn) fireEvent.click(passBtn)
       const hand = screen.getByRole('list', { name: 'Your hand' })
       const [firstTile] = hand.querySelectorAll('[role="listitem"]')
       if (firstTile) fireEvent.click(firstTile)
