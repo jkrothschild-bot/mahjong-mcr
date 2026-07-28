@@ -33,21 +33,30 @@ import {
 // Takes a counts record directly (rather than TileInstanceId[]) so
 // tile-efficiency.ts can probe "what if I drew one more of type X" by
 // bumping a single count, without ever fabricating instance IDs.
-export function standardShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): number {
+//
+// `cache` defaults to a fresh Map, but callers making many *related* calls
+// (tile-efficiency.ts's usefulTiles/evaluateDiscards, which probe dozens of
+// near-identical hands per decision) should pass one shared Map through —
+// see searchBlocks' own comment for why this matters far beyond one call.
+export function standardShantenFromCounts(
+  counts: Readonly<Record<TileTypeId, number>>,
+  meldCount: number,
+  cache: Map<string, number> = new Map(),
+): number {
   const n = 4 - meldCount
   if (n < 0) return Infinity
 
   let best = Infinity
 
   // Baseline: no pair reserved as head at all.
-  best = Math.min(best, 8 - 2 * meldCount - searchBlocks({ ...counts }, n))
+  best = Math.min(best, 8 - 2 * meldCount - searchBlocks({ ...counts }, n, cache))
 
   // Try reserving each type with >=2 copies as the head pair.
   for (const type of ORDERED_STANDARD_TYPE_IDS) {
     if ((counts[type] ?? 0) < 2) continue
     const withoutHead = { ...counts }
     withoutHead[type]! -= 2
-    best = Math.min(best, 8 - 2 * meldCount - searchBlocks(withoutHead, n) - 1)
+    best = Math.min(best, 8 - 2 * meldCount - searchBlocks(withoutHead, n, cache) - 1)
   }
 
   return best
@@ -75,22 +84,45 @@ function lowestNonzeroType(counts: Record<TileTypeId, number>): TileTypeId | nul
   return null
 }
 
+// A compact cache key: one digit (0-4) per standard type, in fixed order,
+// plus the budget. Cheap to build (34 single-digit lookups) and exact —
+// two calls with the same key always have the same answer.
+function cacheKey(counts: Record<TileTypeId, number>, budget: number): string {
+  let key = ''
+  for (const id of ORDERED_STANDARD_TYPE_IDS) key += counts[id] ?? 0
+  return `${budget}:${key}`
+}
+
 // Exhaustive search (mutates `counts` during recursion, always restores
 // before returning) for the maximum value of `2*sets + partials` achievable
 // using at most `budget` total blocks. Every branch — complete pung/chow,
 // partial pung, partial chow (adjacent or gapped), or leaving the tile
 // unconsumed ("floating") — is tried and the max taken, so this is a true
-// maximum, not a greedy heuristic. Budget is capped at 4 and hands are at
-// most ~14 tiles, so this terminates quickly with no memoization needed.
-function searchBlocks(counts: Record<TileTypeId, number>, budget: number): number {
+// maximum, not a greedy heuristic.
+//
+// The `cache` is load-bearing, not an optional nicety: standardShantenFromCounts
+// calls this once per candidate head-pair (up to 35 times), and — worse —
+// tile-efficiency.ts's usefulTiles/evaluateDiscards call the whole shanten
+// calculation dozens of times per decision (once per candidate tile type).
+// Without caching, a single discard decision measured over 1 SECOND;
+// sharing one cache across all of one standardShantenFromCounts call's
+// head-pair trials (many of the "floating tiles left over" sub-states
+// converge across trials) brought that down to low single-digit
+// milliseconds — verified directly against a real simulated hand, not
+// assumed.
+function searchBlocks(counts: Record<TileTypeId, number>, budget: number, cache: Map<string, number>): number {
   const lowest = lowestNonzeroType(counts)
   if (lowest === null || budget <= 0) return 0
+
+  const key = cacheKey(counts, budget)
+  const cached = cache.get(key)
+  if (cached !== undefined) return cached
 
   let best = 0
 
   if ((counts[lowest] ?? 0) >= 3) {
     counts[lowest]! -= 3
-    best = Math.max(best, 2 + searchBlocks(counts, budget - 1))
+    best = Math.max(best, 2 + searchBlocks(counts, budget - 1, cache))
     counts[lowest]! += 3
   }
 
@@ -101,7 +133,7 @@ function searchBlocks(counts: Record<TileTypeId, number>, budget: number): numbe
       counts[lowest]! -= 1
       counts[n1] = (counts[n1] ?? 0) - 1
       counts[n2] = (counts[n2] ?? 0) - 1
-      best = Math.max(best, 2 + searchBlocks(counts, budget - 1))
+      best = Math.max(best, 2 + searchBlocks(counts, budget - 1, cache))
       counts[lowest]! += 1
       counts[n1] = (counts[n1] ?? 0) + 1
       counts[n2] = (counts[n2] ?? 0) + 1
@@ -110,7 +142,7 @@ function searchBlocks(counts: Record<TileTypeId, number>, budget: number): numbe
 
   if ((counts[lowest] ?? 0) >= 2) {
     counts[lowest]! -= 2
-    best = Math.max(best, 1 + searchBlocks(counts, budget - 1))
+    best = Math.max(best, 1 + searchBlocks(counts, budget - 1, cache))
     counts[lowest]! += 2
   }
 
@@ -118,7 +150,7 @@ function searchBlocks(counts: Record<TileTypeId, number>, budget: number): numbe
     if ((counts[lowest] ?? 0) >= 1 && (counts[neighbor] ?? 0) >= 1) {
       counts[lowest]! -= 1
       counts[neighbor] = (counts[neighbor] ?? 0) - 1
-      best = Math.max(best, 1 + searchBlocks(counts, budget - 1))
+      best = Math.max(best, 1 + searchBlocks(counts, budget - 1, cache))
       counts[lowest]! += 1
       counts[neighbor] = (counts[neighbor] ?? 0) + 1
     }
@@ -126,9 +158,10 @@ function searchBlocks(counts: Record<TileTypeId, number>, budget: number): numbe
 
   // Leave this tile unconsumed (floating) — always a valid choice, same budget.
   counts[lowest]! -= 1
-  best = Math.max(best, searchBlocks(counts, budget))
+  best = Math.max(best, searchBlocks(counts, budget, cache))
   counts[lowest]! += 1
 
+  cache.set(key, best)
   return best
 }
 
@@ -180,15 +213,23 @@ export interface ShantenResult {
 // The minimum shanten across all three recognized structural shapes (the
 // same three win-detection.ts's isWinningHand checks) — ties broken toward
 // 'standard' since it's the most common case, for deterministic output.
-export function calculateShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): ShantenResult {
+export function calculateShantenFromCounts(
+  counts: Readonly<Record<TileTypeId, number>>,
+  meldCount: number,
+  cache: Map<string, number> = new Map(),
+): ShantenResult {
   const candidates: ShantenResult[] = [
-    { shanten: standardShantenFromCounts(counts, meldCount), shape: 'standard' },
+    { shanten: standardShantenFromCounts(counts, meldCount, cache), shape: 'standard' },
     { shanten: sevenPairsShantenFromCounts(counts, meldCount), shape: 'sevenPairs' },
     { shanten: thirteenOrphansShantenFromCounts(counts, meldCount), shape: 'thirteenOrphans' },
   ]
   return candidates.reduce((best, candidate) => (candidate.shanten < best.shanten ? candidate : best))
 }
 
-export function calculateShanten(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): ShantenResult {
-  return calculateShantenFromCounts(groupConcealedByType(concealedTiles), melds.length)
+export function calculateShanten(
+  concealedTiles: readonly TileInstanceId[],
+  melds: readonly Meld[],
+  cache: Map<string, number> = new Map(),
+): ShantenResult {
+  return calculateShantenFromCounts(groupConcealedByType(concealedTiles), melds.length, cache)
 }
