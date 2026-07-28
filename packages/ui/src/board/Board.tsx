@@ -100,6 +100,7 @@ export function Board({
                 onRequestDiscard={isHuman ? onRequestDiscard : undefined}
                 justDrawnTileId={isHuman ? justDrawnTileId : undefined}
                 onInspectTile={inspectTile}
+                prevailingWind={isHuman ? state.prevailingWind : undefined}
               />
             </div>
           )

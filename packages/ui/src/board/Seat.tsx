@@ -1,6 +1,7 @@
-import type { PlayerState, Seat as SeatId } from '@mahjong-mcr/engine'
+import type { PlayerState, Seat as SeatId, Wind } from '@mahjong-mcr/engine'
 import { HandTiles } from '../hand/HandTiles.js'
 import { SortToolbar } from '../hand/SortToolbar.js'
+import { WaitsPanel } from '../hand/WaitsPanel.js'
 import type { SortMode } from '../hand/handOrder.js'
 import { botBackImageSrc } from '../tiles/tileImages.js'
 import { tileBackCompactClassName } from '../tiles/tileStyles.js'
@@ -33,6 +34,8 @@ export interface SeatProps {
   // Tile inspector (Phase 6) — fires for any seat's discard/meld tile, and
   // additionally for the human's own hand tiles (see onTileClick above).
   onInspectTile?: (id: number) => void
+  // Only used when isHuman — the ready-hand/waits display (M4).
+  prevailingWind?: Wind
 }
 
 // A player's full slot: identity (wind/dealer/turn), hand-or-backs, melds,
@@ -58,6 +61,7 @@ export function Seat({
   onRequestDiscard,
   justDrawnTileId,
   onInspectTile,
+  prevailingWind,
 }: SeatProps) {
   return (
     <section
@@ -94,6 +98,7 @@ export function Seat({
 
       {isHuman ? (
         <div className="flex flex-col gap-2">
+          {prevailingWind && <WaitsPanel hand={player.hand} prevailingWind={prevailingWind} seatWind={player.seatWind} />}
           <div className="flex flex-wrap items-center gap-2">
             {onSortHand && <SortToolbar onSort={onSortHand} />}
             {onRequestDiscard && (
