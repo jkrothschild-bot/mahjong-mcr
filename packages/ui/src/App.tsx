@@ -9,6 +9,7 @@ import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop } from './game/useGameLoop.js'
+import { HintPanel } from './hints/HintPanel.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
 
@@ -16,6 +17,7 @@ function App() {
   const { settings, update } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
+  const [hintOpen, setHintOpen] = useState(false)
   const {
     state,
     matchState,
@@ -55,6 +57,13 @@ function App() {
           </button>
           <button
             type="button"
+            onClick={() => setHintOpen((open) => !open)}
+            className="min-h-11 min-w-11 rounded-md border border-indigo-500 px-3 text-sm text-indigo-300 hover:bg-indigo-950"
+          >
+            Hint
+          </button>
+          <button
+            type="button"
             onClick={() => setSettingsOpen((open) => !open)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
@@ -85,6 +94,8 @@ function App() {
         />
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
+
+        {hintOpen && <HintPanel hand={state.players[HUMAN_SEAT].hand} onClose={() => setHintOpen(false)} />}
 
         {settings.stepMode && hasPendingBotMove && (
           <button

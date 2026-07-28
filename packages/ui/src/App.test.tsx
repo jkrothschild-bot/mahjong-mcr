@@ -160,4 +160,17 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Tile-count grid' })).not.toBeInTheDocument()
   })
+
+  it('opens and closes the Strategy Coach hint panel, on the Best move tab by default', () => {
+    render(<App />)
+
+    expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }))
+    expect(screen.getByTestId('hint-panel')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
+  })
 })
