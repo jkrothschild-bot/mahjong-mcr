@@ -69,8 +69,8 @@ export function Board({
   const justDrawnTileId = isHumanTurn ? (state.lastDrawnTile ?? null) : null
 
   return (
-    <div className="flex w-full max-w-5xl flex-col items-center gap-2">
-      <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className="flex w-full max-w-5xl flex-col items-center gap-1">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         <WindIndicator matchState={matchState} />
         <WallCounter wall={state.wall} />
         <TileInspector selectedTypeId={selectedTypeId} unseenCounts={unseenCounts} />

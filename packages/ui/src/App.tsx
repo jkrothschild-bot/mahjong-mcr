@@ -90,8 +90,8 @@ function App() {
 
   return (
     <div className="min-h-svh bg-neutral-900 text-neutral-100 flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
-        <h1 className="text-xl font-semibold tracking-tight">MCR Mahjong Trainer</h1>
+      <header className="flex items-center justify-between px-4 py-1 border-b border-neutral-700">
+        <h1 className="text-lg font-semibold tracking-tight">MCR Mahjong Trainer</h1>
         <div className="flex gap-2">
           <button
             type="button"
@@ -158,11 +158,11 @@ function App() {
         </div>
       )}
 
-      <div className="flex justify-center px-4 pt-3">
+      <div className="flex justify-center px-4 pt-1">
         <CallOutToast state={state} />
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-start gap-2 p-2">
+      <main className="flex-1 flex flex-col items-center justify-start gap-1 p-1">
         <Board
           state={state}
           matchState={matchState}

@@ -64,23 +64,37 @@ export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps
 
   const options = legalMoves(state, HUMAN_SEAT)
 
+  // Fixed, bottom-anchored overlay — not an in-flow block. Every other
+  // overlay in the app (ScoreScreen, TileCountGrid, etc.) uses fixed
+  // positioning and is correctly excluded from document flow; this one used
+  // to render as a normal <main> child instead, so its ~70px of real height
+  // added directly to the page whenever a claim window opened, which alone
+  // was enough to overflow the iPad viewport (found via live play — a claim
+  // window appearing just 4 rounds into a fresh hand, no cumulative discard
+  // buildup needed, already pushed the page 75px past the viewport). The
+  // outer wrapper is pointer-events-none so it doesn't swallow clicks on the
+  // rest of the page when no claim is pending... but since this component
+  // returns null entirely in that case, that's already moot — kept anyway
+  // as the pattern's own defense-in-depth against covering unrelated UI.
   return (
-    <div
-      role="group"
-      aria-label="Claim this discard"
-      className="flex flex-col gap-2 rounded-lg border border-amber-500 bg-neutral-900 p-3"
-    >
-      <div className="flex flex-wrap gap-2">
-        {options.map((move, index) => (
-          <button
-            key={index}
-            type="button"
-            onClick={() => declare(move)}
-            className="min-h-11 rounded-md border border-neutral-600 bg-neutral-800 px-4 text-sm font-medium hover:bg-neutral-700"
-          >
-            {moveLabel(move)}
-          </button>
-        ))}
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center p-2">
+      <div
+        role="group"
+        aria-label="Claim this discard"
+        className="pointer-events-auto flex flex-col gap-2 rounded-lg border border-amber-500 bg-neutral-900 p-3 shadow-lg"
+      >
+        <div className="flex flex-wrap gap-2">
+          {options.map((move, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => declare(move)}
+              className="min-h-11 rounded-md border border-neutral-600 bg-neutral-800 px-4 text-sm font-medium hover:bg-neutral-700"
+            >
+              {moveLabel(move)}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

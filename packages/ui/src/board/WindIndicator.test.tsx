@@ -8,6 +8,6 @@ describe('WindIndicator', () => {
     const matchState = { ...startMatch(1), roundHandIndex: 2 as const, matchHandNumber: 2 }
     render(<WindIndicator matchState={matchState} />)
     expect(screen.getByTestId('wind-indicator')).toHaveTextContent('East 2')
-    expect(screen.getByText('Hand 2 of 16')).toBeInTheDocument()
+    expect(screen.getByTestId('wind-indicator')).toHaveTextContent('Hand 2 of 16')
   })
 })

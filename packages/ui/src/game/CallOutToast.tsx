@@ -54,7 +54,7 @@ export function CallOutToast({ state, dismissAfterMs = 2000 }: CallOutToastProps
   if (!message) return null
 
   return (
-    <div role="status" data-testid="call-out-toast" className="rounded-full border border-neutral-600 bg-neutral-800 px-4 py-2 text-sm">
+    <div role="status" data-testid="call-out-toast" className="rounded-full border border-neutral-600 bg-neutral-800 px-3 py-1 text-sm">
       {message}
     </div>
   )

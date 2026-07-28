@@ -17,7 +17,7 @@ export function TileInspector({ selectedTypeId, unseenCounts }: TileInspectorPro
   return (
     <div
       data-testid="tile-inspector"
-      className="flex items-center gap-2 rounded-full border border-neutral-600 bg-neutral-800 px-4 py-2 text-sm"
+      className="flex items-center gap-2 rounded-full border border-neutral-600 bg-neutral-800 px-3 py-1.5 text-sm"
     >
       <span className="font-semibold">{tileDisplayName(selectedTypeId)}</span>
       <span className="text-neutral-400">
