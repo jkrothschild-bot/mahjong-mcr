@@ -4,6 +4,7 @@ import { Board } from './board/Board.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
 import { TileCountGrid } from './board/TileCountGrid.js'
 import { computeUnseenCounts } from './board/unseenCounts.js'
+import { ExportPositionModal } from './export/ExportPositionModal.js'
 import { CallOutToast } from './game/CallOutToast.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
@@ -21,6 +22,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
   // Replay is open (nothing pauses useGameLoop's bot timers), so scrubbing
@@ -100,6 +102,13 @@ function App() {
           </button>
           <button
             type="button"
+            onClick={() => setExportOpen(true)}
+            className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Export
+          </button>
+          <button
+            type="button"
             onClick={() => setSettingsOpen((open) => !open)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
@@ -176,6 +185,8 @@ function App() {
       {encyclopediaOpen && <FanEncyclopedia initialFanId={encyclopediaFanId} onClose={() => setEncyclopediaOpen(false)} />}
 
       {replaySnapshot && <ReplayView handMoveLogs={replaySnapshot} onClose={() => setReplaySnapshot(null)} />}
+
+      <ExportPositionModal open={exportOpen} state={state} forSeat={HUMAN_SEAT} onClose={() => setExportOpen(false)} />
     </div>
   )
 }
