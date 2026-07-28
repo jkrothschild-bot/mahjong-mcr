@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { typeIdOfInstance, type TileTypeId } from '@mahjong-mcr/engine'
+import { typeIdOfInstance, type ScenarioPreset, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
 import { TileCountGrid } from './board/TileCountGrid.js'
@@ -13,6 +13,8 @@ import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop, type HandMoveLog } from './game/useGameLoop.js'
 import { FanEncyclopedia } from './hints/FanEncyclopedia.js'
 import { HintPanel } from './hints/HintPanel.js'
+import { PracticePicker } from './practice/PracticePicker.js'
+import { PracticeView } from './practice/PracticeView.js'
 import { ReplayView } from './replay/ReplayView.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
@@ -23,6 +25,8 @@ function App() {
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [practicePickerOpen, setPracticePickerOpen] = useState(false)
+  const [practicePreset, setPracticePreset] = useState<ScenarioPreset | null>(null)
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
   // Replay is open (nothing pauses useGameLoop's bot timers), so scrubbing
@@ -109,6 +113,13 @@ function App() {
           </button>
           <button
             type="button"
+            onClick={() => setPracticePickerOpen(true)}
+            className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            Practice
+          </button>
+          <button
+            type="button"
             onClick={() => setSettingsOpen((open) => !open)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
@@ -187,6 +198,25 @@ function App() {
       {replaySnapshot && <ReplayView handMoveLogs={replaySnapshot} onClose={() => setReplaySnapshot(null)} />}
 
       <ExportPositionModal open={exportOpen} state={state} forSeat={HUMAN_SEAT} onClose={() => setExportOpen(false)} />
+
+      {practicePickerOpen && (
+        <PracticePicker
+          onSelect={(preset) => {
+            setPracticePreset(preset)
+            setPracticePickerOpen(false)
+          }}
+          onClose={() => setPracticePickerOpen(false)}
+        />
+      )}
+
+      {practicePreset && (
+        <PracticeView
+          preset={practicePreset}
+          botSpeedMs={settings.botSpeedMs}
+          confirmBeforeDiscard={settings.confirmBeforeDiscard}
+          onExit={() => setPracticePreset(null)}
+        />
+      )}
     </div>
   )
 }
