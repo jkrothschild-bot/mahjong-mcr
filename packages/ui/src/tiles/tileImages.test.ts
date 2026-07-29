@@ -16,13 +16,13 @@ describe('tileImageSrc', () => {
   })
 
   it('maps winds and dragons through their traditional asset letters', () => {
-    expect(tileImageSrc('WE')).toMatch(/\/E[^/]*\.png/)
-    expect(tileImageSrc('WS')).toMatch(/\/S[^/]*\.png/)
-    expect(tileImageSrc('WW')).toMatch(/\/W[^/]*\.png/)
-    expect(tileImageSrc('WN')).toMatch(/\/N[^/]*\.png/)
-    expect(tileImageSrc('DR')).toMatch(/\/C[^/]*\.png/) // Chun (red)
-    expect(tileImageSrc('DG')).toMatch(/\/F[^/]*\.png/) // Faat (green)
-    expect(tileImageSrc('DW')).toMatch(/\/P[^/]*\.png/) // Pak (white)
+    expect(tileImageSrc('WE')).toMatch(/\/E[^/]*\.svg/)
+    expect(tileImageSrc('WS')).toMatch(/\/S[^/]*\.svg/)
+    expect(tileImageSrc('WW')).toMatch(/\/W[^/]*\.svg/)
+    expect(tileImageSrc('WN')).toMatch(/\/N[^/]*\.svg/)
+    expect(tileImageSrc('DR')).toMatch(/\/C[^/]*\.svg/) // Chun (red)
+    expect(tileImageSrc('DG')).toMatch(/\/F[^/]*\.svg/) // Faat (green)
+    expect(tileImageSrc('DW')).toMatch(/\/P[^/]*\.svg/) // Pak (white)
   })
 
   it('returns undefined for flowers/seasons — no art exists for these yet', () => {

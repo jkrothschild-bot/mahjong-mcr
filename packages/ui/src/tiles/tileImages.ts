@@ -1,11 +1,13 @@
 import { parseSuited, type TileTypeId } from '@mahjong-mcr/engine'
 
-// Eagerly bundles every PNG under tiles/assets/ once, keyed by bare filename
-// (no extension) — Vite hashes each URL and rewrites it under the app's
-// /mahjong-mcr/ base path automatically, unlike a hardcoded string path.
-const modules = import.meta.glob('./assets/*.png', { eager: true, import: 'default' }) as Record<string, string>
+// Eagerly bundles every PNG/SVG under tiles/assets/ once, keyed by bare
+// filename (no extension) — Vite hashes each URL and rewrites it under the
+// app's /mahjong-mcr/ base path automatically, unlike a hardcoded string
+// path. The 34 standard tile faces are generated SVGs (see
+// scripts/generate-tile-art.mjs); bot-back stays a plain PNG.
+const modules = import.meta.glob('./assets/*.{png,svg}', { eager: true, import: 'default' }) as Record<string, string>
 const ASSET_BY_KEY: Record<string, string> = Object.fromEntries(
-  Object.entries(modules).map(([path, url]) => [path.replace(/^.*\//, '').replace(/\.png$/, ''), url]),
+  Object.entries(modules).map(([path, url]) => [path.replace(/^.*\//, '').replace(/\.(png|svg)$/, ''), url]),
 )
 
 // The asset filenames use mahjong's traditional m(Characters)/p(Dots)/

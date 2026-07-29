@@ -7,6 +7,13 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: '/mahjong-mcr/',
   plugins: [react(), tailwindcss()],
+  // tileImages.ts assumes every tile-face asset resolves to a real, hashed
+  // URL (see its own doc comment) — without this, Vite inlines small assets
+  // as base64 data URIs below its default 4KB threshold, which one tile
+  // (White Dragon's pure-vector SVG, no embedded PNG) falls under while
+  // every other tile face doesn't, producing inconsistent behavior between
+  // tiles for no reason a caller should have to care about.
+  build: { assetsInlineLimit: 0 },
   test: {
     environment: 'jsdom',
     globals: true,
