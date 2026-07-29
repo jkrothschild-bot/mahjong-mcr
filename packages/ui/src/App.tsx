@@ -161,19 +161,13 @@ function App() {
           </button>
           <button
             type="button"
-            onClick={() => setSettingsOpen((open) => !open)}
+            onClick={() => setSettingsOpen(true)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Settings
           </button>
         </div>
       </header>
-
-      {settingsOpen && (
-        <div className="px-4 pt-3">
-          <SettingsPanel settings={settings} onUpdate={update} />
-        </div>
-      )}
 
       <div className="flex justify-center px-4 pt-1">
         <CallOutToast state={state} />
@@ -267,6 +261,8 @@ function App() {
       )}
 
       <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
+
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onUpdate={update} />
     </div>
     </MotionConfig>
     </SettingsContext.Provider>

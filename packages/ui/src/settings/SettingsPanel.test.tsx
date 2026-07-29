@@ -15,8 +15,20 @@ function tileSizeGroup() {
 }
 
 describe('SettingsPanel', () => {
+  it('renders nothing when closed', () => {
+    render(<SettingsPanel open={false} onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={() => {}} />)
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+
+  it('calls onClose when the Close button is clicked', () => {
+    const onClose = vi.fn()
+    render(<SettingsPanel open onClose={onClose} settings={DEFAULT_SETTINGS} onUpdate={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('reflects the current settings values', () => {
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={() => {}} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={() => {}} />)
     expect(botSpeedGroup().getByRole('radio', { name: 'Normal' })).toBeChecked()
     expect(tileSizeGroup().getByRole('radio', { name: 'Normal' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Confirm before discard' })).not.toBeChecked()
@@ -25,21 +37,21 @@ describe('SettingsPanel', () => {
 
   it('selecting a bot-speed preset calls onUpdate with the right ms value', () => {
     const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     fireEvent.click(botSpeedGroup().getByRole('radio', { name: 'Relaxed' }))
     expect(onUpdate).toHaveBeenCalledWith({ botSpeedMs: BOT_SPEED_PRESETS.relaxed })
   })
 
   it('toggling confirm-before-discard calls onUpdate', () => {
     const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     fireEvent.click(screen.getByRole('checkbox', { name: 'Confirm before discard' }))
     expect(onUpdate).toHaveBeenCalledWith({ confirmBeforeDiscard: true })
   })
 
   it('toggling step mode calls onUpdate', () => {
     const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     const checkbox = screen.getByRole('checkbox', { name: /Step mode/ })
     expect(checkbox).not.toBeChecked()
     fireEvent.click(checkbox)
@@ -48,21 +60,21 @@ describe('SettingsPanel', () => {
 
   it('toggling the color-blind palette calls onUpdate', () => {
     const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     fireEvent.click(screen.getByRole('checkbox', { name: 'Color-blind-safe palette' }))
     expect(onUpdate).toHaveBeenCalledWith({ colorBlindPalette: true })
   })
 
   it('selecting a tile-size preset calls onUpdate with the right value', () => {
     const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     fireEvent.click(tileSizeGroup().getByRole('radio', { name: 'X-Large' }))
     expect(onUpdate).toHaveBeenCalledWith({ tileScale: 'xlarge' })
   })
 
   it('toggling reduce motion calls onUpdate', () => {
     const onUpdate = vi.fn()
-    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
     fireEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion' }))
     expect(onUpdate).toHaveBeenCalledWith({ reducedMotion: true })
   })
