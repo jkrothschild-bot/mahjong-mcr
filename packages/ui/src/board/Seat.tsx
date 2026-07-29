@@ -1,7 +1,7 @@
 import type { PlayerState, Seat as SeatId } from '@mahjong-mcr/engine'
 import { HandTiles } from '../hand/HandTiles.js'
 import { Positioned } from '../stage/Positioned.js'
-import { SEAT_REGIONS, type SeatOffset } from '../stage/stageLayout.js'
+import { SEAT_BACK_ROTATION, SEAT_REGIONS, type SeatOffset } from '../stage/stageLayout.js'
 import { ConcealedBacks } from './ConcealedBacks.js'
 import { Discards } from './Discards.js'
 import { Flowers } from './Flowers.js'
@@ -42,9 +42,11 @@ export interface SeatProps {
 // this seat's stage region (stageLayout.ts's SEAT_REGIONS) rather than
 // stacked inside a bordered flow-layout card (M8 Step 1 removed that card
 // entirely — see stageLayout.ts's own comment on the region partition that
-// replaced it). Sort/discard controls and the fan-tracker/waits panels
-// moved up to Board.tsx's temporary control row; they're page-level HUD
-// now, not part of a seat's own stage presence. The turn highlight uses the
+// replaced it). Sort/discard controls and the fan-tracker/waits panels live
+// in Board.tsx's HudBar; they're page-level HUD, not part of a seat's own
+// stage presence. Only concealed backs rotate to face inward (M8 Step 2) —
+// this header stays upright for every seat, since wind/dealer/turn/score
+// must stay legible at a glance (SPEC.md §5a). The turn highlight uses the
 // exact same treatment regardless of seat — SPEC.md §5a/§5b's explicit
 // requirement is that a bot's turn must be just as unambiguous as the
 // human's, not a lesser afterthought.
@@ -127,7 +129,12 @@ export function Seat({
           justDrawnTileId={justDrawnTileId}
         />
       ) : (
-        <ConcealedBacks seat={seat} count={player.hand.concealedTiles.length} region={regions.backs!} />
+        <ConcealedBacks
+          seat={seat}
+          count={player.hand.concealedTiles.length}
+          region={regions.backs!}
+          rotation={SEAT_BACK_ROTATION[offset]}
+        />
       )}
     </div>
   )

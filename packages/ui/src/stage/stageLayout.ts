@@ -154,6 +154,17 @@ export const SEAT_REGIONS: Record<SeatOffset, SeatRegions> = {
   },
 }
 
+// Only the concealed tile-back art rotates to "face inward" (M8 Step 2) —
+// identity labels, discards, and melds deliberately stay upright for every
+// seat, since they carry legibility-critical content (numerals, wind/
+// dealer/turn/score text) SPEC.md §5a requires be answerable within ~2
+// seconds; sideways/upside-down text or tile faces work against that. Backs
+// carry no such content (just an indigo pattern), so rotating them is a
+// pure visual win with no readability cost. Human (offset 0) never has
+// backs. Left/top/right rotate so each seat's own "up" points toward the
+// table center.
+export const SEAT_BACK_ROTATION: Record<SeatOffset, number> = { 0: 0, 1: 90, 2: 180, 3: -90 }
+
 export interface PlacedTile {
   x: number // absolute stage-space center x, already accounting for the group's fitScale
   y: number // absolute stage-space center y

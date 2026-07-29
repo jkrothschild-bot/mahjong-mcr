@@ -42,7 +42,7 @@ describe('App', () => {
     const reference = initLoopState(42)
     const referenceTiles = reference.gameState.players[0].hand.concealedTiles
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort hand' }), { target: { value: 'suit' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Suit' }))
 
     // Sorting is purely visual (SPEC.md §5) — the engine-shaped reference
     // hand is unaffected by anything the UI does.

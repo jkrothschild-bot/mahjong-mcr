@@ -1,12 +1,11 @@
 import type { GameState, MatchState, Seat as SeatId, TileTypeId } from '@mahjong-mcr/engine'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
-import { FanTrackerPanel } from '../hand/FanTrackerPanel.js'
-import { SortToolbar } from '../hand/SortToolbar.js'
 import { useHandOrder } from '../hand/useHandOrder.js'
-import { WaitsPanel } from '../hand/WaitsPanel.js'
 import { GameStage } from '../stage/GameStage.js'
 import type { SeatOffset } from '../stage/stageLayout.js'
+import { HudBar } from './HudBar.js'
 import { Seat } from './Seat.js'
+import { TableSurface } from './TableSurface.js'
 import { TileInspector } from './TileInspector.js'
 import { computeUnseenCounts } from './unseenCounts.js'
 import { WallCounter } from './WallCounter.js'
@@ -71,6 +70,7 @@ export function Board({
       </div>
 
       <GameStage>
+        <TableSurface />
         <WallSegment />
         {state.players.map((player) => {
           const offset = ((player.seat - HUMAN_SEAT + 4) % 4) as SeatOffset
@@ -97,24 +97,14 @@ export function Board({
         })}
       </GameStage>
 
-      {/* Temporary plain control row: Step 1 only needed Sort/Discard/
-          FanTracker/Waits relocated out of the now-removed per-seat panel.
-          Step 2 is explicitly where this becomes a real styled HUD bar
-          (and SortToolbar's native <select> gets replaced) — deliberately
-          not attempted here. */}
-      <div className="flex w-full flex-wrap items-center justify-center gap-2 px-2 pb-1">
-        <FanTrackerPanel hand={humanPlayer.hand} prevailingWind={state.prevailingWind} seatWind={humanPlayer.seatWind} />
-        <WaitsPanel hand={humanPlayer.hand} prevailingWind={state.prevailingWind} seatWind={humanPlayer.seatWind} />
-        <SortToolbar onSort={sort} />
-        <button
-          type="button"
-          disabled={!canDiscard}
-          onClick={onRequestDiscard}
-          className="min-h-11 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400 disabled:cursor-not-allowed disabled:border-neutral-600 disabled:bg-neutral-700 disabled:text-neutral-400"
-        >
-          Discard selected
-        </button>
-      </div>
+      <HudBar
+        hand={humanPlayer.hand}
+        prevailingWind={state.prevailingWind}
+        seatWind={humanPlayer.seatWind}
+        onSort={sort}
+        canDiscard={canDiscard}
+        onRequestDiscard={onRequestDiscard}
+      />
     </div>
   )
 }
