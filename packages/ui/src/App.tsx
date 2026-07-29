@@ -91,7 +91,15 @@ function App() {
 
   return (
     <SettingsContext.Provider value={settings}>
-    <div className="min-h-svh bg-neutral-900 text-neutral-100 flex flex-col">
+    {/* h-svh (a definite height), not min-h-svh (only a floor) — flex-grow
+        children need a definite ancestor size to distribute remaining
+        space against; a min-height-only ancestor has no "remaining space"
+        to give out, so it was sizing to content instead and pushing the
+        whole page past the viewport. overflow-hidden is the hard backstop
+        matching CLAUDE.md's no-scroll rule now that GameStage's fit-to-
+        available-space logic is the thing actually responsible for making
+        content fit, rather than manually-tuned per-component pixel budgets. */}
+    <div className="h-svh overflow-hidden bg-neutral-900 text-neutral-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-1 border-b border-neutral-700">
         <h1 className="text-lg font-semibold tracking-tight">MCR Mahjong Trainer</h1>
         <div className="flex gap-2">
@@ -164,7 +172,14 @@ function App() {
         <CallOutToast state={state} />
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-start gap-1 p-1">
+      {/* min-h-0 is load-bearing: flex items default to min-height:auto,
+          which lets a child's natural content size push this (and every
+          ancestor up to min-h-svh, which is only a floor, not a ceiling)
+          taller than the viewport — exactly the page-scroll GameStage's
+          fit-to-viewport measurement is supposed to prevent. Without this,
+          Board's own flex-1/min-h-0 measures against an already-inflated
+          <main>, not the true remaining space. */}
+      <main className="flex-1 min-h-0 flex flex-col items-center justify-start gap-1 p-1">
         <Board
           state={state}
           matchState={matchState}

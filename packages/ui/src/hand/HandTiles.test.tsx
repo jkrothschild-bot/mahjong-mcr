@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
+import type { Rect } from '../stage/stageLayout.js'
 import { HandTiles } from './HandTiles.js'
+
+const TEST_REGION: Rect = { x: 0, y: 0, width: 1000, height: 200 }
 
 function idsFor(typeId: TileTypeId, count: number): TileInstanceId[] {
   const ids: TileInstanceId[] = []
@@ -30,7 +33,7 @@ describe('HandTiles', () => {
     const [c1] = idsFor('C1', 1)
     const [we] = idsFor('WE', 1)
     const order = [c1!, we!]
-    render(<HandTiles order={order} onReorder={() => {}} />)
+    render(<HandTiles order={order} onReorder={() => {}} region={TEST_REGION} />)
 
     const list = screen.getByRole('list', { name: 'Your hand' })
     const items = list.querySelectorAll('[role="listitem"]')
@@ -41,7 +44,7 @@ describe('HandTiles', () => {
 
   it('renders real tile-face art, not just the text label', () => {
     const [c1] = idsFor('C1', 1)
-    render(<HandTiles order={[c1!]} onReorder={() => {}} />)
+    render(<HandTiles order={[c1!]} onReorder={() => {}} region={TEST_REGION} />)
 
     const img = screen.getByTestId(`hand-tile-${c1}`).querySelector('img')
     expect(img).toBeInTheDocument()
@@ -54,7 +57,7 @@ describe('HandTiles', () => {
     const [c3] = idsFor('C3', 1)
     const order = [c1!, c2!, c3!]
     const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} />)
+    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
 
     const dragged = screen.getByTestId(`hand-tile-${c3}`)
     const target = screen.getByTestId(`hand-tile-${c1}`)
@@ -71,7 +74,7 @@ describe('HandTiles', () => {
     const [c2] = idsFor('C2', 1)
     const order = [c1!, c2!]
     const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} />)
+    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
 
     const dragged = screen.getByTestId(`hand-tile-${c1}`)
     const endZone = screen.getByTestId('hand-end-zone')
@@ -88,7 +91,7 @@ describe('HandTiles', () => {
     const [c2] = idsFor('C2', 1)
     const order = [c1!, c2!]
     const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} />)
+    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
 
     const dragged = screen.getByTestId(`hand-tile-${c1}`)
     mockDropTarget(null)
@@ -104,7 +107,7 @@ describe('HandTiles', () => {
     const [c2] = idsFor('C2', 1)
     const order = [c1!, c2!]
     const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} />)
+    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
 
     const dragged = screen.getByTestId(`hand-tile-${c1}`)
     const target = screen.getByTestId(`hand-tile-${c2}`)
@@ -121,7 +124,7 @@ describe('HandTiles', () => {
     const [c2] = idsFor('C2', 1)
     const order = [c1!, c2!]
     const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} />)
+    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
 
     const dragged = screen.getByTestId(`hand-tile-${c1}`)
     mockDropTarget(dragged)
@@ -136,7 +139,7 @@ describe('HandTiles', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
     const onTileClick = vi.fn()
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} onTileClick={onTileClick} />)
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} onTileClick={onTileClick} />)
 
     fireEvent.click(screen.getByTestId(`hand-tile-${c2}`))
 
@@ -146,7 +149,7 @@ describe('HandTiles', () => {
   it('highlights the selected tile', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} selectedTileId={c2} />)
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} selectedTileId={c2} />)
 
     expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-2')
     expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-2')
@@ -155,7 +158,7 @@ describe('HandTiles', () => {
   it('marks the just-drawn tile distinctly from an explicit selection, so it is identifiable without clicking', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} justDrawnTileId={c2} />)
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} justDrawnTileId={c2} />)
 
     expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-sky-400')
     expect(screen.getByTestId(`hand-tile-${c2}`).className).not.toContain('ring-amber-400')
@@ -164,7 +167,7 @@ describe('HandTiles', () => {
 
   it('lets an explicit selection\'s amber ring take precedence over the just-drawn ring on the same tile', () => {
     const [c1] = idsFor('C1', 1)
-    render(<HandTiles order={[c1!]} onReorder={() => {}} selectedTileId={c1} justDrawnTileId={c1} />)
+    render(<HandTiles order={[c1!]} onReorder={() => {}} region={TEST_REGION} selectedTileId={c1} justDrawnTileId={c1} />)
 
     const el = screen.getByTestId(`hand-tile-${c1}`)
     expect(el.className).toContain('ring-amber-400')

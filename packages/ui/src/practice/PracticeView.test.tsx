@@ -16,7 +16,7 @@ describe('PracticeView', () => {
   it('renders the board and the preset label', () => {
     render(<PracticeView preset={PRESET} botSpeedMs={20} confirmBeforeDiscard={false} onExit={() => {}} />)
     expect(screen.getByText(`Practice — ${PRESET.label}`)).toBeInTheDocument()
-    expect(screen.getByTestId('board')).toBeInTheDocument()
+    expect(screen.getByTestId('game-stage')).toBeInTheDocument()
   })
 
   it('calls onExit when "Exit practice" is clicked', () => {

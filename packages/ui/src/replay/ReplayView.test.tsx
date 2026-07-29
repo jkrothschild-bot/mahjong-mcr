@@ -19,7 +19,7 @@ describe('ReplayView', () => {
 
     expect(screen.getByTestId('replay-hand-indicator')).toHaveTextContent('Hand 2 of 2')
     expect(screen.getByTestId('replay-move-indicator')).toHaveTextContent('Move 0 of 1')
-    expect(screen.getByTestId('board')).toBeInTheDocument()
+    expect(screen.getByTestId('game-stage')).toBeInTheDocument()
   })
 
   it('scrubbing to the next move shows the discard actually happening', () => {

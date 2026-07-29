@@ -29,6 +29,19 @@ const TILE_BOX_SIZE: Record<TileScale, string> = {
   xlarge: 'h-[8.75rem] w-[5.75rem]',
 }
 
+// Numeric px twins of the class maps above (16px root em) — the game stage
+// (packages/ui/src/stage/stageLayout.ts) needs real numbers to compute tile
+// positions, but Tailwind's JIT scanner needs literal class strings, so
+// these can't be derived from one another. Keep both in sync by hand; a
+// mismatch only shows up visually (positions computed slightly off from the
+// actual rendered box), not as a type error, so double-check both when
+// touching either.
+export const TILE_BOX_PX: Record<TileScale, { width: number; height: number }> = {
+  normal: { width: 60, height: 92 },
+  large: { width: 76, height: 116 },
+  xlarge: { width: 92, height: 140 },
+}
+
 // `relative` + `perspective` give every tile box a positioning/3D context
 // for Tile3DFace's internal object/front/bottom-edge layers (see that file);
 // the directional shadow grounds it on the table. Both are purely additive
@@ -87,6 +100,13 @@ const TILE_BACK_COMPACT_SIZE: Record<TileScale, string> = {
   xlarge: 'h-16 w-12',
 }
 
+// Numeric px twin of TILE_BACK_COMPACT_SIZE — see TILE_BOX_PX's comment.
+export const TILE_BACK_COMPACT_PX: Record<TileScale, { width: number; height: number }> = {
+  normal: { width: 32, height: 44 },
+  large: { width: 40, height: 56 },
+  xlarge: { width: 48, height: 64 },
+}
+
 export function tileBackCompactClassName(scale: TileScale = 'normal'): string {
   return [
     `flex ${TILE_BACK_COMPACT_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
@@ -107,6 +127,13 @@ const TILE_FACE_COMPACT_SIZE: Record<TileScale, string> = {
   normal: 'h-11 w-9',
   large: 'h-14 w-11',
   xlarge: 'h-16 w-14',
+}
+
+// Numeric px twin of TILE_FACE_COMPACT_SIZE — see TILE_BOX_PX's comment.
+export const TILE_FACE_COMPACT_PX: Record<TileScale, { width: number; height: number }> = {
+  normal: { width: 36, height: 44 },
+  large: { width: 44, height: 56 },
+  xlarge: { width: 56, height: 64 },
 }
 
 export function tileFaceCompactClassName(

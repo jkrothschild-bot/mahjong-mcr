@@ -10,7 +10,7 @@ describe('App', () => {
     render(<App />)
 
     expect(screen.getByText('MCR Mahjong Trainer')).toBeInTheDocument()
-    expect(screen.getByTestId('board')).toBeInTheDocument()
+    expect(screen.getByTestId('game-stage')).toBeInTheDocument()
     for (const seat of [0, 1, 2, 3]) {
       expect(screen.getByTestId(`seat-${seat}`)).toBeInTheDocument()
     }
@@ -115,7 +115,7 @@ describe('App', () => {
     })
 
     const nextButton = screen.getByRole('button', { name: 'Next' })
-    const board = screen.getByTestId('board')
+    const board = screen.getByTestId('game-stage')
     const boardBefore = board.innerHTML
 
     fireEvent.click(nextButton)
