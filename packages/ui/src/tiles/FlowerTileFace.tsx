@@ -7,11 +7,13 @@ export interface FlowerTileFaceProps {
 const FLOWER_ACCENT = '#db2777' // pink — distinct from Characters' red, Dots' blue, Bamboo's green
 const SEASON_ACCENT = '#d97706' // amber — distinct from every suit/dragon/wind color already in use
 
-// No PNG art exists for flowers/seasons (tileImages.ts's known gap) — this
-// is a coded stand-in, not a raster asset, satisfying SPEC.md §4's own
-// description of what a flower/season tile needs: "numbered, distinct
-// color band, never confusable with playing tiles." Same 220:300 viewBox
-// as the real tile PNGs, so it drops into the exact same tile-face box.
+// Originally the only flower/season rendering (no art existed at all);
+// now a fallback kept for when tileImageSrc can't resolve an asset — real
+// generated SVG art (scripts/generate-tile-art.mjs) normally takes over via
+// TileFaceContent. Still satisfies SPEC.md §4's own description of what a
+// flower/season tile needs on its own: "numbered, distinct color band,
+// never confusable with playing tiles." Same 220:300 viewBox as the real
+// tile SVGs, so it drops into the exact same tile-face box either way.
 export function FlowerTileFace({ typeId }: FlowerTileFaceProps) {
   const isFlower = typeId.startsWith('F')
   const number = Number(typeId[1])

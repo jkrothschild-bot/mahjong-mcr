@@ -18,12 +18,12 @@ describe('Flowers', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('renders every flower tile, with real (coded) art, not just text', () => {
+  it('renders every flower tile, with real art, not just text', () => {
     const [f1] = idsFor('F1', 1)
     render(<Flowers seat={0} tiles={[f1!]} />)
     const el = screen.getByTestId(`flower-tile-${f1}`)
     expect(el).toHaveTextContent('F1')
-    expect(el.querySelector('svg')).toBeInTheDocument()
+    expect(el.querySelector('img')).toBeInTheDocument()
   })
 
   it('highlights a flower tile matching the selected type', () => {

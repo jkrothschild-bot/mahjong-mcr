@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" role="presentation">
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fffdf7" />
+      <stop offset="100%" stop-color="#ede0c0" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="10" width="210" height="284" rx="16" fill="#0b3d24" />
+  <rect x="2" y="2" width="210" height="284" rx="16" fill="url(#face)" stroke="#b8935a" stroke-width="3" />
+  <path d="M 110 244 L 16.0 209.8 A 100 100 0 0 1 204.0 209.8 Z" fill="#ea580c" opacity="0.88" />
+  <line x1="110" y1="244" x2="33.4" y2="179.7" stroke="#c2410c" stroke-width="2" opacity="0.6" />
+  <line x1="110" y1="244" x2="75.8" y2="150.0" stroke="#c2410c" stroke-width="2" opacity="0.6" />
+  <line x1="110" y1="244" x2="127.4" y2="145.5" stroke="#c2410c" stroke-width="2" opacity="0.6" />
+  <line x1="110" y1="244" x2="174.3" y2="167.4" stroke="#c2410c" stroke-width="2" opacity="0.6" />
+  <circle cx="110" cy="244" r="8" fill="#7c2d12" />
+  <text x="18" y="44" font-size="36" font-weight="800" font-family="Georgia, serif" text-anchor="start" fill="#ea580c" stroke="#fff" stroke-width="0.6" paint-order="stroke">2</text>
+</svg>

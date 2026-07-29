@@ -11,10 +11,10 @@ describe('TileFaceContent', () => {
     expect(container).toHaveTextContent('C5') // via the sr-only span
   })
 
-  it('falls back to a coded FlowerTileFace for flowers/seasons (no PNG art exists)', () => {
+  it('renders the real generated SVG art for a flower/season type, not the FlowerTileFace fallback', () => {
     const { container } = render(<TileFaceContent typeId="F2" />)
-    expect(container.querySelector('img')).not.toBeInTheDocument()
-    expect(container.querySelector('svg')).toBeInTheDocument()
+    const img = container.querySelector('img')
+    expect(img).toHaveAttribute('src', expect.stringMatching(/flower2/))
     expect(container).toHaveTextContent('F2') // via the sr-only span
   })
 })

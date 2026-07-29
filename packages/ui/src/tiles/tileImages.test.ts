@@ -25,9 +25,16 @@ describe('tileImageSrc', () => {
     expect(tileImageSrc('DW')).toMatch(/\/P[^/]*\.svg/) // Pak (white)
   })
 
-  it('returns undefined for flowers/seasons — no art exists for these yet', () => {
-    expect(tileImageSrc('F1')).toBeUndefined()
-    expect(tileImageSrc('S1')).toBeUndefined()
+  it('returns a real asset URL for flowers and seasons (original art)', () => {
+    for (const typeId of ['F1', 'F2', 'F3', 'F4', 'S1', 'S2', 'S3', 'S4'] as const) {
+      expect(tileImageSrc(typeId)).toMatch(new RegExp(`${typeId.startsWith('F') ? 'flower' : 'season'}${typeId[1]}`))
+    }
+  })
+
+  it("doesn't resolve a season to the same asset as its same-numbered bamboo tile (case-insensitive filesystems collide 'S1.svg' with 's1.svg')", () => {
+    expect(tileImageSrc('B1')).not.toEqual(tileImageSrc('S1'))
+    expect(tileImageSrc('B1')).toMatch(/s1/)
+    expect(tileImageSrc('S1')).toMatch(/season1/)
   })
 })
 
