@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext,
   DragOverlay,
@@ -8,6 +9,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
@@ -113,6 +115,7 @@ export function HandTiles({ order, onReorder, region, onTileClick, selectedTileI
   const { tileScale } = useSettingsContext()
   const stageScale = useStageScale()
   const [activeId, setActiveId] = useState<TileInstanceId | null>(null)
+  const [overId, setOverId] = useState<TileInstanceId | typeof END_ZONE_ID | null>(null)
   const { width: tileWidth, height: tileHeight } = TILE_BOX_PX[tileScale]
   const sensors = useSensors(
     // 8px of real pointer movement before a drag activates — lets a plain
@@ -130,8 +133,13 @@ export function HandTiles({ order, onReorder, region, onTileClick, selectedTileI
     setActiveId(event.active.id as TileInstanceId)
   }
 
+  function handleDragOver(event: DragOverEvent) {
+    setOverId(event.over ? (event.over.id === END_ZONE_ID ? END_ZONE_ID : (event.over.id as TileInstanceId)) : null)
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null)
+    setOverId(null)
     const { active, over } = event
     if (!over) return
     const overId = over.id === END_ZONE_ID ? END_ZONE_ID : (over.id as TileInstanceId)
@@ -147,8 +155,31 @@ export function HandTiles({ order, onReorder, region, onTileClick, selectedTileI
   const placed = placeGroup(layout, region, tileWidth, tileHeight)
   const activeTypeId = activeId !== null ? typeIdOfInstance(activeId) : null
 
+  // Where to draw the drop-preview line: immediately before whatever tile
+  // (or the trailing end zone) the pointer/keyboard focus is currently
+  // over. `order.length` (the end-zone's own slot in `placed`, reusing the
+  // exact same row-wrap slot the sentinel already occupies) means "at the
+  // very end." Deliberately independent of resolveReorderTarget's
+  // arrayMove-based final-drop-index math — this is a live "here's what
+  // you're pointing at" cue, not a prediction of the exact settled order.
+  const insertionIndex =
+    activeId === null || overId === null || overId === activeId
+      ? null
+      : overId === END_ZONE_ID
+        ? order.length
+        : order.indexOf(overId)
+
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveId(null)}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => {
+        setActiveId(null)
+        setOverId(null)
+      }}
+    >
       <SortableContext items={[...order]} strategy={rectSortingStrategy}>
         <div role="list" aria-label="Your hand">
           {order.map((id, index) => (
@@ -175,24 +206,48 @@ export function HandTiles({ order, onReorder, region, onTileClick, selectedTileI
           >
             <div ref={setEndZoneRef} data-testid="hand-end-zone" className="h-full w-full" aria-hidden />
           </Positioned>
+          {insertionIndex !== null && (
+            <div
+              aria-hidden
+              data-testid="hand-drop-indicator"
+              className="pointer-events-none absolute rounded-full bg-sky-400"
+              style={{
+                left: placed[insertionIndex]!.x - (tileWidth * layout.scale) / 2 - (TILE_GAP * layout.scale) / 2,
+                top: placed[insertionIndex]!.y - (tileHeight * layout.scale) / 2,
+                width: 3,
+                height: tileHeight * layout.scale,
+              }}
+            />
+          )}
         </div>
       </SortableContext>
-      {/* Portals to document.body, outside GameStage's scaled container, so
-          a dragged tile can visually escape the stage's overflow-hidden
-          clip — counter-scale by the stage's own current zoom (plus the
-          hand group's own fit-to-region scale) so it doesn't jump to a
-          different apparent size than its on-stage sibling the instant a
-          drag starts. */}
-      <DragOverlay>
-        {activeTypeId !== null ? (
-          <div
-            style={{ transform: `scale(${stageScale * layout.scale})`, transformOrigin: 'center' }}
-            className={tileFaceClassName({ scale: tileScale, extra: 'shadow-xl cursor-grabbing' })}
-          >
-            <TileFaceContent typeId={activeTypeId} />
-          </div>
-        ) : null}
-      </DragOverlay>
+      {/* DragOverlay renders position:fixed *in place* in the React tree
+          (dnd-kit v6 doesn't portal it itself) — left as a direct
+          descendant of GameStage's scaled `transform` container, a CSS
+          `transform` on an ancestor redefines the containing block for
+          `position: fixed` descendants, so the overlay would be
+          repositioned AND rescaled by GameStage's own zoom instead of
+          tracking the real cursor (confirmed live: the dragged tile
+          visibly flew to the wrong place). Portaling here, to
+          document.body, gives it a real, untransformed containing block —
+          React context (useDndContext) still flows through a portal
+          regardless of DOM placement, so DragOverlay keeps working
+          correctly. Counter-scale the content by the stage's own current
+          zoom (plus the hand group's own fit-to-region scale) so it still
+          renders at the same apparent size as its on-stage sibling. */}
+      {createPortal(
+        <DragOverlay>
+          {activeTypeId !== null ? (
+            <div
+              style={{ transform: `scale(${stageScale * layout.scale})`, transformOrigin: 'center' }}
+              className={tileFaceClassName({ scale: tileScale, extra: 'shadow-xl cursor-grabbing' })}
+            >
+              <TileFaceContent typeId={activeTypeId} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   )
 }
