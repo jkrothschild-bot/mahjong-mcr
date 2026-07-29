@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { startHand, type GameState } from '@mahjong-mcr/engine'
+import { DEFAULT_SETTINGS } from '../settings/useSettings.js'
+import { SettingsContext } from '../settings/SettingsContext.js'
 import { TileSafetyTab } from './TileSafetyTab.js'
 
 function baseState(): GameState {
@@ -19,5 +21,15 @@ describe('TileSafetyTab', () => {
     const rating = screen.getByTestId('tile-safety-rating')
     expect(rating).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Safety reasons' })).toBeInTheDocument()
+  })
+
+  it('swaps the danger-rating colors when the color-blind palette is on', () => {
+    render(
+      <SettingsContext.Provider value={{ ...DEFAULT_SETTINGS, colorBlindPalette: true }}>
+        <TileSafetyTab state={baseState()} forSeat={0} selectedTypeId="C5" />
+      </SettingsContext.Provider>,
+    )
+    const rating = screen.getByTestId('tile-safety-rating')
+    expect(rating.className).not.toMatch(/emerald|amber|red-/)
   })
 })

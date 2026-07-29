@@ -1,4 +1,5 @@
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 
@@ -17,6 +18,7 @@ export interface DiscardsProps {
 // the page itself past the iPad viewport (found via real extended play:
 // see Seat.tsx's own comment on this).
 export function Discards({ seat, tiles, selectedTypeId, onTileClick }: DiscardsProps) {
+  const { tileScale } = useSettingsContext()
   return (
     <div role="list" aria-label={`Seat ${seat} discards`} className="grid grid-cols-6 gap-1">
       {tiles.map((id) => {
@@ -31,6 +33,7 @@ export function Discards({ seat, tiles, selectedTypeId, onTileClick }: DiscardsP
             className={tileFaceCompactClassName({
               highlighted: selectedTypeId === typeId,
               extra: onTileClick ? 'cursor-pointer' : undefined,
+              scale: tileScale,
             })}
           >
             <TileFaceContent typeId={typeId} />

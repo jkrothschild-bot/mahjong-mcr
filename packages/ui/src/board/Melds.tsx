@@ -1,4 +1,5 @@
 import { typeIdOfInstance, type Meld } from '@mahjong-mcr/engine'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceClassName } from '../tiles/tileStyles.js'
 
@@ -15,6 +16,7 @@ export interface MeldsProps {
 // concealment already only matters for scoring (conveyed via fan names on
 // the score screen), not table secrecy. Documented simplification, not a bug.
 export function Melds({ seat, melds, selectedTypeId, onTileClick }: MeldsProps) {
+  const { tileScale } = useSettingsContext()
   if (melds.length === 0) return null
   return (
     <div aria-label={`Seat ${seat} melds`} className="flex flex-wrap gap-2">
@@ -32,6 +34,7 @@ export function Melds({ seat, melds, selectedTypeId, onTileClick }: MeldsProps) 
                 className={tileFaceClassName({
                   highlighted: selectedTypeId === typeId,
                   extra: onTileClick ? 'cursor-pointer' : undefined,
+                  scale: tileScale,
                 })}
               >
                 <TileFaceContent typeId={typeId} />

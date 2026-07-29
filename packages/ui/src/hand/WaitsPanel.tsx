@@ -1,5 +1,6 @@
 import { computeWaits, type Hand, type Wind } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 
@@ -16,6 +17,7 @@ export interface WaitsPanelProps {
 // shanten engine directly via computeWaits (M4), which is why this is
 // bundled into M4 rather than M5. Renders nothing outside tenpai.
 export function WaitsPanel({ hand, prevailingWind, seatWind }: WaitsPanelProps) {
+  const { tileScale } = useSettingsContext()
   const waits = computeWaits(hand.concealedTiles, hand.melds, { prevailingWind, seatWind })
   if (waits.length === 0) return null
 
@@ -30,7 +32,7 @@ export function WaitsPanel({ hand, prevailingWind, seatWind }: WaitsPanelProps) 
       <div className="flex flex-wrap gap-3">
         {waits.map((wait) => (
           <div key={wait.tileType} data-testid={`wait-${wait.tileType}`} className="flex items-center gap-2">
-            <div className={tileFaceCompactClassName()}>
+            <div className={tileFaceCompactClassName({ scale: tileScale })}>
               <TileFaceContent typeId={wait.tileType} />
             </div>
             <div className="flex flex-col text-xs leading-tight text-neutral-300">

@@ -17,7 +17,13 @@ describe('loadSettings', () => {
   })
 
   it('round-trips a fully valid settings object', () => {
-    const settings = { botSpeedMs: 3000, confirmBeforeDiscard: true, stepMode: true }
+    const settings = {
+      botSpeedMs: 3000,
+      confirmBeforeDiscard: true,
+      stepMode: true,
+      colorBlindPalette: true,
+      tileScale: 'large' as const,
+    }
     expect(loadSettings(serializeSettings(settings))).toEqual(settings)
   })
 
@@ -27,6 +33,11 @@ describe('loadSettings', () => {
       ...DEFAULT_SETTINGS,
       confirmBeforeDiscard: true,
     })
+  })
+
+  it('falls back to default tileScale for an unrecognized value', () => {
+    const raw = JSON.stringify({ tileScale: 'huge' })
+    expect(loadSettings(raw)).toEqual(DEFAULT_SETTINGS)
   })
 })
 

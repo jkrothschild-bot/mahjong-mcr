@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 
+export type TileScale = 'normal' | 'large' | 'xlarge'
+
 export interface Settings {
   botSpeedMs: number
   confirmBeforeDiscard: boolean
@@ -8,6 +10,13 @@ export interface Settings {
   // "Next" tap instead of the botSpeedMs timer, one bot decision per tap —
   // for studying claim-priority/discard choices one at a time.
   stepMode: boolean
+  // SPEC.md §8/§9: swaps the Tile Safety tab's low/medium/high danger
+  // colors (a red/amber/emerald triad) for a palette mutually
+  // distinguishable under common color-vision deficiencies.
+  colorBlindPalette: boolean
+  // SPEC.md §8's "tile size / zoom" — a named preset, not a continuous
+  // value, matching BOT_SPEED_PRESETS below.
+  tileScale: TileScale
 }
 
 // SPEC.md §7's bot-speed presets. A named preset, not a raw slider value,
@@ -19,16 +28,24 @@ export const BOT_SPEED_PRESETS = {
   relaxed: 3000,
 } as const
 
+export const TILE_SCALE_VALUES: readonly TileScale[] = ['normal', 'large', 'xlarge']
+
 export const DEFAULT_SETTINGS: Settings = {
   botSpeedMs: BOT_SPEED_PRESETS.normal,
   confirmBeforeDiscard: false,
   stepMode: false,
+  colorBlindPalette: false,
+  tileScale: 'normal',
 }
 
 const STORAGE_KEY = 'mcr-mahjong:settings:v1'
 
 function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isTileScale(value: unknown): value is TileScale {
+  return typeof value === 'string' && (TILE_SCALE_VALUES as readonly string[]).includes(value)
 }
 
 // Pure — no localStorage access — so it's directly unit-testable, including
@@ -51,6 +68,9 @@ export function loadSettings(raw: string | null): Settings {
     confirmBeforeDiscard:
       typeof candidate.confirmBeforeDiscard === 'boolean' ? candidate.confirmBeforeDiscard : DEFAULT_SETTINGS.confirmBeforeDiscard,
     stepMode: typeof candidate.stepMode === 'boolean' ? candidate.stepMode : DEFAULT_SETTINGS.stepMode,
+    colorBlindPalette:
+      typeof candidate.colorBlindPalette === 'boolean' ? candidate.colorBlindPalette : DEFAULT_SETTINGS.colorBlindPalette,
+    tileScale: isTileScale(candidate.tileScale) ? candidate.tileScale : DEFAULT_SETTINGS.tileScale,
   }
 }
 

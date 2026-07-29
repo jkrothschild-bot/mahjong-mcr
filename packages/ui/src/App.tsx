@@ -16,6 +16,7 @@ import { HintPanel } from './hints/HintPanel.js'
 import { PracticePicker } from './practice/PracticePicker.js'
 import { PracticeView } from './practice/PracticeView.js'
 import { ReplayView } from './replay/ReplayView.js'
+import { SettingsContext } from './settings/SettingsContext.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
 import { StatsPanel } from './stats/StatsPanel.js'
@@ -89,6 +90,7 @@ function App() {
   })
 
   return (
+    <SettingsContext.Provider value={settings}>
     <div className="min-h-svh bg-neutral-900 text-neutral-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-1 border-b border-neutral-700">
         <h1 className="text-lg font-semibold tracking-tight">MCR Mahjong Trainer</h1>
@@ -244,6 +246,7 @@ function App() {
 
       <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
     </div>
+    </SettingsContext.Provider>
   )
 }
 

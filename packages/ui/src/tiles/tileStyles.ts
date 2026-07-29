@@ -2,13 +2,36 @@
 // renders: the hand, discard rivers, melds, and the tile inspector's
 // highlight state. Centralized so all these renderers read as the "same
 // game," not a patchwork of independently-styled boxes.
-//
+import type { TileScale } from '../settings/useSettings.js'
+
 // Fixed-size + overflow-hidden (rather than the old min-size/padding box)
 // so real tile-face art (TileFaceContent) renders as a clean, contained
 // image; text-sm/font-semibold still matter for the text fallback
 // (flowers/seasons — no art yet).
-export const TILE_BOX_BASE =
-  'flex h-[5.75rem] w-[3.75rem] shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold'
+//
+// Three literal size variants (not a computed/interpolated value) per
+// SPEC.md §8's tile-size setting — Tailwind's JIT scanner needs each full
+// class string present in source, so these can't be built from a numeric
+// scale factor at runtime.
+//
+// The 'normal' size already fits a fresh 13-tile hand in one row with zero
+// spare height at the 1024x768 iPad viewport (see Seat.tsx's comment on
+// that). 'large'/'xlarge' don't preserve that — verified via Playwright
+// that the human hand wraps to a second row and the page grows past one
+// screenful. That's treated as an acceptable trade-off for an opt-in
+// larger-tile accessibility mode (WCAG reflow: content growing and
+// scrolling, not being clipped, is the expected behavior for scaled-up
+// text/targets) rather than a bug to eliminate — SPEC.md §5a's "answerable
+// at a glance, no scrolling" bar is written for the default size.
+const TILE_BOX_SIZE: Record<TileScale, string> = {
+  normal: 'h-[5.75rem] w-[3.75rem]',
+  large: 'h-[7.25rem] w-[4.75rem]',
+  xlarge: 'h-[8.75rem] w-[5.75rem]',
+}
+
+function tileBoxBase(scale: TileScale): string {
+  return `flex ${TILE_BOX_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold`
+}
 
 export const TILE_FACE_CLASSES = 'border-neutral-500 bg-neutral-100 text-neutral-900'
 
@@ -32,10 +55,10 @@ export const TILE_JUST_DRAWN_RING_CLASSES = 'ring-2 ring-sky-400'
 export const TILE_JUST_DRAWN_LIFT_CLASSES = '-translate-y-1'
 
 export function tileFaceClassName(
-  opts: { highlighted?: boolean; dimmed?: boolean; justDrawn?: boolean; extra?: string } = {},
+  opts: { highlighted?: boolean; dimmed?: boolean; justDrawn?: boolean; extra?: string; scale?: TileScale } = {},
 ): string {
   return [
-    TILE_BOX_BASE,
+    tileBoxBase(opts.scale ?? 'normal'),
     TILE_FACE_CLASSES,
     opts.highlighted ? TILE_HIGHLIGHT_CLASSES : opts.justDrawn ? TILE_JUST_DRAWN_RING_CLASSES : '',
     opts.justDrawn ? TILE_JUST_DRAWN_LIFT_CLASSES : '',
@@ -48,12 +71,18 @@ export function tileFaceClassName(
 
 // A bot's concealed hand is never interactive (nothing to tap — the tiles
 // are hidden), so it's exempt from the ≥44px touch-target rule that
-// TILE_BOX_BASE enforces for real controls. A compact, wrapping back keeps
+// tileBoxBase enforces for real controls. A compact, wrapping back keeps
 // 13-14 tiles from forcing the whole board wider than an iPad viewport
 // (SPEC.md §5a/§5b) the way one un-wrapped row of full-size boxes did.
-export function tileBackCompactClassName(): string {
+const TILE_BACK_COMPACT_SIZE: Record<TileScale, string> = {
+  normal: 'h-11 w-8',
+  large: 'h-14 w-10',
+  xlarge: 'h-16 w-12',
+}
+
+export function tileBackCompactClassName(scale: TileScale = 'normal'): string {
   return [
-    'flex h-11 w-8 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
+    `flex ${TILE_BACK_COMPACT_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
     TILE_BACK_CLASSES,
   ].join(' ')
 }
@@ -66,9 +95,17 @@ export function tileBackCompactClassName(): string {
 // keep 2-character labels (WE, DR, C5) legible. A discard river that grows
 // to 10+ tiles at full hand-tile size was consuming a lot of vertical
 // space across every seat's panel.
-export function tileFaceCompactClassName(opts: { highlighted?: boolean; extra?: string } = {}): string {
+const TILE_FACE_COMPACT_SIZE: Record<TileScale, string> = {
+  normal: 'h-11 w-9',
+  large: 'h-14 w-11',
+  xlarge: 'h-16 w-14',
+}
+
+export function tileFaceCompactClassName(
+  opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {},
+): string {
   return [
-    'flex h-11 w-9 shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold',
+    `flex ${TILE_FACE_COMPACT_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
     TILE_FACE_CLASSES,
     opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
     opts.extra ?? '',

@@ -5,6 +5,7 @@ import { HandTiles } from '../hand/HandTiles.js'
 import { SortToolbar } from '../hand/SortToolbar.js'
 import { WaitsPanel } from '../hand/WaitsPanel.js'
 import type { SortMode } from '../hand/handOrder.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { botBackImageSrc } from '../tiles/tileImages.js'
 import { tileBackCompactClassName } from '../tiles/tileStyles.js'
 import { Discards } from './Discards.js'
@@ -83,6 +84,7 @@ export function Seat({
   // deliberately NOT included in its cap — that must stay fully visible and
   // clickable; only the human's own flowers/melds/discards share this
   // treatment with the bot seats.
+  const { tileScale } = useSettingsContext()
   const growingContentRef = useRef<HTMLDivElement>(null)
   const flowerCount = player.hand.flowers.length
   const meldCount = player.hand.melds.length
@@ -161,7 +163,12 @@ export function Seat({
           <Discards seat={seat} tiles={player.discards} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
           <div role="list" aria-label={`Seat ${seat} concealed tiles`} className="flex flex-wrap gap-1">
             {player.hand.concealedTiles.map((_, index) => (
-              <div key={index} data-testid={`seat-${seat}-back-${index}`} role="listitem" className={tileBackCompactClassName()}>
+              <div
+                key={index}
+                data-testid={`seat-${seat}-back-${index}`}
+                role="listitem"
+                className={tileBackCompactClassName(tileScale)}
+              >
                 <img src={botBackImageSrc()} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
               </div>
             ))}

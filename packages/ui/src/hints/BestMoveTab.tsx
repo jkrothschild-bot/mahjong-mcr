@@ -1,5 +1,6 @@
 import { computeBestMoveHint, typeIdOfInstance, type Hand } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 
@@ -12,6 +13,7 @@ export interface BestMoveTabProps {
 // the deeper "other reasonable choices" detail, both visible as soon as the
 // tab opens (no extra click to go from nudge to reasoning).
 export function BestMoveTab({ hand }: BestMoveTabProps) {
+  const { tileScale } = useSettingsContext()
   const hint = computeBestMoveHint(hand)
   if (!hint) return <p className="text-sm text-neutral-400">No discard decision to make right now.</p>
 
@@ -20,7 +22,7 @@ export function BestMoveTab({ hand }: BestMoveTabProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <div className={tileFaceCompactClassName()}>
+        <div className={tileFaceCompactClassName({ scale: tileScale })}>
           <TileFaceContent typeId={recommendedType} />
         </div>
         <div className="flex flex-col text-sm">
@@ -37,7 +39,7 @@ export function BestMoveTab({ hand }: BestMoveTabProps) {
               const typeId = typeIdOfInstance(alt.tile)
               return (
                 <li key={alt.tile} role="listitem" className="flex items-center gap-1.5">
-                  <div className={tileFaceCompactClassName()}>
+                  <div className={tileFaceCompactClassName({ scale: tileScale })}>
                     <TileFaceContent typeId={typeId} />
                   </div>
                   <span className="text-xs text-neutral-300">{tileDisplayName(typeId)}</span>

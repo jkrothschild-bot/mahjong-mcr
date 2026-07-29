@@ -1,5 +1,6 @@
 import { useState, type PointerEvent } from 'react'
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceClassName } from '../tiles/tileStyles.js'
 
@@ -43,6 +44,7 @@ function resolveDropTarget(clientX: number, clientY: number): TileInstanceId | n
 // same onReorder/order state (useHandOrder), so there's one place hand
 // position changes happen, matching CLAUDE.md's zone-movement rule.
 export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highlightedTypeId, justDrawnTileId }: HandTilesProps) {
+  const { tileScale } = useSettingsContext()
   const [draggingId, setDraggingId] = useState<TileInstanceId | null>(null)
 
   function handlePointerDown(e: PointerEvent<HTMLDivElement>, id: TileInstanceId) {
@@ -78,6 +80,7 @@ export function HandTiles({ order, onReorder, onTileClick, selectedTileId, highl
             highlighted: selectedTileId === id || highlightedTypeId === typeIdOfInstance(id),
             justDrawn: justDrawnTileId === id,
             extra: 'cursor-grab',
+            scale: tileScale,
           })}
         >
           <TileFaceContent typeId={typeIdOfInstance(id)} />

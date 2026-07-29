@@ -1,5 +1,6 @@
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceClassName } from '../tiles/tileStyles.js'
 
@@ -10,6 +11,7 @@ export interface DiscardConfirmModalProps {
 }
 
 export function DiscardConfirmModal({ tileId, onConfirm, onCancel }: DiscardConfirmModalProps) {
+  const { tileScale } = useSettingsContext()
   if (tileId === null) return null
   const typeId = typeIdOfInstance(tileId)
   const name = tileDisplayName(typeId)
@@ -17,7 +19,7 @@ export function DiscardConfirmModal({ tileId, onConfirm, onCancel }: DiscardConf
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50">
       <div role="dialog" aria-label="Confirm discard" className="flex flex-col items-center gap-4 rounded-lg border border-neutral-600 bg-neutral-800 p-5">
-        <div className={tileFaceClassName()}>
+        <div className={tileFaceClassName({ scale: tileScale })}>
           <TileFaceContent typeId={typeId} />
         </div>
         <p className="text-sm">

@@ -1,4 +1,5 @@
 import { typeIdOfInstance, type TileInstanceId } from '@mahjong-mcr/engine'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 
@@ -15,6 +16,7 @@ export interface FlowersProps {
 // score screen. Compact sizing (matches Discards): they're bonus info, not
 // a primary interactive surface.
 export function Flowers({ seat, tiles, selectedTypeId, onTileClick }: FlowersProps) {
+  const { tileScale } = useSettingsContext()
   if (tiles.length === 0) return null
   return (
     <div role="list" aria-label={`Seat ${seat} flowers`} className="flex flex-wrap gap-1">
@@ -30,6 +32,7 @@ export function Flowers({ seat, tiles, selectedTypeId, onTileClick }: FlowersPro
             className={tileFaceCompactClassName({
               highlighted: selectedTypeId === typeId,
               extra: onTileClick ? 'cursor-pointer' : undefined,
+              scale: tileScale,
             })}
           >
             <TileFaceContent typeId={typeId} />
