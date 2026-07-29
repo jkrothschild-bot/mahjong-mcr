@@ -6,6 +6,7 @@ import { SortToolbar } from '../hand/SortToolbar.js'
 import { WaitsPanel } from '../hand/WaitsPanel.js'
 import type { SortMode } from '../hand/handOrder.js'
 import { useSettingsContext } from '../settings/SettingsContext.js'
+import { Tile3DFace } from '../tiles/Tile3DFace.js'
 import { botBackImageSrc } from '../tiles/tileImages.js'
 import { tileBackCompactClassName } from '../tiles/tileStyles.js'
 import { Discards } from './Discards.js'
@@ -169,7 +170,9 @@ export function Seat({
                 role="listitem"
                 className={tileBackCompactClassName(tileScale)}
               >
-                <img src={botBackImageSrc()} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+                <Tile3DFace tone="back">
+                  <img src={botBackImageSrc()} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+                </Tile3DFace>
               </div>
             ))}
           </div>

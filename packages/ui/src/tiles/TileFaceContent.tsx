@@ -1,5 +1,6 @@
 import type { TileTypeId } from '@mahjong-mcr/engine'
 import { FlowerTileFace } from './FlowerTileFace.js'
+import { Tile3DFace } from './Tile3DFace.js'
 import { tileImageSrc } from './tileImages.js'
 
 export interface TileFaceContentProps {
@@ -22,15 +23,22 @@ export interface TileFaceContentProps {
 // Text-content-based test assertions (`toHaveTextContent(typeId)`) keep
 // working unchanged as a result — .textContent includes visually-hidden
 // text nodes regardless of CSS.
+//
+// Tile3DFace wraps the real content to give it physical thickness — it's an
+// internal layering detail, not "a wrapper div of its own" in the sense the
+// note above cares about: it doesn't touch or duplicate anything the call
+// site owns (data-testid, role, handlers all stay on the call site's box).
 export function TileFaceContent({ typeId }: TileFaceContentProps) {
   const src = tileImageSrc(typeId)
   return (
     <>
-      {src ? (
-        <img src={src} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
-      ) : (
-        <FlowerTileFace typeId={typeId} />
-      )}
+      <Tile3DFace tone="face">
+        {src ? (
+          <img src={src} alt="" draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+        ) : (
+          <FlowerTileFace typeId={typeId} />
+        )}
+      </Tile3DFace>
       <span className="sr-only">{typeId}</span>
     </>
   )

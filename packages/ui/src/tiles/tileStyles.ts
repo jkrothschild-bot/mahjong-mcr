@@ -29,16 +29,23 @@ const TILE_BOX_SIZE: Record<TileScale, string> = {
   xlarge: 'h-[8.75rem] w-[5.75rem]',
 }
 
+// `relative` + `perspective` give every tile box a positioning/3D context
+// for Tile3DFace's internal object/front/bottom-edge layers (see that file);
+// the directional shadow grounds it on the table. Both are purely additive
+// — the box's own h/w footprint is unchanged, so this can't affect the
+// already-razor-thin iPad viewport budget documented below.
+const TILE_3D_CONTEXT = 'relative [perspective:500px] shadow-[2px_3px_4px_rgba(0,0,0,0.35)]'
+
 function tileBoxBase(scale: TileScale): string {
-  return `flex ${TILE_BOX_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold`
+  return `flex ${TILE_BOX_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold ${TILE_3D_CONTEXT}`
 }
 
 export const TILE_FACE_CLASSES = 'border-neutral-500 bg-neutral-100 text-neutral-900'
 
-// Concealed bot tile back — deliberately distinct from both the wall's own
-// back styling (Phase 2 doesn't render a physical wall stack, only a count)
-// and the face styling, per SPEC.md §5's "clear physical separation, never
-// similar enough to require guessing."
+// Concealed bot tile back — deliberately distinct from both the wall
+// stack's own back styling (WallCounter.tsx) and the face styling, per
+// SPEC.md §5's "clear physical separation, never similar enough to require
+// guessing."
 export const TILE_BACK_CLASSES = 'border-indigo-900 bg-indigo-950 text-indigo-200'
 
 export const TILE_HIGHLIGHT_CLASSES = 'ring-2 ring-amber-400'
@@ -83,6 +90,7 @@ const TILE_BACK_COMPACT_SIZE: Record<TileScale, string> = {
 export function tileBackCompactClassName(scale: TileScale = 'normal'): string {
   return [
     `flex ${TILE_BACK_COMPACT_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
+    TILE_3D_CONTEXT,
     TILE_BACK_CLASSES,
   ].join(' ')
 }
@@ -106,6 +114,7 @@ export function tileFaceCompactClassName(
 ): string {
   return [
     `flex ${TILE_FACE_COMPACT_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
+    TILE_3D_CONTEXT,
     TILE_FACE_CLASSES,
     opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
     opts.extra ?? '',
