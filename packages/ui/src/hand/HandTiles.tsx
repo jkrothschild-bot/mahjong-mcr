@@ -27,7 +27,7 @@ import { END_ZONE_ID, resolveReorderTarget } from './resolveReorderTarget.js'
 export interface HandTilesProps {
   order: readonly TileInstanceId[]
   onReorder: (draggedId: TileInstanceId, beforeId: TileInstanceId | null) => void
-  // The stage region (stageLayout.ts's SEAT_REGIONS[offset].hand) this hand
+  // The stage region (stageLayout.ts's getSeatRegions(tileScale)[offset].hand) this hand
   // is laid out within — only the human seat renders HandTiles, but the
   // region still comes from Board.tsx/Seat.tsx rather than being hardcoded
   // here, same as every other stage object.

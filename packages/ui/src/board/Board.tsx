@@ -32,7 +32,7 @@ export interface BoardProps {
 // (SeatOffset 0), and the other 3 seats go counter-clockwise from there
 // (the direction turn order actually proceeds: 0 -> 1 -> 2 -> 3 -> 0),
 // matching standard 4-player mahjong seating as viewed from above. As of
-// M8 Step 1 this spatial intent lives in stageLayout.ts's SEAT_REGIONS
+// M8 Step 1 this spatial intent lives in stageLayout.ts's getSeatRegions
 // (stage coordinates) rather than a CSS grid — Seat.tsx no longer renders
 // a bordered per-seat card, so there's nothing left for a grid to arrange.
 export function Board({

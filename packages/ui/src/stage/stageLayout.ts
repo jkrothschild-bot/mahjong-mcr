@@ -3,6 +3,8 @@
 // is placed by computed x/y in this fixed 1024x768 design-resolution space;
 // GameStage.tsx is the only place that turns this into real pixels via one
 // CSS transform.
+import type { TileScale } from '../settings/useSettings.js'
+
 export interface Rect {
   x: number
   y: number
@@ -116,42 +118,150 @@ export interface SeatRegions {
 // is sized generously first (it's the primary, always-fully-visible
 // interactive surface — see Board.tsx's original comment on why); bot
 // regions get whatever's left, same priority the old capped/scrollable
-// layout expressed. Not pixel-final — Step 2 is where this gets real visual
-// refinement; Step 1 just needs a non-overlapping partition every group's
-// fitScale fallback can work within.
-export const SEAT_REGIONS: Record<SeatOffset, SeatRegions> = {
+// layout expressed.
+//
+// **Scale-dependent, not a single static partition (M8 post-ship fix).**
+// The stage is a fixed 1024x768 with no scroll — a static partition meant
+// every zone's rendered tile size was entirely at the mercy of `fitScale`
+// shrinking a larger natural block into the same fixed box. That produced
+// two real bugs: (1) at `large`/`xlarge`, the human hand no longer fits one
+// row at its natural tile size (`computeRowPositions`' column math is
+// unscaled), so it wraps to 2 rows and got shrunk to a natural-2-row-height
+// fraction that was *smaller* than `normal`'s un-shrunk single row —
+// `xlarge` literally rendered smaller than `normal`. (2) `melds`/`discards`
+// regions (20-40px tall) were shrinking tiles to ~0.2-0.3x regardless of
+// `tileScale`, illegible (SPEC.md §5a). Each of these 3 tables is hand-
+// derived (not a live formula) against `tiles/tileStyles.ts`'s real
+// per-scale pixel sizes (`TILE_BOX_PX` for hand, `TILE_FACE_COMPACT_PX` for
+// melds/discards/flowers, `TILE_BACK_COMPACT_PX` for bot backs), verified
+// so the *rendered* tile height/width (after `fitScale`) is strictly
+// bigger normal -> large -> xlarge for the hand (the literal reported
+// bug), and never *shrinks* going normal -> large -> xlarge for melds/
+// discards, landing comfortably above their old ~20-30px worst case (see
+// stageLayout.test.ts's monotonic-size guard, and the trade-off note
+// below for why melds/discards don't also get hand's strict 3-way growth).
+//
+// **A real, deliberate trade-off, not an oversight:** the fixed 768px
+// stage height cannot fit a properly-legible hand *and* fully natural-
+// sized bot concealed backs at `large`/`xlarge` — there simply isn't
+// enough vertical room for both. Backs are prioritized last: they carry
+// zero legibility-relevant content (no numerals/text, just a back
+// pattern), unlike hand/melds/discards, which SPEC.md §5a's "answerable
+// within ~2 seconds" bar is actually about. Bot backs' region is widened
+// horizontally (350px, reaching most of the way toward the wall's own
+// region without touching it) specifically to reduce how many *rows* they
+// need at a given height budget, but at `xlarge` they still end up more
+// compressed than at `normal` — an accepted cosmetic cost, not a bug.
+const SEAT_REGIONS_NORMAL: Record<SeatOffset, SeatRegions> = {
   0: {
     // human, bottom, full width
-    header: { x: 16, y: 526, width: 992, height: 20 },
-    flowers: { x: 16, y: 550, width: 992, height: 22 },
-    melds: { x: 16, y: 576, width: 992, height: 30 },
-    discards: { x: 16, y: 610, width: 992, height: 40 },
-    hand: { x: 16, y: 654, width: 992, height: 104 },
+    header: { x: 16, y: 530, width: 992, height: 20 },
+    flowers: { x: 16, y: 554, width: 992, height: 20 },
+    melds: { x: 16, y: 578, width: 992, height: 36 },
+    discards: { x: 16, y: 618, width: 992, height: 36 },
+    hand: { x: 16, y: 658, width: 992, height: 104 },
   },
   1: {
-    // left
-    header: { x: 8, y: 154, width: 172, height: 16 },
-    flowers: { x: 8, y: 174, width: 172, height: 18 },
-    melds: { x: 8, y: 196, width: 172, height: 24 },
-    discards: { x: 8, y: 224, width: 172, height: 36 },
-    backs: { x: 8, y: 264, width: 172, height: 240 },
+    // left — melds/discards widened past the header/flowers column (same
+    // reasoning as backs below: a fixed 172px column forces multi-row
+    // wrapping at larger tile sizes even for a modest, realistic tile
+    // count, which shrinks them far more than the region height alone
+    // would suggest).
+    header: { x: 8, y: 172, width: 172, height: 16 },
+    flowers: { x: 8, y: 192, width: 172, height: 20 },
+    melds: { x: 8, y: 216, width: 360, height: 36 },
+    discards: { x: 8, y: 256, width: 360, height: 36 },
+    backs: { x: 8, y: 296, width: 350, height: 226 },
   },
   2: {
     // across (top)
-    header: { x: 200, y: 14, width: 624, height: 16 },
-    flowers: { x: 200, y: 34, width: 624, height: 16 },
-    melds: { x: 200, y: 54, width: 624, height: 20 },
-    discards: { x: 200, y: 78, width: 624, height: 20 },
-    backs: { x: 200, y: 102, width: 624, height: 26 },
+    header: { x: 200, y: 10, width: 624, height: 16 },
+    flowers: { x: 200, y: 30, width: 624, height: 20 },
+    melds: { x: 200, y: 54, width: 624, height: 36 },
+    discards: { x: 200, y: 94, width: 624, height: 36 },
+    backs: { x: 200, y: 134, width: 624, height: 30 },
   },
   3: {
-    // right
-    header: { x: 844, y: 154, width: 172, height: 16 },
-    flowers: { x: 844, y: 174, width: 172, height: 18 },
-    melds: { x: 844, y: 196, width: 172, height: 24 },
-    discards: { x: 844, y: 224, width: 172, height: 36 },
-    backs: { x: 844, y: 264, width: 172, height: 240 },
+    // right — mirrors offset 1; widened regions grow toward the wall from
+    // the right edge instead of the left.
+    header: { x: 844, y: 172, width: 172, height: 16 },
+    flowers: { x: 844, y: 192, width: 172, height: 20 },
+    melds: { x: 664, y: 216, width: 360, height: 36 },
+    discards: { x: 664, y: 256, width: 360, height: 36 },
+    backs: { x: 666, y: 296, width: 350, height: 226 },
   },
+}
+
+const SEAT_REGIONS_LARGE: Record<SeatOffset, SeatRegions> = {
+  0: {
+    header: { x: 16, y: 428, width: 992, height: 20 },
+    flowers: { x: 16, y: 452, width: 992, height: 20 },
+    melds: { x: 16, y: 476, width: 992, height: 44 },
+    discards: { x: 16, y: 524, width: 992, height: 44 },
+    hand: { x: 16, y: 572, width: 992, height: 190 },
+  },
+  1: {
+    header: { x: 8, y: 192, width: 172, height: 16 },
+    flowers: { x: 8, y: 212, width: 172, height: 20 },
+    melds: { x: 8, y: 236, width: 360, height: 44 },
+    discards: { x: 8, y: 284, width: 360, height: 44 },
+    backs: { x: 8, y: 332, width: 350, height: 88 },
+  },
+  2: {
+    header: { x: 200, y: 10, width: 624, height: 16 },
+    flowers: { x: 200, y: 30, width: 624, height: 20 },
+    melds: { x: 200, y: 54, width: 624, height: 44 },
+    discards: { x: 200, y: 102, width: 624, height: 44 },
+    backs: { x: 200, y: 150, width: 624, height: 34 },
+  },
+  3: {
+    header: { x: 844, y: 192, width: 172, height: 16 },
+    flowers: { x: 844, y: 212, width: 172, height: 20 },
+    melds: { x: 664, y: 236, width: 360, height: 44 },
+    discards: { x: 664, y: 284, width: 360, height: 44 },
+    backs: { x: 666, y: 332, width: 350, height: 88 },
+  },
+}
+
+const SEAT_REGIONS_XLARGE: Record<SeatOffset, SeatRegions> = {
+  0: {
+    header: { x: 16, y: 423, width: 992, height: 20 },
+    flowers: { x: 16, y: 447, width: 992, height: 20 },
+    melds: { x: 16, y: 471, width: 992, height: 44 },
+    discards: { x: 16, y: 519, width: 992, height: 44 },
+    hand: { x: 16, y: 567, width: 992, height: 195 },
+  },
+  1: {
+    header: { x: 8, y: 196, width: 172, height: 16 },
+    flowers: { x: 8, y: 216, width: 172, height: 20 },
+    melds: { x: 8, y: 240, width: 360, height: 44 },
+    discards: { x: 8, y: 288, width: 360, height: 44 },
+    backs: { x: 8, y: 336, width: 350, height: 79 },
+  },
+  2: {
+    header: { x: 200, y: 10, width: 624, height: 16 },
+    flowers: { x: 200, y: 30, width: 624, height: 20 },
+    melds: { x: 200, y: 54, width: 624, height: 44 },
+    discards: { x: 200, y: 102, width: 624, height: 44 },
+    backs: { x: 200, y: 150, width: 624, height: 38 },
+  },
+  3: {
+    header: { x: 844, y: 196, width: 172, height: 16 },
+    flowers: { x: 844, y: 216, width: 172, height: 20 },
+    melds: { x: 664, y: 240, width: 360, height: 44 },
+    discards: { x: 664, y: 288, width: 360, height: 44 },
+    backs: { x: 666, y: 336, width: 350, height: 79 },
+  },
+}
+
+const SEAT_REGIONS_BY_SCALE: Record<TileScale, Record<SeatOffset, SeatRegions>> = {
+  normal: SEAT_REGIONS_NORMAL,
+  large: SEAT_REGIONS_LARGE,
+  xlarge: SEAT_REGIONS_XLARGE,
+}
+
+export function getSeatRegions(tileScale: TileScale): Record<SeatOffset, SeatRegions> {
+  return SEAT_REGIONS_BY_SCALE[tileScale]
 }
 
 // Only the concealed tile-back art rotates to "face inward" (M8 Step 2) —

@@ -1,7 +1,8 @@
 import type { PlayerState, Seat as SeatId } from '@mahjong-mcr/engine'
 import { HandTiles } from '../hand/HandTiles.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { Positioned } from '../stage/Positioned.js'
-import { SEAT_BACK_ROTATION, SEAT_REGIONS, type SeatOffset } from '../stage/stageLayout.js'
+import { getSeatRegions, SEAT_BACK_ROTATION, type SeatOffset } from '../stage/stageLayout.js'
 import { ConcealedBacks } from './ConcealedBacks.js'
 import { Discards } from './Discards.js'
 import { Flowers } from './Flowers.js'
@@ -11,9 +12,9 @@ const WIND_LETTER: Record<PlayerState['seatWind'], string> = { east: 'E', south:
 
 export interface SeatProps {
   seat: SeatId
-  // Which of the 4 stage regions (stageLayout.ts's SEAT_REGIONS) this seat
-  // occupies — human is always 0 (bottom); the other 3 go counter-clockwise
-  // from there in turn order, same spatial intent as the old
+  // Which of the 4 stage regions (stageLayout.ts's getSeatRegions) this
+  // seat occupies — human is always 0 (bottom); the other 3 go counter-
+  // clockwise from there in turn order, same spatial intent as the old
   // GRID_CLASS_BY_OFFSET.
   offset: SeatOffset
   player: PlayerState
@@ -39,7 +40,7 @@ export interface SeatProps {
 
 // A player's stage presence: identity (wind/dealer/turn/score), hand-or-
 // backs, melds, discards, flowers — each independently positioned within
-// this seat's stage region (stageLayout.ts's SEAT_REGIONS) rather than
+// this seat's stage region (stageLayout.ts's getSeatRegions) rather than
 // stacked inside a bordered flow-layout card (M8 Step 1 removed that card
 // entirely — see stageLayout.ts's own comment on the region partition that
 // replaced it). Sort/discard controls and the fan-tracker/waits panels live
@@ -66,7 +67,8 @@ export function Seat({
   justDrawnTileId,
   onInspectTile,
 }: SeatProps) {
-  const regions = SEAT_REGIONS[offset]
+  const { tileScale } = useSettingsContext()
+  const regions = getSeatRegions(tileScale)[offset]
 
   return (
     <div data-testid={`seat-${seat}`} aria-label={`Seat ${seat}${isHuman ? ' (you)' : ''}`}>

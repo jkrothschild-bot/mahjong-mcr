@@ -3,7 +3,7 @@ import { Positioned } from '../stage/Positioned.js'
 import { computeRowPositions, placeGroup, type Rect } from '../stage/stageLayout.js'
 import { useSettingsContext } from '../settings/SettingsContext.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
-import { tileFaceClassName, TILE_BOX_PX } from '../tiles/tileStyles.js'
+import { tileFaceCompactClassName, TILE_FACE_COMPACT_PX } from '../tiles/tileStyles.js'
 
 const TILE_GAP = 4
 
@@ -26,9 +26,15 @@ export interface MeldsProps {
 // they still read as distinct clusters — while each meld keeps its own
 // semantic grouping div (role/aria-label/testid) for accessibility, same as
 // before this just isn't also a *visual* flex container anymore.
+//
+// Compact sizing (matches Discards/Flowers), not full hand-tile size: melds
+// are revealed-but-not-draggable info, same category as a discard river,
+// and their stage region (stageLayout.ts's getSeatRegions) is sized for a
+// compact tile — rendering at full TILE_BOX_PX size forced a ~0.2-0.3x
+// shrink regardless of tileScale, illegibly small (SPEC.md §5a).
 export function Melds({ seat, melds, region, selectedTypeId, onTileClick }: MeldsProps) {
   const { tileScale } = useSettingsContext()
-  const { width: tileWidth, height: tileHeight } = TILE_BOX_PX[tileScale]
+  const { width: tileWidth, height: tileHeight } = TILE_FACE_COMPACT_PX[tileScale]
   if (melds.length === 0) return null
 
   const totalTiles = melds.reduce((sum, meld) => sum + meld.tiles.length, 0)
@@ -57,7 +63,7 @@ export function Melds({ seat, melds, region, selectedTypeId, onTileClick }: Meld
                   data-testid={`meld-tile-${meld.id}-${index}`}
                   role="listitem"
                   onClick={onTileClick ? () => onTileClick(id) : undefined}
-                  className={tileFaceClassName({
+                  className={tileFaceCompactClassName({
                     highlighted: selectedTypeId === typeId,
                     extra: onTileClick ? 'cursor-pointer' : undefined,
                     scale: tileScale,
