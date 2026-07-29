@@ -43,7 +43,7 @@ interface LoopState {
   matchMoveLogs: HandMoveLog[]
 }
 
-type LoopAction = { type: 'apply'; seat: Seat; move: Move } | { type: 'startNextHand' }
+type LoopAction = { type: 'apply'; seat: Seat; move: Move } | { type: 'startNextHand' } | { type: 'reset'; matchSeed: number }
 
 interface BegunHand {
   gameState: GameState
@@ -111,6 +111,16 @@ function loopReducer(state: LoopState, action: LoopAction): LoopState {
         matchMoveLogs: [...state.matchMoveLogs, { startParams: begun.startParams, moves: [] }],
       }
     }
+    // Discards the current match entirely and begins a brand new one — the
+    // "Restart" button's action. Reuses initLoopState wholesale (fresh
+    // matchScores, a single fresh move-log entry) rather than reconciling
+    // anything from the abandoned match; there's nothing worth keeping.
+    // Deliberately does NOT touch session stats (useSessionStats.ts) — that
+    // lives entirely outside this reducer (recorded by App.tsx's own effect,
+    // keyed off state.phase === 'handEnded', which an abandoned/reset match
+    // never reaches), so restarting can never inflate or skew hands-played.
+    case 'reset':
+      return initLoopState(action.matchSeed)
   }
 }
 
@@ -128,6 +138,10 @@ export interface UseGameLoopResult {
   isHumanTurn: boolean
   submitHumanMove: (move: Move) => void
   startNextHand: () => void
+  // Abandons the current match and begins a brand new one with a fresh
+  // random seed — the "Restart" button. Never touches session stats (see
+  // loopReducer's 'reset' case).
+  resetMatch: () => void
   // True whenever a non-human seat has a real decision pending (a draw
   // never counts — it isn't a real decision and always auto-resolves
   // regardless of step mode). Only meaningful for gating the "Next" button;
@@ -209,6 +223,16 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     dispatch({ type: 'startNextHand' })
   }, [])
 
+  // A fresh random seed each time — restarting is meant to hand the player
+  // a genuinely new match, not silently replay the same one over again
+  // (see loopReducer's 'reset' case for what it does and doesn't touch).
+  // Range matches engine/rng.ts's own nextSeed (a uint32) — mulberry32
+  // coerces any number via `>>> 0` regardless, but staying in-range keeps
+  // this obviously equivalent to how the engine derives its own seeds.
+  const resetMatch = useCallback(() => {
+    dispatch({ type: 'reset', matchSeed: Math.floor(Math.random() * 4294967296) })
+  }, [])
+
   // Dispatches exactly one pending bot seat's move immediately — the
   // step-mode "Next" button's action. A no-op if nothing is actually
   // pending (e.g. the button was somehow clicked mid-transition).
@@ -229,5 +253,6 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     isHumanTurn,
     submitHumanMove,
     startNextHand,
+    resetMatch,
   }
 }

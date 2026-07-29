@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { typeIdOfInstance } from '@mahjong-mcr/engine'
 import App from './App'
@@ -70,6 +70,41 @@ describe('App', () => {
     const discards = screen.getByRole('list', { name: 'Seat 0 discards' })
     expect(discards.querySelectorAll('[role="listitem"]')).toHaveLength(1)
     expect(discards).toHaveTextContent(discardedLabel!)
+  })
+
+  it('Restart asks for confirmation, and canceling leaves the current match untouched', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restart' }))
+    const dialog = screen.getByRole('dialog', { name: 'Confirm restart' })
+    expect(dialog).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog', { name: 'Confirm restart' })).not.toBeInTheDocument()
+
+    // Still the same deterministic matchSeed-42 opening deal — nothing reset.
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    expect(hand.querySelectorAll('[role="listitem"]')).toHaveLength(14)
+  })
+
+  it('confirming Restart abandons the current match — a discard made before restarting is gone afterward', () => {
+    render(<App />)
+
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+    fireEvent.click(firstTile!)
+    fireEvent.click(screen.getByRole('button', { name: 'Discard selected' }))
+    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restart' }))
+    const dialog = screen.getByRole('dialog', { name: 'Confirm restart' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restart' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Confirm restart' })).not.toBeInTheDocument()
+    // A brand new match: the discard from the abandoned one is gone, and
+    // the human's hand is a fresh 14-tile deal again.
+    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
+    expect(screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[role="listitem"]')).toHaveLength(14)
   })
 
   it('shows a confirmation modal before discarding when the setting is on, and only commits on confirm', () => {

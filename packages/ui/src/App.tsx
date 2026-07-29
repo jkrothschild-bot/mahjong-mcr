@@ -10,6 +10,7 @@ import { CallOutToast } from './game/CallOutToast.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
+import { RestartConfirmModal } from './game/RestartConfirmModal.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop, type HandMoveLog } from './game/useGameLoop.js'
 import { FanEncyclopedia } from './hints/FanEncyclopedia.js'
@@ -37,6 +38,7 @@ function App() {
   const [practicePickerOpen, setPracticePickerOpen] = useState(false)
   const [practicePreset, setPracticePreset] = useState<ScenarioPreset | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const { stats, recordHandResult } = useSessionStats()
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
@@ -66,6 +68,7 @@ function App() {
     startNextHand,
     hasPendingBotMove,
     advanceOneBotMove,
+    resetMatch,
   } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
@@ -166,6 +169,13 @@ function App() {
           >
             Settings
           </button>
+          <button
+            type="button"
+            onClick={() => setRestartConfirmOpen(true)}
+            className="min-h-11 rounded-md border border-red-500 px-3 text-sm text-red-300 hover:bg-red-950"
+          >
+            Restart
+          </button>
         </div>
       </header>
 
@@ -263,6 +273,15 @@ function App() {
       <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onUpdate={update} />
+
+      <RestartConfirmModal
+        open={restartConfirmOpen}
+        onConfirm={() => {
+          resetMatch()
+          setRestartConfirmOpen(false)
+        }}
+        onCancel={() => setRestartConfirmOpen(false)}
+      />
     </div>
     </MotionConfig>
     </SettingsContext.Provider>

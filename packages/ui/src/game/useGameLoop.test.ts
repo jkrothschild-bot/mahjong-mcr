@@ -324,4 +324,47 @@ describe('useGameLoop', () => {
     expect(result.current.isHumanTurn).toBe(true)
     expect(result.current.state.phase).toBe('awaitingDiscard') // not stuck on 'awaitingDraw'
   })
+
+  it('resetMatch abandons the in-progress match and deals a brand new hand 1, wiping matchScores and move logs', () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
+
+    // Play into the match a bit and advance to hand 2, so there's real
+    // progress (a non-empty move log, a non-hand-1 state, nonzero scores)
+    // for resetMatch to actually discard.
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+    act(() => {
+      result.current.startNextHand()
+    })
+    expect(result.current.matchState.matchHandNumber).toBe(2)
+
+    act(() => {
+      result.current.resetMatch()
+    })
+
+    expect(result.current.matchState.matchHandNumber).toBe(1)
+    expect(result.current.matchState.dealerSeat).toBe(0)
+    expect(result.current.matchScores).toEqual(ZERO_SCORES)
+    expect(result.current.matchMoveLogs).toHaveLength(1)
+    expect(result.current.matchMoveLogs[0]!.moves).toEqual([])
+    expect(result.current.state.phase).toBe('awaitingDiscard') // a fresh deal, not mid-hand
+  })
+
+  it("resetMatch picks a different seed each time, so it's a genuinely new match rather than a replay of the same one", () => {
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false }))
+    const seedBefore = result.current.state.seed
+
+    act(() => {
+      result.current.resetMatch()
+    })
+
+    // Astronomically unlikely to collide by chance (a uint32 seed space) —
+    // a collision here would mean resetMatch stopped randomizing.
+    expect(result.current.state.seed).not.toBe(seedBefore)
+  })
 })
