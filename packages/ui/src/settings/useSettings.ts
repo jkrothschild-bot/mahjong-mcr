@@ -17,6 +17,11 @@ export interface Settings {
   // SPEC.md §8's "tile size / zoom" — a named preset, not a continuous
   // value, matching BOT_SPEED_PRESETS below.
   tileScale: TileScale
+  // M8 Step 3: force-disables Framer Motion's layout animations (tile
+  // movement) regardless of the OS-level prefers-reduced-motion media
+  // query — App.tsx ORs this with motion/react's own useReducedMotion()
+  // result, so either trigger alone is enough to turn animation off.
+  reducedMotion: boolean
 }
 
 // SPEC.md §7's bot-speed presets. A named preset, not a raw slider value,
@@ -36,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   stepMode: false,
   colorBlindPalette: false,
   tileScale: 'normal',
+  reducedMotion: false,
 }
 
 const STORAGE_KEY = 'mcr-mahjong:settings:v1'
@@ -71,6 +77,7 @@ export function loadSettings(raw: string | null): Settings {
     colorBlindPalette:
       typeof candidate.colorBlindPalette === 'boolean' ? candidate.colorBlindPalette : DEFAULT_SETTINGS.colorBlindPalette,
     tileScale: isTileScale(candidate.tileScale) ? candidate.tileScale : DEFAULT_SETTINGS.tileScale,
+    reducedMotion: typeof candidate.reducedMotion === 'boolean' ? candidate.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
   }
 }
 

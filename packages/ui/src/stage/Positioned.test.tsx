@@ -42,11 +42,27 @@ describe('Positioned', () => {
     expect(style.height).toBe('15px')
   })
 
-  it('centers the box at (x, y) via left/top plus a translate(-50%, -50%)', () => {
+  it('centers the box at (x, y) via left/top plus negative margins (not a transform:translate string, which would fight Framer Motion for ownership of `transform`)', () => {
     const style = boxStyle(0)
     expect(style.left).toBe('100px')
     expect(style.top).toBe('200px')
-    expect(style.transform).toContain('translate(-50%, -50%)')
-    expect(style.transform).toContain('rotate(0deg)')
+    expect(style.marginLeft).toBe('-15px') // -boxWidth/2
+    expect(style.marginTop).toBe('-25px') // -boxHeight/2
+  })
+
+  it('re-centers via margins using the post-rotation (swapped) box size', () => {
+    const style = boxStyle(90)
+    expect(style.marginLeft).toBe('-25px') // -boxWidth/2, boxWidth now 50 (swapped)
+    expect(style.marginTop).toBe('-15px') // -boxHeight/2, boxHeight now 30 (swapped)
+  })
+
+  it('expresses rotation via the rotate style shorthand (Framer Motion compiles it into transform itself, not a hand-authored transform string)', () => {
+    const { container } = render(
+      <Positioned x={0} y={0} naturalWidth={30} naturalHeight={50} rotation={90}>
+        <span>tile</span>
+      </Positioned>,
+    )
+    const el = container.firstElementChild as HTMLElement
+    expect(el.style.transform).toBe('rotate(90deg)')
   })
 })

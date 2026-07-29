@@ -19,7 +19,9 @@ export interface SettingsPanelProps {
 }
 
 // Plain form wiring over useSettings — bot speed, confirm-before-discard,
-// step mode, color-blind palette, and tile size (PLAN.md M7 Polish scope).
+// step mode, color-blind palette, tile size (PLAN.md M7 Polish scope), and
+// reduce-motion (M8 Step 3 — App.tsx ORs this with the OS-level
+// prefers-reduced-motion query, so either alone disables tile animation).
 // Sound is still unimplemented; the claim timer was removed entirely
 // (owner's call — claims now wait indefinitely for the human's decision).
 export function SettingsPanel({ settings, onUpdate }: SettingsPanelProps) {
@@ -84,6 +86,15 @@ export function SettingsPanel({ settings, onUpdate }: SettingsPanelProps) {
           <p className="text-xs text-neutral-400">Larger tiles may require scrolling to see the full board.</p>
         )}
       </fieldset>
+
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={settings.reducedMotion}
+          onChange={(e) => onUpdate({ reducedMotion: e.target.checked })}
+        />
+        Reduce motion
+      </label>
     </div>
   )
 }

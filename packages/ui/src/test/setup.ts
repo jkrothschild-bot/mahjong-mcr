@@ -12,3 +12,19 @@ class ResizeObserverStub {
   disconnect() {}
 }
 globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver
+
+// jsdom doesn't implement window.matchMedia either — motion/react's
+// useReducedMotion() (M8 Step 3) calls it to watch the OS-level
+// prefers-reduced-motion preference. Stub always reports "no preference"
+// (matches: false) and a no-op listener API; real browsers implement this
+// natively.
+window.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: () => {},
+  removeListener: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => false,
+})) as unknown as typeof window.matchMedia

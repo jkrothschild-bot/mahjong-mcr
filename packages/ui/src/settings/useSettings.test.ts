@@ -23,6 +23,7 @@ describe('loadSettings', () => {
       stepMode: true,
       colorBlindPalette: true,
       tileScale: 'large' as const,
+      reducedMotion: true,
     }
     expect(loadSettings(serializeSettings(settings))).toEqual(settings)
   })

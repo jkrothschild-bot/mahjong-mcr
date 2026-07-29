@@ -51,7 +51,7 @@ export function Melds({ seat, melds, region, selectedTypeId, onTileClick }: Meld
             const p = placed[flatIndex]!
             flatIndex++
             return (
-              <Positioned key={id} x={p.x} y={p.y} naturalWidth={tileWidth} naturalHeight={tileHeight} scale={layout.scale}>
+              <Positioned key={id} layoutId={String(id)} x={p.x} y={p.y} naturalWidth={tileWidth} naturalHeight={tileHeight} scale={layout.scale}>
                 <div
                   data-tile-id={id}
                   data-testid={`meld-tile-${meld.id}-${index}`}

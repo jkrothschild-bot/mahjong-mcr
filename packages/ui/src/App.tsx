@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { MotionConfig, useReducedMotion } from 'motion/react'
 import { typeIdOfInstance, type ScenarioPreset, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
@@ -24,6 +25,11 @@ import { useSessionStats } from './stats/useSessionStats.js'
 
 function App() {
   const { settings, update } = useSettings()
+  // M8 Step 3: either trigger — the app's own setting, or the OS-level
+  // prefers-reduced-motion media query motion/react's useReducedMotion()
+  // already watches — is enough to turn off tile-movement animation.
+  const osPrefersReducedMotion = useReducedMotion()
+  const reducedMotion = settings.reducedMotion || osPrefersReducedMotion
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
@@ -91,6 +97,7 @@ function App() {
 
   return (
     <SettingsContext.Provider value={settings}>
+    <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
     {/* h-svh (a definite height), not min-h-svh (only a floor) — flex-grow
         children need a definite ancestor size to distribute remaining
         space against; a min-height-only ancestor has no "remaining space"
@@ -261,6 +268,7 @@ function App() {
 
       <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
     </div>
+    </MotionConfig>
     </SettingsContext.Provider>
   )
 }

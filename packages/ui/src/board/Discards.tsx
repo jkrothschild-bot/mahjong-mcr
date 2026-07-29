@@ -37,6 +37,7 @@ export function Discards({ seat, tiles, region, selectedTypeId, onTileClick }: D
         return (
           <Positioned
             key={id}
+            layoutId={String(id)}
             x={placed[index]!.x}
             y={placed[index]!.y}
             naturalWidth={tileWidth}

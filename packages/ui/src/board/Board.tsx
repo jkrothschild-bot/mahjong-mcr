@@ -71,7 +71,7 @@ export function Board({
 
       <GameStage>
         <TableSurface />
-        <WallSegment />
+        <WallSegment wall={state.wall} />
         {state.players.map((player) => {
           const offset = ((player.seat - HUMAN_SEAT + 4) % 4) as SeatOffset
           const isHuman = player.seat === HUMAN_SEAT

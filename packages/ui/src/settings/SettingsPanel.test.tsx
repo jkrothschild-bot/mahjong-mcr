@@ -59,4 +59,11 @@ describe('SettingsPanel', () => {
     fireEvent.click(tileSizeGroup().getByRole('radio', { name: 'X-Large' }))
     expect(onUpdate).toHaveBeenCalledWith({ tileScale: 'xlarge' })
   })
+
+  it('toggling reduce motion calls onUpdate', () => {
+    const onUpdate = vi.fn()
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion' }))
+    expect(onUpdate).toHaveBeenCalledWith({ reducedMotion: true })
+  })
 })

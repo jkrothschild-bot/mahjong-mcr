@@ -131,7 +131,7 @@ export function Seat({
       ) : (
         <ConcealedBacks
           seat={seat}
-          count={player.hand.concealedTiles.length}
+          tileIds={player.hand.concealedTiles}
           region={regions.backs!}
           rotation={SEAT_BACK_ROTATION[offset]}
         />
