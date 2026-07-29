@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { StageScaleContext } from './StageScaleContext.js'
 import { STAGE_HEIGHT, STAGE_WIDTH } from './stageLayout.js'
 
 export interface GameStageProps {
@@ -45,7 +46,7 @@ export function GameStage({ children }: GameStageProps) {
         className="relative shrink-0 overflow-hidden rounded-lg border border-neutral-700 bg-neutral-950"
         style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT, transform: `scale(${scale})` }}
       >
-        {children}
+        <StageScaleContext.Provider value={scale}>{children}</StageScaleContext.Provider>
       </div>
     </div>
   )

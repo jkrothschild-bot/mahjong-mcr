@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
 import type { Rect } from '../stage/stageLayout.js'
 import { HandTiles } from './HandTiles.js'
@@ -15,19 +15,15 @@ function idsFor(typeId: TileTypeId, count: number): TileInstanceId[] {
   return ids
 }
 
-// jsdom has no real layout engine, so document.elementFromPoint always
-// returns null and Element.prototype.setPointerCapture doesn't exist.
-// Stubbing both is the documented approach for testing pointer-based drag
-// (see the hand-rearrangement plan) — real browsers (including iPad
-// Safari) implement both natively.
-function mockDropTarget(element: Element | null) {
-  document.elementFromPoint = vi.fn().mockReturnValue(element)
-}
-
-beforeEach(() => {
-  Element.prototype.setPointerCapture = vi.fn()
-})
-
+// The actual drag *gesture* (M8 Step 4's @dnd-kit/core + @dnd-kit/sortable)
+// depends on real measured getBoundingClientRect() values for collision
+// detection, which jsdom always reports as zero-size — a full simulated
+// drag isn't meaningfully testable here the way the old
+// document.elementFromPoint mechanism was. That mechanism's own reorder
+// logic is covered directly and cheaply in resolveReorderTarget.test.ts
+// (pure function, no DOM); the real drag gesture, the sibling-shift gap
+// preview, and the DragOverlay lift are verified against the running app
+// with Playwright instead (see the M8 Step 4 plan's verification section).
 describe('HandTiles', () => {
   it('renders one tile per order entry, in order', () => {
     const [c1] = idsFor('C1', 1)
@@ -49,90 +45,6 @@ describe('HandTiles', () => {
     const img = screen.getByTestId(`hand-tile-${c1}`).querySelector('img')
     expect(img).toBeInTheDocument()
     expect(img).toHaveAttribute('src', expect.stringMatching(/m1/))
-  })
-
-  it('calls onReorder with the dragged tile and the tile dropped onto', () => {
-    const [c1] = idsFor('C1', 1)
-    const [c2] = idsFor('C2', 1)
-    const [c3] = idsFor('C3', 1)
-    const order = [c1!, c2!, c3!]
-    const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
-
-    const dragged = screen.getByTestId(`hand-tile-${c3}`)
-    const target = screen.getByTestId(`hand-tile-${c1}`)
-    mockDropTarget(target)
-
-    fireEvent.pointerDown(dragged, { pointerId: 1 })
-    fireEvent.pointerUp(dragged, { pointerId: 1, clientX: 5, clientY: 5 })
-
-    expect(onReorder).toHaveBeenCalledWith(c3, c1)
-  })
-
-  it('calls onReorder with beforeId null when dropped on the trailing end zone', () => {
-    const [c1] = idsFor('C1', 1)
-    const [c2] = idsFor('C2', 1)
-    const order = [c1!, c2!]
-    const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
-
-    const dragged = screen.getByTestId(`hand-tile-${c1}`)
-    const endZone = screen.getByTestId('hand-end-zone')
-    mockDropTarget(endZone)
-
-    fireEvent.pointerDown(dragged, { pointerId: 1 })
-    fireEvent.pointerUp(dragged, { pointerId: 1, clientX: 99, clientY: 5 })
-
-    expect(onReorder).toHaveBeenCalledWith(c1, null)
-  })
-
-  it('does not call onReorder when dropped outside any valid target', () => {
-    const [c1] = idsFor('C1', 1)
-    const [c2] = idsFor('C2', 1)
-    const order = [c1!, c2!]
-    const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
-
-    const dragged = screen.getByTestId(`hand-tile-${c1}`)
-    mockDropTarget(null)
-
-    fireEvent.pointerDown(dragged, { pointerId: 1 })
-    fireEvent.pointerUp(dragged, { pointerId: 1, clientX: -1, clientY: -1 })
-
-    expect(onReorder).not.toHaveBeenCalled()
-  })
-
-  it('does not call onReorder when a drag is cancelled', () => {
-    const [c1] = idsFor('C1', 1)
-    const [c2] = idsFor('C2', 1)
-    const order = [c1!, c2!]
-    const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
-
-    const dragged = screen.getByTestId(`hand-tile-${c1}`)
-    const target = screen.getByTestId(`hand-tile-${c2}`)
-    mockDropTarget(target)
-
-    fireEvent.pointerDown(dragged, { pointerId: 1 })
-    fireEvent.pointerCancel(dragged, { pointerId: 1 })
-
-    expect(onReorder).not.toHaveBeenCalled()
-  })
-
-  it('does not call onReorder when dropped on itself', () => {
-    const [c1] = idsFor('C1', 1)
-    const [c2] = idsFor('C2', 1)
-    const order = [c1!, c2!]
-    const onReorder = vi.fn()
-    render(<HandTiles order={order} onReorder={onReorder} region={TEST_REGION} />)
-
-    const dragged = screen.getByTestId(`hand-tile-${c1}`)
-    mockDropTarget(dragged)
-
-    fireEvent.pointerDown(dragged, { pointerId: 1 })
-    fireEvent.pointerUp(dragged, { pointerId: 1, clientX: 5, clientY: 5 })
-
-    expect(onReorder).not.toHaveBeenCalled()
   })
 
   it('calls onTileClick with the clicked tile id', () => {
@@ -172,5 +84,21 @@ describe('HandTiles', () => {
     const el = screen.getByTestId(`hand-tile-${c1}`)
     expect(el.className).toContain('ring-amber-400')
     expect(el.className).not.toContain('ring-sky-400')
+  })
+
+  it('makes every hand tile keyboard-focusable, in logical (order-array) sequence — dnd-kit\'s sortable attributes, new in M8 Step 4', () => {
+    const [c1] = idsFor('C1', 1)
+    const [c2] = idsFor('C2', 1)
+    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} />)
+
+    const list = screen.getByRole('list', { name: 'Your hand' })
+    const items = list.querySelectorAll('[role="listitem"]')
+    expect(items).toHaveLength(2)
+    expect(items[0]).toHaveAttribute('tabindex', '0')
+    expect(items[1]).toHaveAttribute('tabindex', '0')
+    // DOM order (which tab order follows) matches the logical `order` array
+    // passed in, not some independently-DOM-sorted sequence.
+    expect(items[0]).toHaveAttribute('data-tile-id', String(c1))
+    expect(items[1]).toHaveAttribute('data-tile-id', String(c2))
   })
 })
