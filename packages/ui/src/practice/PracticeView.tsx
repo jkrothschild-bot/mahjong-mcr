@@ -42,10 +42,11 @@ export function PracticeView({ preset, botSpeedMs, confirmBeforeDiscard, onExit 
   const [selectedTypeId, setSelectedTypeId] = useState<TileTypeId | null>(null)
   const inspectTile = (id: number) => setSelectedTypeId(typeIdOfInstance(id))
 
-  const { selectedTileId, selectTile, pendingConfirmTileId, requestDiscard, confirmDiscard, cancelDiscard } = useDiscardFlow({
-    confirmBeforeDiscard,
-    onSubmitDiscard: (tile) => submitHumanMove({ kind: 'discard', tile }),
-  })
+  const { selectedTileId, selectTile, pendingConfirmTileId, requestDiscardTile, confirmDiscard, cancelDiscard } =
+    useDiscardFlow({
+      confirmBeforeDiscard,
+      onSubmitDiscard: (tile) => submitHumanMove({ kind: 'discard', tile }),
+    })
 
   const outcome = state.phase === 'handEnded' ? deriveHandOutcome(state) : null
 
@@ -72,7 +73,7 @@ export function PracticeView({ preset, botSpeedMs, confirmBeforeDiscard, onExit 
           selectTile(id)
           inspectTile(id)
         }}
-        onRequestDiscard={requestDiscard}
+        onRequestDiscardTile={isHumanTurn ? requestDiscardTile : undefined}
         selectedTypeId={selectedTypeId}
         onInspectTile={inspectTile}
       />

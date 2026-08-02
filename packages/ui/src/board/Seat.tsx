@@ -1,59 +1,119 @@
 import type { PlayerState, Seat as SeatId } from '@mahjong-mcr/engine'
+import type { SortMode } from '../hand/handOrder.js'
+import { DISCARD_ZONE_ID, END_ZONE_ID } from '../hand/resolveReorderTarget.js'
 import { HandTiles } from '../hand/HandTiles.js'
-import { useSettingsContext } from '../settings/SettingsContext.js'
+import { DiscardHint } from '../hand/DiscardHint.js'
+import { SortToolbar } from '../hand/SortToolbar.js'
+import { useStageMetrics } from '../stage/StageMetricsContext.js'
 import { Positioned } from '../stage/Positioned.js'
-import { getSeatRegions, SEAT_BACK_ROTATION, type SeatOffset } from '../stage/stageLayout.js'
-import { ConcealedBacks } from './ConcealedBacks.js'
-import { Discards } from './Discards.js'
-import { Flowers } from './Flowers.js'
-import { Melds } from './Melds.js'
+import { getBoardRegions, type SeatLineRegion, type SeatRole } from '../stage/stageLayout.js'
+import { SeatLine } from './SeatLine.js'
 
-const WIND_LETTER: Record<PlayerState['seatWind'], string> = { east: 'E', south: 'S', west: 'W', north: 'N' }
+// The sort control's own reserved slot at the left edge of the human row —
+// carved out here, in Seat.tsx, rather than in stageLayout.ts's own
+// getBoardRegions: that geometry is KICKOFF-phase7-board-rebuild.md's
+// literal, doc-anchored golden region set, and human.row's own width is
+// asserted against directly by several of its tests (capacity, property,
+// golden-snapshot). Subdividing the region AFTER reading it, here, keeps
+// that geometry untouched while still guaranteeing the hand+meld block
+// (HandTiles' own budget math, unaware of this) never overlaps the control —
+// HandTiles is handed the already-narrowed, already-shifted region below,
+// the same way it's handed any other region, and centers/reserves within
+// whatever it's given.
+// Was 130 for the 6-mode dropdown, briefly 88 for the bare "Sort" button,
+// now 150 because the slot also hosts the one-time discard hint
+// (DiscardHint.tsx) stacked beneath the button.
+//
+// This width is reserved UNCONDITIONALLY — whether the hint is currently
+// showing or not. Sizing it to the visible content would mean the hand row's
+// budget changed the moment the player made their first discard and the hint
+// disappeared, re-solving fitRowTileWidth and shifting every tile mid-hand.
+// CLAUDE.md's standing rule is that layout never reflows mid-hand, so the
+// reservation is constant and the hint simply vacates space that stays
+// reserved. The cost is ~50px of hand row at every designWidth; at the 1768
+// reference the row has ample slack (18 slots at nominal 60px plus gaps is
+// well under the remaining width), so this only bites at the narrow end
+// where the row is already shrinking.
+const SORT_CONTROL_WIDTH = 150
+const SORT_CONTROL_HEIGHT = 44
+// Fixed offsets within the slot, NOT a flex stack: the button must not move
+// when the hint unmounts. Both are measured from the slot's own top edge.
+const SORT_BUTTON_TOP = 4
+const DISCARD_HINT_TOP = SORT_BUTTON_TOP + SORT_CONTROL_HEIGHT + 8
+const DISCARD_HINT_HEIGHT = 72
+
+// Spelled out, not the E/S/W/N abbreviation. The seat band sits on the table
+// rail with room to spare, and a learner shouldn't have to expand an initial
+// to answer "which seat am I?" — SPEC.md §5a wants that at a glance.
+//
+// This is NOT in tension with the standing rule that wind tiles carry a Latin
+// letter baked into their face art (CLAUDE.md; SPEC.md §4). That rule is about
+// the tile artwork, which is untouched — the tiles still read E/S/W/N, and this
+// band is what tells you which of them is yours.
+const WIND_NAME: Record<PlayerState['seatWind'], string> = { east: 'East', south: 'South', west: 'West', north: 'North' }
 
 export interface SeatProps {
   seat: SeatId
-  // Which of the 4 stage regions (stageLayout.ts's getSeatRegions) this
-  // seat occupies — human is always 0 (bottom); the other 3 go counter-
-  // clockwise from there in turn order, same spatial intent as the old
-  // GRID_CLASS_BY_OFFSET.
-  offset: SeatOffset
+  // Which seat line this seat occupies — human is always the bottom row
+  // (rendered specially, see isHuman below); west/north/east are the three
+  // bot positions (stageLayout.ts's getBoardRegions), going counter-
+  // clockwise in turn order from the human.
+  role: 'human' | SeatRole
   player: PlayerState
   isDealer: boolean
   isCurrentTurn: boolean
   isHuman: boolean
   matchScore: number
   selectedTypeId?: string
-  // Only used when isHuman — the player's own reorderable hand.
+  // Only used when isHuman — the player's own reorderable hand. Reordering
+  // itself happens via the lifted DndContext in Board.tsx now (it has to
+  // span both this hand and DiscardField's drop target); HandTiles only
+  // needs the live drag state to render its own insertion indicator/drag
+  // overlay, not a reorder callback.
   handOrder?: readonly number[]
-  onReorderHand?: (draggedId: number, beforeId: number | null) => void
-  // Only used when isHuman — the discard flow (Phase 5).
+  // Only used when isHuman — the discard flow.
   selectedTileId?: number | null
   onTileClick?: (id: number) => void
+  // Double-click / drag-onto-DiscardField discard trigger (see Board.tsx's
+  // own comment on why the DndContext lives there). Only used when isHuman.
+  onRequestDiscardTile?: (id: number) => void
+  activeId?: number | null
+  overId?: number | typeof END_ZONE_ID | typeof DISCARD_ZONE_ID | null
+  // Only used when isHuman — renders next to the hand, inside the human
+  // row's own reserved left-edge slot (see SORT_CONTROL_WIDTH above).
+  onSort?: (mode: SortMode) => void
+  // Only used when isHuman — the one-time "how do I discard?" cue, stacked
+  // under the Sort button in that same slot. Shares onSort's own gate: the
+  // slot is only carved out of the hand row when there's a Sort control to
+  // put in it, so the hint has nowhere to live without it.
+  showDiscardHint?: boolean
   // The tile the human just drew this turn (GameState.lastDrawnTile) — only
   // meaningful while it's actually their turn to discard.
   justDrawnTileId?: number | null
-  // Tile inspector (Phase 6) — fires for any seat's discard/meld/flower
-  // tile, and additionally for the human's own hand tiles (see onTileClick
-  // above).
+  // Tile inspector — fires for any seat's meld/flower tile, and
+  // additionally for the human's own hand tiles (see onTileClick above).
+  // Discards are no longer this seat's own concern (Phase 7: DiscardField
+  // is one shared board-level component, not per-seat) — Board.tsx wires
+  // its own onTileClick/onOpenDiscardOverlay directly onto DiscardField.
   onInspectTile?: (id: number) => void
+  // Only meaningful for a bot seat (isHuman's own hand is never hidden from
+  // itself) — true once the hand has ended (win or exhaustive draw), so
+  // every seat's concealed tiles turn face-up for review instead of staying
+  // hidden behind their backs. See SeatLine's own prop of the same name.
+  revealConcealed?: boolean
 }
 
-// A player's stage presence: identity (wind/dealer/turn/score), hand-or-
-// backs, melds, discards, flowers — each independently positioned within
-// this seat's stage region (stageLayout.ts's getSeatRegions) rather than
-// stacked inside a bordered flow-layout card (M8 Step 1 removed that card
-// entirely — see stageLayout.ts's own comment on the region partition that
-// replaced it). Sort/discard controls and the fan-tracker/waits panels live
-// in Board.tsx's HudBar; they're page-level HUD, not part of a seat's own
-// stage presence. Only concealed backs rotate to face inward (M8 Step 2) —
-// this header stays upright for every seat, since wind/dealer/turn/score
-// must stay legible at a glance (SPEC.md §5a). The turn highlight uses the
-// exact same treatment regardless of seat — SPEC.md §5a/§5b's explicit
-// requirement is that a bot's turn must be just as unambiguous as the
-// human's, not a lesser afterthought.
+// Phase 7 (KICKOFF-phase7-board-rebuild.md): a player's identity header plus
+// ONE combined line — hand (backs for a bot) + melds + flowers together,
+// stageLayout.ts's getBoardRegions(designWidth)[role].line. Discards moved
+// out entirely: Board.tsx renders one shared DiscardField covering all four
+// zones, since a seat's own discards no longer live in a per-seat region.
+// Only concealed-back art rotates in earlier phases' table look; this phase
+// keeps tile content upright everywhere (KICKOFF: "rotation... costs glyph
+// readability"), so a seat's line never rotates either.
 export function Seat({
   seat,
-  offset,
+  role,
   player,
   isDealer,
   isCurrentTurn,
@@ -61,83 +121,146 @@ export function Seat({
   matchScore,
   selectedTypeId,
   handOrder,
-  onReorderHand,
   selectedTileId,
   onTileClick,
+  onRequestDiscardTile,
+  activeId,
+  overId,
+  onSort,
+  showDiscardHint,
   justDrawnTileId,
   onInspectTile,
+  revealConcealed,
 }: SeatProps) {
-  const { tileScale } = useSettingsContext()
-  const regions = getSeatRegions(tileScale)[offset]
+  const { designWidth } = useStageMetrics()
+  const board = getBoardRegions(designWidth)
+  const seatLine: SeatLineRegion = role === 'human' ? board.north /* unused for human, see below */ : board[role]
+  const headerRegion = role === 'human' ? board.human.header : seatLine.header
+  // The human's band spans the full board width beneath their own tiles and
+  // is never rotated; the three bot roles carry their own (see
+  // SeatLineRegion.headerRotation).
+  const headerRotation = role === 'human' ? 0 : seatLine.headerRotation
+  const sortRegion = { x: board.human.row.x, y: board.human.row.y, width: SORT_CONTROL_WIDTH, height: board.human.row.height }
+  const handRegion = {
+    x: board.human.row.x + SORT_CONTROL_WIDTH,
+    y: board.human.row.y,
+    width: board.human.row.width - SORT_CONTROL_WIDTH,
+    height: board.human.row.height,
+  }
 
-  return (
-    <div data-testid={`seat-${seat}`} aria-label={`Seat ${seat}${isHuman ? ' (you)' : ''}`}>
-      <Positioned
-        x={regions.header.x + regions.header.width / 2}
-        y={regions.header.y + regions.header.height / 2}
-        naturalWidth={regions.header.width}
-        naturalHeight={regions.header.height}
-      >
+  // One centered group per table edge — wind letter, badges and match score
+  // together. This was previously justify-between across a full-width band,
+  // which stranded the letter and the score in opposite corners with no
+  // visual link between them and no obvious tie to the seat they describe.
+  // Centering the whole group on the seat's own rail is what makes it read
+  // as that seat's label.
+  //
+  // Declared here and rendered LAST (below) rather than inline at the top of
+  // the tree: the side rails are the one place a band can be reached by its
+  // own seat's tiles at worst-case occupancy (see stageLayout.ts's SIDE
+  // HEADER PLACEMENT), and these are all absolutely positioned siblings with
+  // no z-index, so DOM order is what keeps the label on top when that
+  // happens.
+  const identityBand = (
+    <Positioned
+      x={headerRegion.x + headerRegion.width / 2}
+      y={headerRegion.y + headerRegion.height / 2}
+      naturalWidth={headerRegion.width}
+      naturalHeight={headerRegion.height}
+      rotation={headerRotation}
+    >
+      <div className="flex h-full w-full items-center justify-center">
+        {/* The chip is sized to its own content rather than to the band, so
+            the band can stay full-edge-length (which is what centers it)
+            while the visible label stays compact. The backdrop keeps it
+            legible against the wood rail, and against a tile back in the
+            worst-case overlap above. */}
         <div
-          className={`flex h-full w-full items-center justify-between rounded px-1.5 text-xs ${
-            isCurrentTurn ? 'bg-emerald-500/20 text-emerald-300' : 'text-neutral-300'
+          className={`flex items-center gap-1.5 whitespace-nowrap rounded-full bg-neutral-950/75 px-2 text-xs leading-none ${
+            isCurrentTurn ? 'text-emerald-300' : 'text-neutral-300'
           }`}
         >
-          <div className="flex items-center gap-1">
-            <span data-testid={`seat-${seat}-wind`} className="font-semibold">
-              {WIND_LETTER[player.seatWind]}
+          <span data-testid={`seat-${seat}-wind`} className="font-semibold">
+            {WIND_NAME[player.seatWind]}
+          </span>
+          {isDealer && (
+            <span data-testid={`seat-${seat}-dealer`} className="rounded-full bg-amber-500/20 px-1.5 text-amber-300">
+              Dealer
             </span>
-            {isDealer && (
-              <span data-testid={`seat-${seat}-dealer`} className="rounded-full bg-amber-500/20 px-1.5 text-amber-300">
-                Dealer
-              </span>
-            )}
-            {isCurrentTurn && (
-              <span data-testid={`seat-${seat}-turn`} className="rounded-full bg-emerald-500/20 px-1.5 text-emerald-300">
-                {isHuman ? 'Your turn' : 'Turn'}
-              </span>
-            )}
-          </div>
-          <span data-testid={`seat-${seat}-score`} className="font-mono">
+          )}
+          {isCurrentTurn && (
+            <span data-testid={`seat-${seat}-turn`} className="rounded-full bg-emerald-500/20 px-1.5 text-emerald-300">
+              {isHuman ? 'Your turn' : 'Turn'}
+            </span>
+          )}
+          {/* Labelled rather than a bare number: the score used to be the
+              only unlabelled figure on the board, and "35" next to a wind
+              letter reads just as easily as this hand's points, the seat's
+              fan, or a tile count. Kept as a separate span from the number so
+              the number stays independently addressable (seat-N-score) and
+              can carry its own mono/tabular treatment. */}
+          <span className="text-neutral-400">Overall Score:</span>
+          <span data-testid={`seat-${seat}-score`} className="font-mono" title="Cumulative match score across every hand this session">
             {matchScore}
           </span>
         </div>
-      </Positioned>
+      </div>
+    </Positioned>
+  )
 
-      <Flowers
-        seat={seat}
-        tiles={player.hand.flowers}
-        region={regions.flowers}
-        selectedTypeId={selectedTypeId}
-        onTileClick={onInspectTile}
-      />
-      <Melds seat={seat} melds={player.hand.melds} region={regions.melds} selectedTypeId={selectedTypeId} onTileClick={onInspectTile} />
-      <Discards
-        seat={seat}
-        tiles={player.discards}
-        region={regions.discards}
-        selectedTypeId={selectedTypeId}
-        onTileClick={onInspectTile}
-      />
-
+  return (
+    <div data-testid={`seat-${seat}`} aria-label={`Seat ${seat}${isHuman ? ' (you)' : ''}`}>
       {isHuman ? (
-        <HandTiles
-          order={handOrder ?? []}
-          onReorder={onReorderHand ?? (() => {})}
-          region={regions.hand!}
-          onTileClick={onTileClick}
-          selectedTileId={selectedTileId}
-          highlightedTypeId={selectedTypeId}
-          justDrawnTileId={justDrawnTileId}
-        />
+        <>
+          {onSort && (
+            <>
+              <Positioned
+                x={sortRegion.x + sortRegion.width / 2}
+                y={sortRegion.y + SORT_BUTTON_TOP + SORT_CONTROL_HEIGHT / 2}
+                naturalWidth={SORT_CONTROL_WIDTH}
+                naturalHeight={SORT_CONTROL_HEIGHT}
+              >
+                <SortToolbar onSort={onSort} />
+              </Positioned>
+              {showDiscardHint && (
+                <Positioned
+                  x={sortRegion.x + sortRegion.width / 2}
+                  y={sortRegion.y + DISCARD_HINT_TOP + DISCARD_HINT_HEIGHT / 2}
+                  naturalWidth={SORT_CONTROL_WIDTH}
+                  naturalHeight={DISCARD_HINT_HEIGHT}
+                >
+                  <DiscardHint visible />
+                </Positioned>
+              )}
+            </>
+          )}
+          <HandTiles
+            order={handOrder ?? []}
+            region={onSort ? handRegion : board.human.row}
+            melds={player.hand.melds}
+            flowers={player.hand.flowers}
+            activeId={activeId ?? null}
+            overId={overId ?? null}
+            onTileClick={onTileClick}
+            onRequestDiscardTile={onRequestDiscardTile}
+            selectedTileId={selectedTileId}
+            highlightedTypeId={selectedTypeId}
+            justDrawnTileId={justDrawnTileId}
+          />
+        </>
       ) : (
-        <ConcealedBacks
+        <SeatLine
           seat={seat}
-          tileIds={player.hand.concealedTiles}
-          region={regions.backs!}
-          rotation={SEAT_BACK_ROTATION[offset]}
+          hand={player.hand}
+          region={seatLine.line}
+          grid={role === 'north' ? undefined : { columns: 3, rows: 9 }}
+          revealConcealed={revealConcealed}
+          selectedTypeId={selectedTypeId}
+          onTileClick={onInspectTile}
         />
       )}
+
+      {identityBand}
     </div>
   )
 }

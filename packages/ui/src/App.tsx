@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { MotionConfig, useReducedMotion } from 'motion/react'
 import { typeIdOfInstance, type ScenarioPreset, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
+import { DiscardOverlay } from './board/DiscardOverlay.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
 import { TileCountGrid } from './board/TileCountGrid.js'
 import { computeUnseenCounts } from './board/unseenCounts.js'
+import { applyDevOccupancy, parseDevOccupancyMode } from './dev/devOccupancy.js'
 import { ExportPositionModal } from './export/ExportPositionModal.js'
-import { CallOutToast } from './game/CallOutToast.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
@@ -33,6 +34,7 @@ function App() {
   const reducedMotion = settings.reducedMotion || osPrefersReducedMotion
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
+  const [discardOverlayOpen, setDiscardOverlayOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [practicePickerOpen, setPracticePickerOpen] = useState(false)
@@ -73,7 +75,22 @@ function App() {
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
     stepMode: settings.stepMode,
+    // KICKOFF-phase4-discard-overlay.md: a player must not lose a claim
+    // window while looking at the overlay — turns here are strictly
+    // timer-driven (see useGameLoop's own effect), so pausing the timer is
+    // both necessary and sufficient; there's no other clock to stop.
+    paused: discardOverlayOpen,
   })
+  // Dev-only worst-case occupancy override (KICKOFF-phase5-melds-backs.md's
+  // prerequisite harness) — ?occupancy=worst, DEV builds only, read once at
+  // mount (a reload picks up a changed param; this is a screenshot-capture
+  // tool, not a live toggle). Overlays synthetic discards/melds on top of
+  // whatever the live match is actually doing rather than replacing it, so
+  // the rest of the app (turn order, wall, hint system) keeps working normally
+  // underneath the visualization.
+  const [devOccupancyMode] = useState(() => (import.meta.env.DEV ? parseDevOccupancyMode(window.location.search) : null))
+  const displayState = devOccupancyMode ? applyDevOccupancy(state, devOccupancyMode, HUMAN_SEAT) : state
+
   const openReplay = () => setReplaySnapshot(matchMoveLogs)
 
   // Folds a finished hand's result into session stats exactly once: a ref
@@ -89,14 +106,29 @@ function App() {
     recordHandResult(state, HUMAN_SEAT)
   }, [state, recordHandResult])
 
+  // One-way latch for the discard hint (DiscardHint.tsx): true until the
+  // human's first discard, false forever after, for the whole session.
+  //
+  // Deliberately NOT derived from state.players[HUMAN_SEAT].discards.length —
+  // that resets with every deal, so the hint would reappear at the start of
+  // all 16 hands. Deliberately not persisted either: it costs one obvious
+  // line to relearn and persisting it would mean a storage decision (and a
+  // "why won't this come back?" support case) for a one-sentence cue.
+  // Survives a Restart on purpose — restarting the match doesn't unteach the
+  // player how to discard.
+  const [hasHumanDiscarded, setHasHumanDiscarded] = useState(false)
   const onSubmitDiscard = useCallback(
-    (tile: number) => submitHumanMove({ kind: 'discard', tile }),
+    (tile: number) => {
+      setHasHumanDiscarded(true)
+      submitHumanMove({ kind: 'discard', tile })
+    },
     [submitHumanMove],
   )
-  const { selectedTileId, selectTile, pendingConfirmTileId, requestDiscard, confirmDiscard, cancelDiscard } = useDiscardFlow({
-    confirmBeforeDiscard: settings.confirmBeforeDiscard,
-    onSubmitDiscard,
-  })
+  const { selectedTileId, selectTile, pendingConfirmTileId, requestDiscardTile, confirmDiscard, cancelDiscard } =
+    useDiscardFlow({
+      confirmBeforeDiscard: settings.confirmBeforeDiscard,
+      onSubmitDiscard,
+    })
 
   return (
     <SettingsContext.Provider value={settings}>
@@ -126,6 +158,13 @@ function App() {
             className="min-h-11 min-w-11 rounded-md border border-indigo-500 px-3 text-sm text-indigo-300 hover:bg-indigo-950"
           >
             Hint
+          </button>
+          <button
+            type="button"
+            onClick={() => setDiscardOverlayOpen(true)}
+            className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
+          >
+            All discards
           </button>
           <button
             type="button"
@@ -179,10 +218,6 @@ function App() {
         </div>
       </header>
 
-      <div className="flex justify-center px-4 pt-1">
-        <CallOutToast state={state} />
-      </div>
-
       {/* min-h-0 is load-bearing: flex items default to min-height:auto,
           which lets a child's natural content size push this (and every
           ancestor up to min-h-svh, which is only a floor, not a ceiling)
@@ -192,15 +227,17 @@ function App() {
           <main>, not the true remaining space. */}
       <main className="flex-1 min-h-0 flex flex-col items-center justify-start gap-1 p-1">
         <Board
-          state={state}
+          state={displayState}
           matchState={matchState}
           matchScores={matchScores}
           isHumanTurn={isHumanTurn}
           selectedTileId={selectedTileId}
           onTileClick={selectTile}
-          onRequestDiscard={requestDiscard}
+          onRequestDiscardTile={isHumanTurn ? requestDiscardTile : undefined}
           selectedTypeId={selectedTypeId}
           onInspectTile={inspectTile}
+          onOpenDiscardOverlay={() => setDiscardOverlayOpen(true)}
+          showDiscardHint={!hasHumanDiscarded}
         />
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
@@ -236,6 +273,16 @@ function App() {
         unseenCounts={computeUnseenCounts(state, HUMAN_SEAT)}
         onClose={() => setTileCountGridOpen(false)}
       />
+
+      {/* KICKOFF-phase4-discard-overlay.md's THE critical instruction: this
+          must render outside GameStage's transform:scale() — a sibling of
+          <main>/<Board>, same as every other overlay here, not a descendant
+          of Board passed down into GameStage. Nesting it inside would (a)
+          inherit the stage's non-integer ~1.077 scale, the exact mechanism
+          that caused this project's earlier tile-blur bug, and (b) cap it at
+          DESIGN_HEIGHT/the middle band instead of the full viewport, which
+          is the entire reason it can be readable when the table can't. */}
+      <DiscardOverlay open={discardOverlayOpen} state={displayState} onClose={() => setDiscardOverlayOpen(false)} />
 
       <ScoreScreen
         state={state}

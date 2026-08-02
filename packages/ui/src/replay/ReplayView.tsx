@@ -90,7 +90,6 @@ export function ReplayView({ handMoveLogs, initialHandIndex, onClose }: ReplayVi
         isHumanTurn={false}
         selectedTileId={null}
         onTileClick={() => {}}
-        onRequestDiscard={() => {}}
         selectedTypeId={null}
         onInspectTile={() => {}}
       />

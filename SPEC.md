@@ -83,11 +83,27 @@ A design that requires hunting, hovering, or opening a menu to answer 1–7 does
 - The owner's own screenshots of mahjong clients already tried (the good and the bad) are treated as primary design input, not just inspiration — specific elements from them get evaluated against §5a/§5c and either adopted or explicitly rejected with a reason, rather than the spec re-describing "a good UI" in the abstract. Keep these in `docs/design/references/` with a short note per image on what's specifically good or bad.
 - **Current baseline (v6):** `docs/Mockups/mahjong-seated-table-prototype-v6.html` + `docs/Mockups/mahjong-visual-design-spec-v6.md` + `docs/Mockups/assets/*.png`, owner-authored. This is a refinable working baseline for Session 5a, not a finished, untouchable artifact — every functional requirement in §5/§5a still applies regardless of what v6 already happens to show. Earlier internal mockups (`ui-mockup.html` v1/v2, and `docs/Mockups/Archive/` v3–v5) remain as history/reference but are superseded by v6 for the tactile table/tile rendering approach.
 - **Open gaps to resolve in Session 5a, not silently drop:**
-  1. Sort toolbar (Suit/Number/Honors/Simples/Odds/Evens) — present in the owner's reference screenshot and required by §5, not shown in v6; confirm it gets added.
+  1. ~~Sort toolbar (Suit/Number/Honors/Simples/Odds/Evens) — present in the owner's reference screenshot and required by §5, not shown in v6; confirm it gets added.~~
+     **Closed by owner decision — reduced to a single "Sort" button that always sorts by suit.** Shipped as 6 buttons, then a `<select>`, then this. Rationale: suit is the sort actually used in play, and a picker makes a one-step job into two steps. This *supersedes* the six-mode requirement in §5 and PLAN.md M3 — those still describe the reference screenshot's toolbar and should be read against this line. The other five comparators remain implemented and tested in `handOrder.ts`, so restoring a multi-mode control is a UI-only change with no logic to rewrite.
   2. Turn indicator for bot seats, not just the player's own turn (see §5 above).
   3. Touch-target size after v6's CSS-transform scale-down — verify ≥44px on a real iPad, not just assumed from the desktop layout.
   4. Tile art asset licensing/origin for `docs/Mockups/assets` (§4).
   5. Missing flower/season tile assets (§4).
+  6. **Side seat label vs. side seat tiles at worst-case occupancy.** Every
+     seat's identity band (wind letter, dealer/turn badge, match score) sits
+     centred on that seat's own wood rail. On the left/right rails this
+     collides with that seat's own tiles once the 3rd column opens — 19+
+     tiles, i.e. 4 kongs or heavy flowers. The label is drawn on top with an
+     opaque backdrop so it stays legible, but it covers a tile back when it
+     happens. Not fixable within the current side-column geometry: reserving
+     a 14px rail strip drops the column from 156px to 142px and shrinks bot
+     tiles from 49px to ~44px (undoing `SEAT_LINE_PX`'s deliberate ≥10%
+     legibility bump), and widening the column to 170px starves the
+     discard field's worst-case zone (352px → 345px, against 351px needed).
+     Pinned by `stageLayout.test.ts`'s `side rail label vs. side seat tiles`
+     so a change that makes it reachable at a *common* tile count fails
+     loudly. Real fix would need the side column and the discard field
+     re-budgeted together.
 
 ### 5c. Visual fidelity bar ("feels like a real table," not just "shows the right information")
 

@@ -58,7 +58,7 @@ function baseState(hands: [Hand, Hand, Hand, Hand], opts: { currentSeat?: Seat; 
     handNumber: 1,
     prevailingWind: 'east',
     dealerSeat: 0,
-    wall: opts.wall ?? { tiles: idsFor('C1', 1), drawIndex: 0 },
+    wall: opts.wall ?? { tiles: idsFor('C1', 1), frontIndex: 0, backIndex: 0 },
     players,
     currentSeat: opts.currentSeat ?? 0,
     phase: opts.phase ?? 'awaitingDiscard',
@@ -70,7 +70,7 @@ function selfDrawWinState(): GameState {
   const [c5] = idsFor('C5', 1)
   let state = baseState([handWith(tenpaiWaitingOnC5()), handWith([]), handWith([]), handWith([])], {
     phase: 'awaitingDraw',
-    wall: { tiles: [c5!, ...idsFor('C6', 4)], drawIndex: 0 },
+    wall: { tiles: [c5!, ...idsFor('C6', 4)], frontIndex: 0, backIndex: 4 },
   })
   state = applyMove(state, 0, { kind: 'draw' })
   state = applyMove(state, 0, { kind: 'selfDrawWin' })

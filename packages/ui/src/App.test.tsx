@@ -36,38 +36,34 @@ describe('App', () => {
     // Seat 0 is dealerSeat in App.tsx's demo match (matchSeed 42, hand 1),
     // so it holds the dealer's folded-in 14th tile (see game-state.ts's
     // startHand) — 14, not 13.
-    expect(hand.querySelectorAll('[role="listitem"]')).toHaveLength(14)
+    expect(hand.querySelectorAll('[data-testid^="hand-tile-"]')).toHaveLength(14)
 
     // Same matchSeed App.tsx uses — the reference hand to compare against.
     const reference = initLoopState(42)
     const referenceTiles = reference.gameState.players[0].hand.concealedTiles
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sort hand' }))
 
     // Sorting is purely visual (SPEC.md §5) — the engine-shaped reference
     // hand is unaffected by anything the UI does.
     expect(reference.gameState.players[0].hand.concealedTiles).toEqual(referenceTiles)
 
-    const renderedLabels = [...hand.querySelectorAll('[role="listitem"]')].map((el) => el.textContent)
+    const renderedLabels = [...hand.querySelectorAll('[data-testid^="hand-tile-"]')].map((el) => el.textContent)
     const expectedLabels = sortByMode(referenceTiles, 'suit').map(typeIdOfInstance)
     expect(renderedLabels).toEqual(expectedLabels)
   })
 
-  it('lets the human select a hand tile and discard it, moving it into their discard pile', () => {
+  it('double-clicking a hand tile discards it, moving it into the discard pile', () => {
     render(<App />)
-
-    expect(screen.getByRole('button', { name: 'Discard selected' })).toBeDisabled()
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
     const discardedLabel = firstTile!.textContent
 
-    fireEvent.click(firstTile!)
-    const discardButton = screen.getByRole('button', { name: 'Discard selected' })
-    expect(discardButton).toBeEnabled()
-    fireEvent.click(discardButton)
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
+    fireEvent.doubleClick(firstTile!)
 
-    const discards = screen.getByRole('list', { name: 'Seat 0 discards' })
+    const discards = screen.getByRole('list', { name: 'You discards' })
     expect(discards.querySelectorAll('[role="listitem"]')).toHaveLength(1)
     expect(discards).toHaveTextContent(discardedLabel!)
   })
@@ -84,7 +80,7 @@ describe('App', () => {
 
     // Still the same deterministic matchSeed-42 opening deal — nothing reset.
     const hand = screen.getByRole('list', { name: 'Your hand' })
-    expect(hand.querySelectorAll('[role="listitem"]')).toHaveLength(14)
+    expect(hand.querySelectorAll('[data-testid^="hand-tile-"]')).toHaveLength(14)
   })
 
   it('confirming Restart abandons the current match — a discard made before restarting is gone afterward', () => {
@@ -92,9 +88,8 @@ describe('App', () => {
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-    fireEvent.click(firstTile!)
-    fireEvent.click(screen.getByRole('button', { name: 'Discard selected' }))
-    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
+    fireEvent.doubleClick(firstTile!)
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Restart' }))
     const dialog = screen.getByRole('dialog', { name: 'Confirm restart' })
@@ -103,8 +98,8 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', { name: 'Confirm restart' })).not.toBeInTheDocument()
     // A brand new match: the discard from the abandoned one is gone, and
     // the human's hand is a fresh 14-tile deal again.
-    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
-    expect(screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[role="listitem"]')).toHaveLength(14)
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
+    expect(screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[data-testid^="hand-tile-"]')).toHaveLength(14)
   })
 
   it('shows a confirmation modal before discarding when the setting is on, and only commits on confirm', () => {
@@ -116,16 +111,15 @@ describe('App', () => {
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-    fireEvent.click(firstTile!)
-    fireEvent.click(screen.getByRole('button', { name: 'Discard selected' }))
+    fireEvent.doubleClick(firstTile!)
 
     expect(screen.getByRole('dialog', { name: 'Confirm discard' })).toBeInTheDocument()
     // Not committed yet — the modal intercepted it.
-    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(screen.queryByRole('dialog', { name: 'Confirm discard' })).not.toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'Seat 0 discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
   })
 
   it('step mode: shows a "Next" button once a bot has a real decision pending, and clicking it advances the board', () => {
@@ -140,8 +134,7 @@ describe('App', () => {
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-    fireEvent.click(firstTile!)
-    fireEvent.click(screen.getByRole('button', { name: 'Discard selected' }))
+    fireEvent.doubleClick(firstTile!)
 
     // Let any pending (non-decision) draws auto-resolve; the bot's own
     // discard/claim decision should NOT auto-resolve under step mode.
@@ -189,8 +182,8 @@ describe('App', () => {
     const reference = initLoopState(42)
     const [firstHandTile] = reference.gameState.players[0].hand.concealedTiles
     const heldTypeId = typeIdOfInstance(firstHandTile!)
-    const countEl = screen.getByTestId(`tile-count-${heldTypeId}`).querySelector('.font-semibold')
-    expect(Number(countEl!.textContent)).toBeLessThan(4)
+    const countEl = screen.getByTestId(`tile-count-value-${heldTypeId}`)
+    expect(Number(countEl.textContent)).toBeLessThan(4)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Tile-count grid' })).not.toBeInTheDocument()
@@ -221,5 +214,82 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('replay-view')).not.toBeInTheDocument()
+  })
+
+  describe('discard overlay (KICKOFF-phase4-discard-overlay.md)', () => {
+    it('opens via the toolbar button, and via clicking a discard on the board', () => {
+      render(<App />)
+      expect(screen.queryByTestId('discard-overlay')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
+      expect(screen.getByTestId('discard-overlay')).toBeInTheDocument()
+      fireEvent.click(screen.getByTestId('discard-overlay-close'))
+      expect(screen.queryByTestId('discard-overlay')).not.toBeInTheDocument()
+
+      // Second trigger: clicking an actual discard tile on the board.
+      const hand = screen.getByRole('list', { name: 'Your hand' })
+      const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+      fireEvent.doubleClick(firstTile!)
+      const discardTile = screen.getByRole('list', { name: 'You discards' }).querySelector('[role="listitem"]')!
+      fireEvent.click(discardTile)
+      expect(screen.getByTestId('discard-overlay')).toBeInTheDocument()
+    })
+
+    it('renders outside the game stage — not nested inside it in the DOM', () => {
+      render(<App />)
+      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
+      const overlay = screen.getByTestId('discard-overlay')
+      const stage = screen.getByTestId('game-stage')
+      expect(stage.contains(overlay)).toBe(false)
+      expect(overlay.contains(stage)).toBe(false)
+    })
+
+    it('pauses bot turns while open, and resumes them once closed', () => {
+      vi.useFakeTimers()
+      window.localStorage.setItem('mcr-mahjong:settings:v1', JSON.stringify({ botSpeedMs: 20 }))
+      render(<App />)
+
+      const hand = screen.getByRole('list', { name: 'Your hand' })
+      const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+      fireEvent.doubleClick(firstTile!)
+
+      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
+      const board = screen.getByTestId('game-stage')
+      const boardWhilePaused = board.innerHTML
+      act(() => {
+        vi.advanceTimersByTime(5_000)
+      })
+      expect(board.innerHTML).toBe(boardWhilePaused)
+
+      fireEvent.click(screen.getByTestId('discard-overlay-close'))
+      act(() => {
+        vi.advanceTimersByTime(5_000)
+      })
+      expect(board.innerHTML).not.toBe(boardWhilePaused)
+
+      vi.useRealTimers()
+    })
+
+    it('opening and closing leaves hand order and selection state untouched', () => {
+      render(<App />)
+
+      const hand = screen.getByRole('list', { name: 'Your hand' })
+      const tilesBefore = [...hand.querySelectorAll('[role="listitem"]')].map((el) => el.textContent)
+      const [firstTile] = hand.querySelectorAll('[role="listitem"]')
+      fireEvent.click(firstTile!) // select it (selectedTileId + tile inspector)
+      expect(firstTile!.className).toContain('ring-2')
+
+      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
+      fireEvent.click(screen.getByTestId('discard-overlay-close'))
+
+      // Selection survived the overlay's open/close round trip — the same
+      // tile is still highlighted as selected.
+      expect(screen.getByTestId(`hand-tile-${firstTile!.getAttribute('data-tile-id')}`).className).toContain('ring-2')
+      const tilesAfter = [...screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[role="listitem"]')].map(
+        (el) => el.textContent,
+      )
+      expect(tilesAfter).toEqual(tilesBefore)
+      expect(screen.getByTestId('hand-end-zone')).toBeInTheDocument()
+    })
   })
 })

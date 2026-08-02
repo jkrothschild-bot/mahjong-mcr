@@ -97,7 +97,7 @@ export function dealHandFromWall(wall: Wall, params: StartHandParams): GameState
   }
 
   for (const seat of dealOrder) {
-    const draw = drawWithFlowerReplacement(wall)
+    const draw = drawWithFlowerReplacement(wall, 'front')
     wall = draw.wall
     for (const flower of draw.flowersDrawn) {
       hands[seat] = addFlower(hands[seat], flower)

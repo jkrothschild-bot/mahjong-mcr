@@ -47,8 +47,21 @@ function tenpaiWaitingOnC5(): number[] {
   ]
 }
 
+// Puts `tiles` at the FRONT of the wall (the next ordinary-draw tiles, in
+// order) — for a kong-replacement fixture, use wallWithNextFromBack instead,
+// since replacements come from the back end (KICKOFF-phase8-addendum-
+// decisions.md's Decision A).
 function wallWithNext(tiles: number[]): Wall {
-  return { tiles, drawIndex: 0 }
+  return { tiles, frontIndex: 0, backIndex: tiles.length - 1 }
+}
+
+// Puts `tiles` at the BACK of the wall, in the order they'll be drawn as
+// replacements (tiles[0] drawn first, tiles[1] second, ...) — i.e. the array
+// itself is built in reverse so backIndex (starting at the end) reads them
+// out in the given order.
+function wallWithNextFromBack(tiles: number[]): Wall {
+  const reversed = tiles.slice().reverse()
+  return { tiles: reversed, frontIndex: 0, backIndex: reversed.length - 1 }
 }
 
 function baseState(hands: [Hand, Hand, Hand, Hand], opts: { currentSeat?: Seat; phase?: GamePhase; wall?: Wall } = {}): GameState {
@@ -118,7 +131,9 @@ describe('deriveScoreHandParams', () => {
     const preKongHand = [...c1, ...idsFor('D4', 1), ...idsFor('D5', 1), ...idsFor('D6', 1), ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1), ...idsFor('DW', 3), c9[0]!]
     let state = baseState([handWith(preKongHand), handWith([]), handWith([]), handWith([])], {
       phase: 'awaitingDiscard',
-      wall: wallWithNext([c9[1]!, ...idsFor('C2', 4)]),
+      // Kong replacements come from the BACK end — c9[1] must be the first
+      // tile the back pointer reaches, not the front.
+      wall: wallWithNextFromBack([c9[1]!, ...idsFor('C2', 4)]),
     })
     state = applyMove(state, 0, { kind: 'concealedKong', tileType: 'C1' })
     expect(state.phase).toBe('awaitingDiscard') // replacement drawn, back to discard

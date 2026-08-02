@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
-import { END_ZONE_ID, resolveReorderTarget } from './resolveReorderTarget.js'
+import { DISCARD_ZONE_ID, END_ZONE_ID, resolveDragEndAction, resolveReorderTarget } from './resolveReorderTarget.js'
 
 function idsFor(typeId: TileTypeId, count: number): TileInstanceId[] {
   const ids: TileInstanceId[] = []
@@ -43,5 +43,31 @@ describe('resolveReorderTarget', () => {
     const order = [a!, b!]
     expect(resolveReorderTarget(order, a!, stale!)).toBeUndefined()
     expect(resolveReorderTarget(order, stale!, a!)).toBeUndefined()
+  })
+})
+
+describe('resolveDragEndAction', () => {
+  it('dropping on DiscardField\'s own zone discards the dragged tile, regardless of where it sits in order', () => {
+    const [a, b] = idsFor('C1', 2)
+    const order = [a!, b!]
+    expect(resolveDragEndAction(order, a!, DISCARD_ZONE_ID)).toEqual({ type: 'discard', id: a })
+  })
+
+  it('dropping on a reorder target (another tile) reorders, matching resolveReorderTarget exactly', () => {
+    const [a, b, c] = idsFor('C1', 3)
+    const order = [a!, b!, c!]
+    expect(resolveDragEndAction(order, a!, c!)).toEqual({ type: 'reorder', draggedId: a, beforeId: resolveReorderTarget(order, a!, c!) })
+  })
+
+  it('dropping on the trailing end zone reorders to the end (beforeId null)', () => {
+    const [a, b] = idsFor('C1', 2)
+    const order = [a!, b!]
+    expect(resolveDragEndAction(order, a!, END_ZONE_ID)).toEqual({ type: 'reorder', draggedId: a, beforeId: null })
+  })
+
+  it('dropping a tile on itself is a no-op — never mistaken for a discard', () => {
+    const [a, b] = idsFor('C1', 2)
+    const order = [a!, b!]
+    expect(resolveDragEndAction(order, a!, a!)).toEqual({ type: 'none' })
   })
 })

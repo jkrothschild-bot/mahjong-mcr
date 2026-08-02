@@ -1,4 +1,6 @@
-import { parseSuited, type TileTypeId } from '@mahjong-mcr/engine'
+import type { TileTypeId } from '@mahjong-mcr/engine'
+import { TileFaceContent } from '../tiles/TileFaceContent.js'
+import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 import { ALL_TILE_TYPE_IDS, tileDisplayName } from './tileNames.js'
 
 export interface TileCountGridProps {
@@ -7,29 +9,15 @@ export interface TileCountGridProps {
   onClose: () => void
 }
 
-const SUIT_SWATCH_CLASSES: Record<'C' | 'D' | 'B' | 'honor', string> = {
-  C: 'bg-red-900 text-red-100',
-  D: 'bg-blue-900 text-blue-100',
-  B: 'bg-green-900 text-green-100',
-  honor: 'bg-neutral-700 text-neutral-200',
-}
-
-function swatchLabel(typeId: TileTypeId): string {
-  const parsed = parseSuited(typeId)
-  return parsed ? String(parsed.rank) : typeId
-}
-
-function swatchClass(typeId: TileTypeId): string {
-  const parsed = parseSuited(typeId)
-  return SUIT_SWATCH_CLASSES[parsed ? parsed.suit : 'honor']
-}
-
 // SPEC.md §9: a small reference panel listing all 34 tile types with how
 // many of each remain unseen — turns the tile inspector's one-at-a-time
-// lookup into an always-available overview. Direct port of the concept
-// already validated in docs/Mockups/mahjong-seated-table-prototype-v8.html
-// (buildTileCountGrid), using real engine types/derivation instead of that
-// mockup's ad-hoc DOM-scrape.
+// lookup into an always-available overview. Originally a colored suit
+// swatch + rank letter (docs/Mockups/mahjong-seated-table-prototype-v8.html's
+// buildTileCountGrid concept); now the same real tile-face art every other
+// tile box on the board renders (TileFaceContent, at the compact size the
+// hint tabs already use for inline tile references) — CLAUDE.md's numerals/
+// letters-baked-into-the-face rule applies here same as anywhere else a tile
+// is shown, not just on the board itself.
 export function TileCountGrid({ open, unseenCounts, onClose }: TileCountGridProps) {
   if (!open) return null
 
@@ -56,10 +44,12 @@ export function TileCountGrid({ open, unseenCounts, onClose }: TileCountGridProp
             const unseen = unseenCounts[typeId] ?? 0
             return (
               <div key={typeId} data-testid={`tile-count-${typeId}`} className="flex flex-col items-center gap-1 rounded-md border border-neutral-700 p-1.5 text-center">
-                <div className={`flex h-8 w-full items-center justify-center rounded font-bold ${swatchClass(typeId)}`}>
-                  {swatchLabel(typeId)}
+                <div className={tileFaceCompactClassName({ extra: unseen === 0 ? 'opacity-40' : undefined })}>
+                  <TileFaceContent typeId={typeId} />
                 </div>
-                <div className={`text-sm font-semibold ${unseen === 0 ? 'text-red-400' : ''}`}>{unseen}</div>
+                <div data-testid={`tile-count-value-${typeId}`} className={`text-sm font-semibold ${unseen === 0 ? 'text-red-400' : ''}`}>
+                  {unseen}
+                </div>
                 <div className="text-[10px] leading-tight text-neutral-400">{tileDisplayName(typeId)}</div>
               </div>
             )

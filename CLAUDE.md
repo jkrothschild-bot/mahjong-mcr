@@ -34,6 +34,12 @@ both before any work.
 - Run typecheck + full test suite before every commit. Never commit red.
 - Every scoring bug found becomes a permanent test fixture before it is fixed.
 - Record any rulebook-ambiguity ruling in docs/rules/decisions.md.
+- Overflow is additive, never rescaling: a region past its soft occupancy
+  limit keeps its fixed tile size and extends along its long axis into
+  adjacent neutral space. It never shrinks retroactively, and layout never
+  reflows mid-hand. This is the general form of a shrink-during-play bug
+  already removed twice from this project — it applies to every region,
+  regardless of which layout/topology work is in progress when you read this.
 
 ## Conventions
 - TypeScript strict; Vitest for tests; small commits with clear messages.

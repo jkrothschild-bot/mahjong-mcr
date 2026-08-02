@@ -31,7 +31,7 @@ describe('startHand', () => {
     }
   })
 
-  it('conserves tiles: dealt concealed + flowers across all seats equals wall.drawIndex', () => {
+  it('conserves tiles: dealt concealed + flowers across all seats equals total tiles consumed from both wall ends', () => {
     // Try several seeds to exercise both the flower-free and flower-during-deal paths.
     for (let seed = 0; seed < 30; seed++) {
       const state = startHand({ seed, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
@@ -39,7 +39,14 @@ describe('startHand', () => {
         (sum, p) => sum + p.hand.concealedTiles.length + p.hand.flowers.length,
         0,
       )
-      expect(dealtTotal).toBe(state.wall.drawIndex)
+      // KICKOFF-phase8-addendum-decisions.md: flower replacements drawn
+      // during the deal come from the BACK end (§3.4.20 is general, not
+      // deal-scoped), so the deal's own primary tiles (always exactly
+      // INITIAL_DEAL_COUNT, one per dealOrder slot) advance frontIndex,
+      // while any flower replacements advance backIndex instead — the two
+      // together, not frontIndex alone, account for every tile dealt.
+      expect(dealtTotal).toBe(144 - state.wall.backIndex + state.wall.frontIndex - 1)
+      expect(state.wall.frontIndex).toBe(INITIAL_DEAL_COUNT)
       expect(dealtTotal).toBeGreaterThanOrEqual(INITIAL_DEAL_COUNT)
     }
   })
@@ -55,6 +62,7 @@ describe('startHand', () => {
     const a = startHand({ seed: 99, handNumber: 1, prevailingWind: 'east', dealerSeat: 1 })
     const b = startHand({ seed: 99, handNumber: 1, prevailingWind: 'east', dealerSeat: 1 })
     expect(a.players.map((p) => p.hand.concealedTiles)).toEqual(b.players.map((p) => p.hand.concealedTiles))
-    expect(a.wall.drawIndex).toBe(b.wall.drawIndex)
+    expect(a.wall.frontIndex).toBe(b.wall.frontIndex)
+    expect(a.wall.backIndex).toBe(b.wall.backIndex)
   })
 })

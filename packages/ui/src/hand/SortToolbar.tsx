@@ -1,41 +1,42 @@
 import type { SortMode } from './handOrder.js'
 
-const SORT_OPTIONS: readonly { mode: SortMode; label: string }[] = [
-  { mode: 'suit', label: 'Suit' },
-  { mode: 'number', label: 'Number' },
-  { mode: 'honors', label: 'Honors' },
-  { mode: 'simples', label: 'Simples' },
-  { mode: 'odds', label: 'Odds' },
-  { mode: 'evens', label: 'Evens' },
-]
+// The one mode this control fires. The other five comparators in
+// handOrder.ts (number/honors/simples/odds/evens) are deliberately kept —
+// they're pure, tested, and cost nothing to leave in place, so restoring a
+// multi-mode control later is a UI change only, with no logic to rewrite.
+const SORT_MODE: SortMode = 'suit'
 
 export interface SortToolbarProps {
   onSort: (mode: SortMode) => void
 }
 
-// 6 always-visible buttons, not a dropdown — SPEC.md §5's original ask was
-// one-tap access to every sort mode. A native <select> was used instead
-// while this lived inside the old per-seat panel, which didn't have room
-// for 6 side-by-side buttons; M8 Step 2 moved Sort into a dedicated HudBar
-// with real space, so that constraint is gone. Buttons are also simpler
-// and more robust here than a custom-styled <select> replacement would be —
-// no ARIA listbox/combobox pattern to get right, just native <button>
-// semantics. No persistent "selected" state: sorting is a one-shot action,
-// not a toggle, so picking the same mode twice in a row (e.g. re-sorting by
-// Suit again after a manual drag) just fires onSort again, same as before.
+// A single button, not a 6-option control.
+//
+// History, so this doesn't get "restored" by accident: this began as 6
+// always-visible buttons (M8 Step 2), became a native <select> when the
+// board reclaimed HudBar's dedicated button-row height, and is now one
+// button that always sorts by suit — the owner's call, on the grounds that
+// suit is the sort actually used in play and a picker is a two-step
+// interaction for a one-step job.
+//
+// NOTE: this deliberately diverges from PLAN.md M3 and SPEC.md §5/§5b, which
+// both call for the full Suit/Number/Honors/Simples/Odds/Evens toolbar from
+// the owner's reference screenshot. See SPEC.md §5b for the recorded
+// decision.
+//
+// Kept as a one-shot action, not a mode: the button never renders as
+// "selected" after a press, and pressing it repeatedly must fire onSort every
+// time (sortByMode is idempotent, so a second press is a visual no-op — but
+// that's the sort function's business, not this control's).
 export function SortToolbar({ onSort }: SortToolbarProps) {
   return (
-    <div role="group" aria-label="Sort hand" className="flex flex-wrap gap-1">
-      {SORT_OPTIONS.map(({ mode, label }) => (
-        <button
-          key={mode}
-          type="button"
-          onClick={() => onSort(mode)}
-          className="min-h-11 rounded-md border border-neutral-600 bg-neutral-800 px-3 text-sm font-medium text-neutral-100 hover:bg-neutral-700"
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      aria-label="Sort hand"
+      onClick={() => onSort(SORT_MODE)}
+      className="min-h-11 rounded-md border border-neutral-600 bg-neutral-800 px-4 text-sm font-medium text-neutral-100 hover:bg-neutral-700 active:bg-neutral-600"
+    >
+      Sort
+    </button>
   )
 }

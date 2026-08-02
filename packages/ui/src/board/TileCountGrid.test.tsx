@@ -10,15 +10,21 @@ describe('TileCountGrid', () => {
 
   it('shows all 34 tile types with their unseen counts', () => {
     render(<TileCountGrid open unseenCounts={{ C1: 2, WE: 0 }} onClose={() => {}} />)
-    expect(screen.getAllByTestId(/^tile-count-/)).toHaveLength(34)
+    expect(screen.getAllByTestId(/^tile-count-(?!value-)/)).toHaveLength(34)
     expect(screen.getByTestId('tile-count-C1')).toHaveTextContent('2')
     expect(screen.getByTestId('tile-count-WE')).toHaveTextContent('0')
   })
 
   it('defensively shows 0 for a type missing from the count map (computeUnseenCounts always provides all 34 in practice)', () => {
     render(<TileCountGrid open unseenCounts={{}} onClose={() => {}} />)
-    const cell = screen.getByTestId('tile-count-B9')
-    expect(cell.querySelector('.font-semibold')).toHaveTextContent('0')
+    expect(screen.getByTestId('tile-count-value-B9')).toHaveTextContent('0')
+  })
+
+  it('renders real tile-face art for each type, not just a letter/color swatch', () => {
+    render(<TileCountGrid open unseenCounts={{ C1: 2 }} onClose={() => {}} />)
+    const img = screen.getByTestId('tile-count-C1').querySelector('img')
+    expect(img).toBeInTheDocument()
+    expect(img).toHaveAttribute('src', expect.stringMatching(/m1/))
   })
 
   it('calls onClose when the Close button is clicked or the backdrop is clicked', () => {

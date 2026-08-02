@@ -36,10 +36,12 @@ corrected to match. See each item's status.
    13) is confirmed correct (§3.5.7.5), but M1's `DEAD_WALL_SIZE = 14` reserved-buffer model
    was invented, not sourced, and has been removed — `packages/engine/src/wall.ts` now draws
    to full exhaustion (144 tiles total, minus whatever was dealt).
-   **Open**: the rulebook doesn't specify a mechanical limit on how close a replacement-draw
-   pointer can approach the front before triggering an early draw game (e.g. what happens if
-   normal draws and back-end replacement draws meet in the middle) — not addressed in the
-   42-page text available; low risk, extremely rare in practice.
+   **Resolved (was "Open")**: whether normal draws and back-end replacement draws could meet
+   before the physical 144 count is exhausted turned out not to need a rulebook answer —
+   Phase 8's two-pointer `Wall` (item 17 below) makes it arithmetically impossible. Every draw
+   consumes exactly one tile from exactly one end, so `frontIndex`/`backIndex` cannot cross;
+   the pointers meeting *is* the wall being empty, not a separate case requiring a tie-break
+   rule.
 
 4. **Dealer rotation — CORRECTED, was wrong.** The dealer passes to the next seat
    unconditionally after every hand — no repeat on a dealer win, no repeat on an exhaustive
@@ -263,6 +265,49 @@ corrected to match. See each item's status.
     convention — MCR's own furiten status is genuinely unconfirmed in the available rulebook
     text (never addressed anywhere in `mcr_EN.pdf`), so this is presented in the UI as a
     heuristic signal, not a guarantee.
+
+17. **Wall pointer model — CORRECTED, was wrong (Phase 8 live-wall investigation).** Kong
+    replacement draws (concealed, added, claimed) and every flower replacement — including
+    flower replacements that occur during the initial deal — come from the **back end** of the
+    wall, not the front. **Status: CONFIRMED, unambiguous, cited twice**: §3.6.8 "How to Kong"
+    (p.12) says so directly for kong replacements ("take a replacement tile from the back end
+    of the wall"); §3.4.20 "Flower replacement ('Bu Hua')" (p.6) — a general glossary
+    definition, not scoped to dealing — says the same for flowers, and is exercised again
+    verbatim at §3.5.7 item 6 (p.11) for the deal-time flower check specifically. Ordinary turn
+    draws and the initial deal's own primary tiles come from the front (§3.5.7 item 5, p.10,
+    "clockwise from the break").
+
+    Before this fix, `packages/engine/src/wall.ts`'s `Wall` was a single `{ tiles, drawIndex }`
+    monotonic counter — every draw (deal, normal turn, AND every kong/flower replacement) came
+    from the same front-advancing index. This was a genuine rules deviation in the engine, not
+    merely a rendering gap: `moves.ts` silently drew every replacement from the wrong end.
+    Fixed to `{ tiles, frontIndex, backIndex }`, two independent pointers; `drawTile`/
+    `drawWithFlowerReplacement` now take an explicit `'front' | 'back'` end, and every call site
+    in `moves.ts` passes the correct one. Confirmed behaviorally identical in every way that
+    matters to scoring: `drawableRemaining` (`backIndex - frontIndex + 1`) still matches the
+    old `tiles.length - drawIndex` count draw-for-draw, so fan 44 (Last Tile Draw), fan 45
+    (Last Tile Claim), and fan 46 (Out with Replacement Tile) — which only depend on wall
+    emptiness and action-log adjacency, never on which physical tile is drawn — fire on exactly
+    the same turns as before. Full fan/scoring suite (246 tests) re-run after the fix with zero
+    behavioral changes to any existing test's expectations.
+
+    **Open (real, flagged, not resolved)**: the rulebook states the physical draw direction for
+    the *initial deal* explicitly (§3.5.7 item 5, "clockwise from the break"), but never
+    restates it for ordinary post-deal turn draws (§3.6.3 only says a player draws, not which
+    direction along the wall). Continuing the same physical direction is a reasonable inference
+    by continuity, used for Phase 8's rendering, but is not a directly quoted rule for the
+    in-play case.
+
+    **Rendering convention, not a rulebook rule**: this app's wall renders as one shared ring
+    (top/bottom/left/right of the discard field), not four separate per-seat walls the way a
+    physical table has them, and the engine models no real dice/break-point at all (a
+    pre-shuffled array drawn sequentially is statistically identical to a dice-rolled break —
+    nothing about fairness depends on simulating the roll). Phase 8's rendering anchors the
+    break position to the current dealer's seat (`state.dealerSeat`, already tracked, already
+    replay-safe, already rotates hand-to-hand per item #4), per §3.5.7 item 5's "counting from
+    the right-hand end of the dealer's own wall" — the closest faithful mapping onto a single
+    shared ring. The rulebook does not itself dictate a convention for a single shared ring, so
+    this is documented here as an explicit UI decision, not a rules citation.
 
 ## Open follow-up work
 

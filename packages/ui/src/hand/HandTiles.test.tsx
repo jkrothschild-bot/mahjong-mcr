@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
-import type { Rect } from '../stage/stageLayout.js'
+import { TILE_TYPE_BY_ID, typeIdOfInstance, type Meld, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
+import { fitRowTileWidth, type Rect } from '../stage/stageLayout.js'
+import { HAND_TILE_WIDTH_FLOOR, TILE_BOX_PX } from '../tiles/tileStyles.js'
 import { HandTiles } from './HandTiles.js'
 
 const TEST_REGION: Rect = { x: 0, y: 0, width: 1000, height: 200 }
@@ -29,7 +30,7 @@ describe('HandTiles', () => {
     const [c1] = idsFor('C1', 1)
     const [we] = idsFor('WE', 1)
     const order = [c1!, we!]
-    render(<HandTiles order={order} onReorder={() => {}} region={TEST_REGION} />)
+    render(<HandTiles order={order} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} />)
 
     const list = screen.getByRole('list', { name: 'Your hand' })
     const items = list.querySelectorAll('[role="listitem"]')
@@ -40,7 +41,7 @@ describe('HandTiles', () => {
 
   it('renders real tile-face art, not just the text label', () => {
     const [c1] = idsFor('C1', 1)
-    render(<HandTiles order={[c1!]} onReorder={() => {}} region={TEST_REGION} />)
+    render(<HandTiles order={[c1!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} />)
 
     const img = screen.getByTestId(`hand-tile-${c1}`).querySelector('img')
     expect(img).toBeInTheDocument()
@@ -51,7 +52,7 @@ describe('HandTiles', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
     const onTileClick = vi.fn()
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} onTileClick={onTileClick} />)
+    render(<HandTiles order={[c1!, c2!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} onTileClick={onTileClick} />)
 
     fireEvent.click(screen.getByTestId(`hand-tile-${c2}`))
 
@@ -61,7 +62,7 @@ describe('HandTiles', () => {
   it('highlights the selected tile', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} selectedTileId={c2} />)
+    render(<HandTiles order={[c1!, c2!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} selectedTileId={c2} />)
 
     expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-2')
     expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-2')
@@ -70,7 +71,7 @@ describe('HandTiles', () => {
   it('marks the just-drawn tile distinctly from an explicit selection, so it is identifiable without clicking', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} justDrawnTileId={c2} />)
+    render(<HandTiles order={[c1!, c2!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} justDrawnTileId={c2} />)
 
     expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-sky-400')
     expect(screen.getByTestId(`hand-tile-${c2}`).className).not.toContain('ring-amber-400')
@@ -79,7 +80,7 @@ describe('HandTiles', () => {
 
   it('lets an explicit selection\'s amber ring take precedence over the just-drawn ring on the same tile', () => {
     const [c1] = idsFor('C1', 1)
-    render(<HandTiles order={[c1!]} onReorder={() => {}} region={TEST_REGION} selectedTileId={c1} justDrawnTileId={c1} />)
+    render(<HandTiles order={[c1!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} selectedTileId={c1} justDrawnTileId={c1} />)
 
     const el = screen.getByTestId(`hand-tile-${c1}`)
     expect(el.className).toContain('ring-amber-400')
@@ -89,7 +90,7 @@ describe('HandTiles', () => {
   it('makes every hand tile keyboard-focusable, in logical (order-array) sequence — dnd-kit\'s sortable attributes, new in M8 Step 4', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
-    render(<HandTiles order={[c1!, c2!]} onReorder={() => {}} region={TEST_REGION} />)
+    render(<HandTiles order={[c1!, c2!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} />)
 
     const list = screen.getByRole('list', { name: 'Your hand' })
     const items = list.querySelectorAll('[role="listitem"]')
@@ -100,5 +101,132 @@ describe('HandTiles', () => {
     // passed in, not some independently-DOM-sorted sequence.
     expect(items[0]).toHaveAttribute('data-tile-id', String(c1))
     expect(items[1]).toHaveAttribute('data-tile-id', String(c2))
+  })
+
+  it('double-clicking a hand tile calls onRequestDiscardTile with that tile, not onTileClick\'s single-click id', () => {
+    const [c1] = idsFor('C1', 1)
+    const [c2] = idsFor('C2', 1)
+    const onTileClick = vi.fn()
+    const onRequestDiscardTile = vi.fn()
+    render(
+      <HandTiles
+        order={[c1!, c2!]}
+        activeId={null}
+        overId={null}
+        region={TEST_REGION}
+        melds={[]}
+        flowers={[]}
+        onTileClick={onTileClick}
+        onRequestDiscardTile={onRequestDiscardTile}
+      />,
+    )
+
+    fireEvent.doubleClick(screen.getByTestId(`hand-tile-${c2}`))
+
+    expect(onRequestDiscardTile).toHaveBeenCalledWith(c2)
+    expect(onRequestDiscardTile).not.toHaveBeenCalledWith(c1)
+  })
+
+  it('omits the double-click handler entirely when onRequestDiscardTile is not provided (not the human\'s turn)', () => {
+    const [c1] = idsFor('C1', 1)
+    render(<HandTiles order={[c1!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} />)
+
+    // No onDoubleClick handler bound at all — asserting this doesn't throw
+    // is the actual guarantee (nothing to call).
+    expect(() => fireEvent.doubleClick(screen.getByTestId(`hand-tile-${c1}`))).not.toThrow()
+  })
+
+  // KICKOFF-phase9-human-melds.md item 4.
+  describe('concealed kongs', () => {
+    it("renders a concealed kong's outer two tiles face-down and its middle two face-up, keeping every tile's original id", () => {
+      const [t0, t1, t2, t3] = idsFor('C1', 4)
+      const kong: Meld = { id: 'k-0', kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles: [t0!, t1!, t2!, t3!], ownerSeat: 0 }
+      render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[kong]} flowers={[]} />)
+
+      const tiles = [0, 1, 2, 3].map((i) => screen.getByTestId(`meld-tile-k-0-${i}`))
+      expect(tiles.map((el) => el.getAttribute('data-tile-id'))).toEqual([t0, t1, t2, t3].map(String))
+
+      // Outer two (index 0, 3): the bot-back image, not the real face.
+      expect(tiles[0]!.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/bot-back/))
+      expect(tiles[3]!.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/bot-back/))
+      // Middle two (index 1, 2): the real C1 ("m1") face art.
+      expect(tiles[1]!.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/m1/))
+      expect(tiles[2]!.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/m1/))
+    })
+
+    it('leaves an exposed kong entirely face-up (kongSource !== concealed only turns the concealed case)', () => {
+      const [t0, t1, t2, t3] = idsFor('C1', 4)
+      const kong: Meld = { id: 'k-0', kind: 'kong', exposure: 'exposed', kongSource: 'exposedFromDiscard', tiles: [t0!, t1!, t2!, t3!], ownerSeat: 0 }
+      render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[kong]} flowers={[]} />)
+
+      for (const i of [0, 1, 2, 3]) {
+        expect(screen.getByTestId(`meld-tile-k-0-${i}`).querySelector('img')).toHaveAttribute('src', expect.stringMatching(/m1/))
+      }
+    })
+
+    it('keeps the tile inspector working on a concealed kong\'s face-down tiles — clicking one highlights it, same as any face-up tile', () => {
+      const [t0, t1, t2, t3] = idsFor('C1', 4)
+      const kong: Meld = { id: 'k-0', kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles: [t0!, t1!, t2!, t3!], ownerSeat: 0 }
+      const onTileClick = vi.fn()
+      render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[kong]} flowers={[]} onTileClick={onTileClick} />)
+
+      fireEvent.click(screen.getByTestId('meld-tile-k-0-0'))
+      expect(onTileClick).toHaveBeenCalledWith(t0)
+    })
+  })
+
+  // KICKOFF-phase9-human-melds.md item 2.
+  it('renders a recessed shelf behind each meld, before that meld\'s own tiles in DOM order', () => {
+    const pung: Meld = { id: 'p-0', kind: 'pung', exposure: 'exposed', tiles: idsFor('C2', 3), ownerSeat: 0 }
+    render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[pung]} flowers={[]} />)
+
+    const shelf = screen.getByTestId('meld-shelf-p-0')
+    const tile0 = screen.getByTestId('meld-tile-p-0-0')
+    // DOCUMENT_POSITION_FOLLOWING on tile0 (from shelf's perspective) means
+    // shelf comes first in the DOM — behind the tile, since neither carries
+    // a z-index.
+    // eslint-disable-next-line no-bitwise
+    expect(shelf.compareDocumentPosition(tile0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  // KICKOFF-phase9-human-melds.md's verification item 2: "the row's tile
+  // width and layout.scale for a given hand+meld configuration are
+  // identical to the values before this phase" — proving items 1-3's shelf/
+  // offset/shadow rendering cost nothing horizontally. Computes the expected
+  // width/height directly from fitRowTileWidth (the same pure function
+  // HandTiles.tsx itself calls) rather than a hardcoded pixel value, so this
+  // stays correct if TILE_GAP/MELD_GAP/HAND_TILE_WIDTH_FLOOR ever change for
+  // an unrelated reason.
+  it('keeps the row width solve unchanged with melds present (a concealed kong, so the width-demand code path is exercised)', () => {
+    const order = idsFor('C1', 3)
+    const kong: Meld = { id: 'k-0', kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles: idsFor('C2', 4), ownerSeat: 0 }
+    render(<HandTiles order={order} activeId={null} overId={null} region={TEST_REGION} melds={[kong]} flowers={[]} />)
+
+    const TILE_GAP = 4
+    const MELD_GAP = 16
+    const meldReserve = MELD_GAP - TILE_GAP
+    const { width: nominalWidth, height: nominalHeight } = TILE_BOX_PX.normal
+    const expected = fitRowTileWidth(
+      order.length + kong.tiles.length,
+      TEST_REGION.width - meldReserve,
+      nominalWidth,
+      nominalHeight,
+      TILE_GAP,
+      HAND_TILE_WIDTH_FLOOR,
+    )
+
+    // Concealed tiles get an inline width/height override (Phase 2.2's
+    // shrink-to-fit) — the direct, load-bearing check that tileWidth/
+    // tileHeight itself wasn't touched.
+    const concealedEl = screen.getByTestId(`hand-tile-${order[0]}`)
+    expect(concealedEl.style.width).toBe(`${expected.width}px`)
+    expect(concealedEl.style.height).toBe(`${expected.height}px`)
+
+    // Melds share that SAME tileWidth/tileHeight (not a separately-drifted
+    // value) — Positioned's own wrapper is what carries the actual
+    // post-scale box size for a meld tile.
+    const meldWrapper = screen.getByTestId('meld-tile-k-0-0').parentElement!
+    expect(meldWrapper.style.width).toBe(`${expected.width}px`)
+    expect(meldWrapper.style.height).toBe(`${expected.height}px`)
   })
 })

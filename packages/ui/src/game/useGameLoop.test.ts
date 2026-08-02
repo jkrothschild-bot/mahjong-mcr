@@ -55,7 +55,7 @@ function baseState(hands: [Hand, Hand, Hand, Hand]): GameState {
     handNumber: 1,
     prevailingWind: 'east',
     dealerSeat: 0,
-    wall: { tiles: idsFor('C1', 1), drawIndex: 0 },
+    wall: { tiles: idsFor('C1', 1), frontIndex: 0, backIndex: 0 },
     players,
     currentSeat: 0,
     phase: 'awaitingDraw',
@@ -72,7 +72,7 @@ describe('applySettlement', () => {
   it('accumulates a self-draw win\'s settlement into the running totals', () => {
     const [c5] = idsFor('C5', 1)
     let state = baseState([handWith(tenpaiWaitingOnC5()), handWith([]), handWith([]), handWith([])])
-    state.wall = { tiles: [c5!, ...idsFor('C6', 4)], drawIndex: 0 }
+    state.wall = { tiles: [c5!, ...idsFor('C6', 4)], frontIndex: 0, backIndex: 4 }
     state = applyMove(state, 0, { kind: 'draw' })
     state = applyMove(state, 0, { kind: 'selfDrawWin' })
 
@@ -136,6 +136,36 @@ describe('useGameLoop', () => {
     })
 
     expect(result.current.state).toBe(stateBefore)
+  })
+
+  it('paused: true holds the game state still, even across many timer ticks, and resumes once paused goes false', () => {
+    // KICKOFF-phase4-discard-overlay.md: the discard overlay pauses the loop
+    // so a player can't lose a claim window while looking at it.
+    const { result, rerender } = renderHook(
+      ({ paused }: { paused: boolean }) => useGameLoop({ matchSeed: 42, botSpeedMs: 20, stepMode: false, paused }),
+      { initialProps: { paused: false } },
+    )
+    const [firstTile] = result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => {
+      result.current.submitHumanMove({ kind: 'discard', tile: firstTile! })
+    })
+
+    rerender({ paused: true })
+    const stateWhilePaused = result.current.state
+    for (let i = 0; i < 40; i++) {
+      act(() => {
+        vi.advanceTimersByTime(20)
+      })
+    }
+    expect(result.current.state).toBe(stateWhilePaused)
+
+    rerender({ paused: false })
+    for (let i = 0; i < 40 && result.current.state === stateWhilePaused; i++) {
+      act(() => {
+        vi.advanceTimersByTime(20)
+      })
+    }
+    expect(result.current.state).not.toBe(stateWhilePaused)
   })
 
   it('keeps advancing via bots until the human must act again or the hand ends', () => {

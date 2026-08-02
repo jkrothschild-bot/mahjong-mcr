@@ -13,9 +13,11 @@ export interface PositionedProps {
   // The group's fitScale (computeRowPositions/computeGridPositions) — 1
   // unless the group didn't fit its region at natural size.
   scale?: number
-  // Degrees; defaults to 0 — Step 1 left every rotation at 0. M8 Step 2
-  // uses this for concealed-back tiles only (see stageLayout.ts's
-  // SEAT_BACK_ROTATION comment on why nothing else rotates).
+  // Degrees; defaults to 0. Unused by any current call site (M8 Step 2's
+  // concealed-back "face inward" rotation was dropped in Phase 5 when
+  // backs folded into the same packed row as melds, which never rotate —
+  // see MeldsAndBacks.tsx) — kept as a general capability of this shared
+  // primitive, not because anything renders rotated today.
   rotation?: number
   // M8 Step 3: stable cross-zone identity for Framer Motion's shared-
   // layout animation. Two Positioned instances in different renders (even

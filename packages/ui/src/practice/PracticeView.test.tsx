@@ -35,33 +35,32 @@ describe('PracticeView', () => {
     render(<PracticeView preset={PRESET} botSpeedMs={20} confirmBeforeDiscard={false} onExit={() => {}} />)
 
     // The human is never the dealer in practice mode (see usePracticeHand's
-    // PRACTICE_DEALER_SEAT), so bots must play first. Selecting a hand tile
-    // is harmless even outside the human's turn (it's local-only state), so
-    // poll by actually attempting a selection each tick and checking whether
-    // the Discard button unlocks — avoids racing the phase transition
-    // between 'awaitingDraw' (seat-0-turn already shows) and 'awaitingDiscard'.
-    // The seed is randomized per PracticeView mount, so an early bot discard
-    // may sometimes be legally claimable by the human (e.g. a C2/C5 for this
+    // PRACTICE_DEALER_SEAT), so bots must play first. Double-clicking a hand
+    // tile is a no-op until onRequestDiscardTile is actually wired up (only
+    // once it's the human's turn — HandTiles only binds the double-click
+    // handler when that prop is non-null), so poll by attempting the
+    // double-click each tick and checking whether a discard actually landed
+    // — avoids racing the phase transition between 'awaitingDraw'
+    // (seat-0-turn already shows) and 'awaitingDiscard'. The seed is
+    // randomized per PracticeView mount, so an early bot discard may
+    // sometimes be legally claimable by the human (e.g. a C2/C5 for this
     // preset's two-sided wait) — always Pass on any claim prompt so the test
     // doesn't stall waiting on a declaration it never makes.
-    let discardBtn = screen.getByRole('button', { name: 'Discard selected' })
-    for (let i = 0; i < 60 && discardBtn.hasAttribute('disabled'); i++) {
+    const discards = () => screen.getByRole('list', { name: 'You discards' })
+    for (let i = 0; i < 60 && discards().querySelectorAll('[role="listitem"]').length === 0; i++) {
       if (screen.queryByRole('dialog', { name: 'Practice hand result' })) return // rare: hand ended first
       const passBtn = screen.queryByRole('button', { name: 'Pass' })
       if (passBtn) fireEvent.click(passBtn)
       const hand = screen.getByRole('list', { name: 'Your hand' })
       const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-      if (firstTile) fireEvent.click(firstTile)
-      discardBtn = screen.getByRole('button', { name: 'Discard selected' })
-      if (discardBtn.hasAttribute('disabled')) {
+      if (firstTile) fireEvent.doubleClick(firstTile)
+      if (discards().querySelectorAll('[role="listitem"]').length === 0) {
         act(() => {
           vi.advanceTimersByTime(20)
         })
-        discardBtn = screen.getByRole('button', { name: 'Discard selected' })
       }
     }
 
-    expect(discardBtn).not.toBeDisabled()
-    fireEvent.click(discardBtn)
+    expect(discards().querySelectorAll('[role="listitem"]').length).toBeGreaterThan(0)
   })
 })

@@ -45,7 +45,7 @@ function tenpaiWaitingOnC5(): number[] {
 }
 
 function wallWithNext(tiles: number[]): Wall {
-  return { tiles, drawIndex: 0 }
+  return { tiles, frontIndex: 0, backIndex: tiles.length - 1 }
 }
 
 function baseState(hands: [Hand, Hand, Hand, Hand], opts: { currentSeat?: Seat; phase?: GamePhase; wall?: Wall } = {}): GameState {

@@ -23,7 +23,7 @@ const SEED_COUNT = 100
 
 function assertTileConservation(state: GameState) {
   const seen: number[] = []
-  seen.push(...state.wall.tiles.slice(state.wall.drawIndex))
+  seen.push(...state.wall.tiles.slice(state.wall.frontIndex, state.wall.backIndex + 1))
   for (const player of state.players) {
     seen.push(...player.hand.concealedTiles, ...player.hand.flowers, ...player.discards)
     for (const meld of player.hand.melds) seen.push(...meld.tiles)
@@ -151,20 +151,31 @@ describe('property: replay determinism', () => {
 })
 
 describe('property: action log is consistent with the deterministic wall generator', () => {
-  it('every logged draw/flowerReplacement tile matches buildWall(seed) at the expected index', () => {
+  it('every logged draw/flowerReplacement tile matches buildWall(seed) at the expected front/back index', () => {
     for (let seed = 0; seed < SEED_COUNT; seed++) {
       const agentRng = mulberry32(seed * 5 + 2)
       const initial = startHand({ seed, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
       const final = playRandomHand({ seed, handNumber: 1, prevailingWind: 'east', dealerSeat: 0, agentRng })
 
       const wall = buildWall(seed)
-      let index = initial.wall.drawIndex // deal already consumed [0, index)
+      // The deal itself already consumed [0, frontIndex) from the front and
+      // (backIndex, 143] from the back (any flowers dealt) — resume from
+      // there. A 'draw' action's own `source` says which end it came from;
+      // every 'flowerReplacement' is unconditionally back (§3.4.20,
+      // KICKOFF-phase8-addendum-decisions.md).
+      let frontIndex = initial.wall.frontIndex
+      let backIndex = initial.wall.backIndex
       const drawActions = final.actionLog.filter((a) => a.type === 'draw' || a.type === 'flowerReplacement')
       for (const action of drawActions) {
-        const expectedTile = wall.tiles[index]
-        const actualTile = action.type === 'draw' ? action.tile : action.replacementTile
-        expect(actualTile).toBe(expectedTile)
-        index++
+        if (action.type === 'draw') {
+          const expectedTile = wall.tiles[action.source === 'front' ? frontIndex : backIndex]
+          expect(action.tile).toBe(expectedTile)
+          if (action.source === 'front') frontIndex++
+          else backIndex--
+        } else {
+          expect(action.replacementTile).toBe(wall.tiles[backIndex])
+          backIndex--
+        }
       }
     }
   })

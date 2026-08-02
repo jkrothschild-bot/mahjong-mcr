@@ -10,7 +10,6 @@ const SPEED_LABELS: { preset: keyof typeof BOT_SPEED_PRESETS; label: string }[] 
 const TILE_SCALE_LABELS: { preset: TileScale; label: string }[] = [
   { preset: 'normal', label: 'Normal' },
   { preset: 'large', label: 'Large' },
-  { preset: 'xlarge', label: 'X-Large' },
 ]
 
 export interface SettingsPanelProps {

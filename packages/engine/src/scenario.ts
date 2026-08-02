@@ -51,6 +51,17 @@ function pickInstances(typeId: TileTypeId, count: number, used: Set<TileInstance
 // dealHandFromWall (game-state.ts) for the actual dealing, so a scenario
 // hand goes through the exact same deal/flower-replacement/action-log path
 // as a normal random hand — only the wall's contents differ.
+//
+// KICKOFF-phase8-addendum-decisions.md's two-pointer wall: `backIndex`
+// starts at the array's literal tail, which is exactly where this function
+// clusters every flower/season tile — so any kong declared in a practice
+// scenario will chain-draw all remaining flowers as part of its replacement
+// before landing on a real tile (deterministically, every time, for every
+// preset that reaches a kong). Not a correctness bug — the flowers are
+// still handled correctly, scoring is unaffected, nothing crashes — but
+// it's a real behavioral quirk worth knowing about; not fixed here since it
+// would mean redesigning this function's flower-placement strategy, out of
+// scope for the wall-pointer fix itself.
 function buildScenarioWall(preset: ScenarioPreset, seed: number, forSeat: Seat, dealerSeat: Seat): Wall {
   for (const typeId of preset.concealedTypeIds) {
     if (!ORDERED_STANDARD_TYPE_IDS.includes(typeId)) {
@@ -101,7 +112,7 @@ function buildScenarioWall(preset: ScenarioPreset, seed: number, forSeat: Seat, 
     tiles[STANDARD_INSTANCE_COUNT + i] = shuffledBonusTiles[i]!
   }
 
-  return { tiles, drawIndex: 0 }
+  return { tiles, frontIndex: 0, backIndex: tiles.length - 1 }
 }
 
 export function startScenarioHand(params: StartScenarioHandParams): GameState {

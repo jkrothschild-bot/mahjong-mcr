@@ -3,7 +3,7 @@ import type { TileInstanceId } from './tiles.js'
 
 // The persisted, append-only replay log. Every field needed to reconstruct
 // exact state is present in the entry itself (e.g. `draw.tile` is recorded
-// explicitly, not left to be re-derived from wall.drawIndex) so the future
+// explicitly, not left to be re-derived from wall pointer state) so the future
 // M6 replay scrubber can describe any entry standalone ("seat 2 drew
 // 5-dot") without cross-referencing wall state.
 export interface BaseAction {
@@ -14,7 +14,7 @@ export interface BaseAction {
 
 export type Action =
   | (BaseAction & { type: 'deal'; hands: Record<Seat, TileInstanceId[]> })
-  | (BaseAction & { type: 'draw'; tile: TileInstanceId; source: 'wall' | 'deadWall' })
+  | (BaseAction & { type: 'draw'; tile: TileInstanceId; source: 'front' | 'back' })
   | (BaseAction & { type: 'flowerReplacement'; flowerTile: TileInstanceId; replacementTile: TileInstanceId })
   | (BaseAction & { type: 'discard'; tile: TileInstanceId })
   | (BaseAction & {

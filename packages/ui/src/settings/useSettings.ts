@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-export type TileScale = 'normal' | 'large' | 'xlarge'
+export type TileScale = 'normal' | 'large'
 
 export interface Settings {
   botSpeedMs: number
@@ -33,7 +33,7 @@ export const BOT_SPEED_PRESETS = {
   relaxed: 3000,
 } as const
 
-export const TILE_SCALE_VALUES: readonly TileScale[] = ['normal', 'large', 'xlarge']
+export const TILE_SCALE_VALUES: readonly TileScale[] = ['normal', 'large']
 
 export const DEFAULT_SETTINGS: Settings = {
   botSpeedMs: BOT_SPEED_PRESETS.normal,

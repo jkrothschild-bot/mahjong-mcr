@@ -160,6 +160,15 @@ export interface UseGameLoopParams {
   // timer — one bot decision per call, for studying them one at a time.
   // Draws still auto-resolve immediately regardless (see the effect below).
   stepMode: boolean
+  // KICKOFF-phase4-discard-overlay.md: while true, no timer is scheduled at
+  // all — every seat's turn (bot AND the human's own auto-draw) sits still
+  // until this goes false. Set by the discard overlay so a player can't lose
+  // a claim window while looking at it. Un-pausing restarts the delay from
+  // scratch (does not resume a partially-elapsed timer) — bots have no
+  // stateful "thinking in progress" to preserve, so this is simplest and
+  // correct. Defaults to false via the `?? false` below so existing callers
+  // (tests, PracticeView) that never pass it behave exactly as before.
+  paused?: boolean
 }
 
 // Owns one live match's worth of state and drives it forward: bots act on
@@ -176,6 +185,7 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
 
   useEffect(() => {
     if (gameState.phase === 'handEnded') return
+    if (params.paused) return
     // A draw is never a real decision (legalMoves' 'awaitingDraw' case is
     // always exactly [{kind:'draw'}], for every seat including the human) —
     // it's auto-dispatched immediately, same as a bot's move, just with no
@@ -200,7 +210,7 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     return () => {
       timers.forEach(clearTimeout)
     }
-  }, [gameState, params.botSpeedMs, params.stepMode])
+  }, [gameState, params.botSpeedMs, params.stepMode, params.paused])
 
   const pendingSeats = pendingSeatsNeedingDecision(gameState)
   const pendingBotSeat = gameState.phase !== 'awaitingDraw' ? pendingSeats.find((seat) => seat !== HUMAN_SEAT) : undefined

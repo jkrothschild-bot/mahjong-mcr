@@ -49,7 +49,7 @@ describe('startScenarioHand', () => {
   it('the wall still totals 144 tiles across the deal, all hands, and the drawable remainder', () => {
     const state = startScenarioHand({ preset: TWO_AWAY_FROM_MIXED_TRIPLE_CHOW, seed: 3, forSeat: 0 as Seat, dealerSeat: 1 as Seat })
     const seen = new Set<number>()
-    for (const tile of state.wall.tiles.slice(state.wall.drawIndex)) seen.add(tile)
+    for (const tile of state.wall.tiles.slice(state.wall.frontIndex, state.wall.backIndex + 1)) seen.add(tile)
     for (const player of state.players) {
       for (const tile of player.hand.concealedTiles) seen.add(tile)
       for (const tile of player.hand.flowers) seen.add(tile)

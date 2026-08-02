@@ -68,8 +68,8 @@ describe('SettingsPanel', () => {
   it('selecting a tile-size preset calls onUpdate with the right value', () => {
     const onUpdate = vi.fn()
     render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
-    fireEvent.click(tileSizeGroup().getByRole('radio', { name: 'X-Large' }))
-    expect(onUpdate).toHaveBeenCalledWith({ tileScale: 'xlarge' })
+    fireEvent.click(tileSizeGroup().getByRole('radio', { name: 'Large' }))
+    expect(onUpdate).toHaveBeenCalledWith({ tileScale: 'large' })
   })
 
   it('toggling reduce motion calls onUpdate', () => {

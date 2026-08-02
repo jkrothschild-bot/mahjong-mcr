@@ -5,6 +5,7 @@ import {
   drawWithFlowerReplacement,
   isWallExhausted,
   type Wall,
+  type WallEnd,
 } from './wall.js'
 import { groupConcealedByType, isWinningHand } from './win-detection.js'
 import { typeIdOf, typeIdOfInstance, typeOf, type Rank, type TileInstanceId, type TileTypeId } from './tiles.js'
@@ -216,14 +217,19 @@ interface DrawLogResult {
 // hand update and phase transition. Used for the normal turn draw AND every
 // kong's replacement draw (concealed kong, added kong, kong claimed from a
 // discard) — they're all the same "draw with flower replacement, then
-// return to awaitingDiscard for the same seat" shape.
-function performDrawWithLog(wall: Wall, seat: Seat, startSeq: number): DrawLogResult {
-  const result = drawWithFlowerReplacement(wall)
+// return to awaitingDiscard for the same seat" shape, differing only in
+// which end of the wall the FIRST tile comes from (`end` — front for a
+// normal turn draw, back for a kong replacement, per
+// KICKOFF-phase8-addendum-decisions.md's Decision A). Any flower-driven
+// redraws within the same call are always back-end (§3.4.20), regardless of
+// `end` — drawWithFlowerReplacement itself enforces that, not this function.
+function performDrawWithLog(wall: Wall, seat: Seat, startSeq: number, end: WallEnd): DrawLogResult {
+  const result = drawWithFlowerReplacement(wall, end)
   const drawnSequence = [...result.flowersDrawn, ...(result.finalTile !== undefined ? [result.finalTile] : [])]
   const actions: Action[] = []
   let seq = startSeq
   if (drawnSequence.length > 0) {
-    actions.push({ seq: seq++, seat, type: 'draw', tile: drawnSequence[0]!, source: 'wall' })
+    actions.push({ seq: seq++, seat, type: 'draw', tile: drawnSequence[0]!, source: end })
     for (let i = 0; i < drawnSequence.length - 1; i++) {
       actions.push({
         seq: seq++,
@@ -243,9 +249,11 @@ function performDrawWithLog(wall: Wall, seat: Seat, startSeq: number): DrawLogRe
 // Shared by: the normal turn draw, concealed kong's replacement draw, added
 // kong's replacement draw (once no one robs it), and kong-from-discard's
 // replacement draw — all end the same way: draw, maybe exhaust the hand,
-// otherwise return to awaitingDiscard for the same seat.
-function performDrawAndAdvance(state: GameState, seat: Seat): GameState {
-  const draw = performDrawWithLog(state.wall, seat, state.actionLog.length)
+// otherwise return to awaitingDiscard for the same seat. `end` distinguishes
+// the one thing that differs: front for the normal turn draw, back for
+// every kong replacement — see performDrawWithLog's own comment.
+function performDrawAndAdvance(state: GameState, seat: Seat, end: WallEnd): GameState {
+  const draw = performDrawWithLog(state.wall, seat, state.actionLog.length, end)
   let hand = state.players[seat].hand
   for (const flower of draw.flowersDrawn) hand = addFlower(hand, flower)
   let players = updatePlayer(state.players, seat, { hand })
@@ -279,7 +287,7 @@ function performDrawAndAdvance(state: GameState, seat: Seat): GameState {
 function applyDrawPhaseMove(state: GameState, seat: Seat, move: Move): GameState {
   if (move.kind !== 'draw') throw new Error(`Illegal move ${move.kind} in awaitingDraw phase`)
   if (seat !== state.currentSeat) throw new Error(`Not seat ${seat}'s turn`)
-  return performDrawAndAdvance(state, seat)
+  return performDrawAndAdvance(state, seat, 'front')
 }
 
 function finalizeWin(
@@ -355,7 +363,7 @@ function applyDiscardPhaseMove(state: GameState, seat: Seat, move: Move): GameSt
     const nextState: GameState = { ...state, players, actionLog: [...state.actionLog, kongAction] }
     // Concealed kong is never robbable (docs/rules/decisions.md #1) — draw
     // the replacement directly, no claims window.
-    return performDrawAndAdvance(nextState, seat)
+    return performDrawAndAdvance(nextState, seat, 'back')
   }
 
   if (move.kind === 'addedKong') {
@@ -367,7 +375,7 @@ function applyDiscardPhaseMove(state: GameState, seat: Seat, move: Move): GameSt
     const eligibleSeats = otherSeats(seat).filter(
       (s) => computeClaimOptionsForSeat(nextState, move.tile, seat, s, 'addedKongRob').length > 0,
     )
-    if (eligibleSeats.length === 0) return performDrawAndAdvance(nextState, seat)
+    if (eligibleSeats.length === 0) return performDrawAndAdvance(nextState, seat, 'back')
     return {
       ...nextState,
       phase: 'awaitingRobKongClaims',
@@ -456,7 +464,7 @@ function applyMeldClaim(state: GameState, claimantSeat: Seat, move: Move, pendin
   }
   const nextState: GameState = { ...state, players, pendingClaim: undefined, actionLog: [...state.actionLog, claimAction] }
 
-  if (meldKind === 'kong') return performDrawAndAdvance(nextState, claimantSeat)
+  if (meldKind === 'kong') return performDrawAndAdvance(nextState, claimantSeat, 'back')
   return { ...nextState, currentSeat: claimantSeat, phase: 'awaitingDiscard' }
 }
 
@@ -483,7 +491,7 @@ function resolveRobKongWindow(state: GameState, pendingClaim: PendingClaim, reso
   }
   // Nobody robbed it — the kong finalizes: the promoting seat draws a
   // replacement tile, same as any other kong.
-  return performDrawAndAdvance(state, pendingClaim.fromSeat)
+  return performDrawAndAdvance(state, pendingClaim.fromSeat, 'back')
 }
 
 function applyClaimDeclaration(state: GameState, seat: Seat, move: Move): GameState {

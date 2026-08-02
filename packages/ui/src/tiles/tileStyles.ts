@@ -14,19 +14,18 @@ import type { TileScale } from '../settings/useSettings.js'
 // class string present in source, so these can't be built from a numeric
 // scale factor at runtime.
 //
-// The 'normal' size already fits a fresh 13-tile hand in one row with zero
-// spare height at the 1024x768 iPad viewport (see Seat.tsx's comment on
-// that). 'large'/'xlarge' don't preserve that — verified via Playwright
-// that the human hand wraps to a second row and the page grows past one
-// screenful. That's treated as an acceptable trade-off for an opt-in
-// larger-tile accessibility mode (WCAG reflow: content growing and
-// scrolling, not being clipped, is the expected behavior for scaled-up
-// text/targets) rather than a bug to eliminate — SPEC.md §5a's "answerable
-// at a glance, no scrolling" bar is written for the default size.
+// These are the tile's NOMINAL per-tileScale size — the biggest a tile is
+// ever allowed to render at that setting. HandTiles.tsx (Phase 2.2's
+// shrink-to-fit, KICKOFF-phase2-2-hand-fit.md) can render hand tiles
+// *smaller* than this on a cramped viewport, via an inline width/height
+// style that overrides these classes (Tailwind's JIT can't generate an
+// arbitrary-value class from a runtime number, so the override has to be
+// inline, not a class swap) — down to HAND_TILE_WIDTH_FLOOR below, never
+// upscaled past the values here. Melds/discards/flowers/backs never
+// override these; only the human hand row does.
 const TILE_BOX_SIZE: Record<TileScale, string> = {
   normal: 'h-[5.75rem] w-[3.75rem]',
   large: 'h-[7.25rem] w-[4.75rem]',
-  xlarge: 'h-[8.75rem] w-[5.75rem]',
 }
 
 // Numeric px twins of the class maps above (16px root em) — the game stage
@@ -39,8 +38,21 @@ const TILE_BOX_SIZE: Record<TileScale, string> = {
 export const TILE_BOX_PX: Record<TileScale, { width: number; height: number }> = {
   normal: { width: 60, height: 92 },
   large: { width: 76, height: 116 },
-  xlarge: { width: 92, height: 140 },
 }
+
+// Phase 2.2 step 4's (KICKOFF-phase2-2-hand-fit.md) shrink-to-fit floor for
+// the human hand row (stageLayout.ts's fitRowTileWidth) — how narrow a
+// `large` tile is allowed to get on a cramped viewport before
+// HandTiles falls back to wrapping instead of continuing to shrink. Must
+// stay above TILE_BOX_PX.normal.width (60): every tileScale setting is
+// rendered under the SAME shared stage `scale` (StageMetricsContext), so as
+// long as this floor's design-space width exceeds normal's, raising
+// tileScale from normal can never render smaller tiles than normal at any
+// viewport — the bug Phase 2 found ("raising tileScale currently makes
+// tiles smaller"). 64 is a deliberate, modest 4px/6.7% floor above that
+// 60px baseline: real headroom for the invariant, not tuned to any one
+// viewport's projected outcome.
+export const HAND_TILE_WIDTH_FLOOR = 64
 
 // `relative` + `perspective` give every tile box a positioning/3D context
 // for Tile3DFace's internal object/front/bottom-edge layers (see that file);
@@ -89,51 +101,81 @@ export function tileFaceClassName(
     .join(' ')
 }
 
-// A bot's concealed hand is never interactive (nothing to tap — the tiles
-// are hidden), so it's exempt from the ≥44px touch-target rule that
-// tileBoxBase enforces for real controls. A compact, wrapping back keeps
-// 13-14 tiles from forcing the whole board wider than an iPad viewport
-// (SPEC.md §5a/§5b) the way one un-wrapped row of full-size boxes did.
-const TILE_BACK_COMPACT_SIZE: Record<TileScale, string> = {
-  normal: 'h-11 w-8',
-  large: 'h-14 w-10',
-  xlarge: 'h-16 w-12',
+// ---------------------------------------------------------------------------
+// KICKOFF-phase9-human-melds.md — the human hand's own melds were rendering
+// through tileFaceClassName, identical in every way to concealed tiles
+// except a 12px gap. Items 1-3 give a meld its own look: laid flat on the
+// table (lower baseline, flatter shadow) with a recessed shelf underneath —
+// human seat only (bot seats already read fine: indigo backs vs. neutral
+// faces already carries the concealed/exposed distinction there).
+//
+// Same box footprint as tileFaceClassName/TILE_BOX_SIZE (this must NOT
+// change the row's width solve — fitRowTileWidth/packGroupsMajor only ever
+// see `tileWidth`/`tileHeight`, computed once and shared by concealed AND
+// meld tiles alike). Only the 3D-context shadow and border differ.
+const MELD_TILE_3D_CONTEXT = 'relative [perspective:500px] shadow-[1px_1px_2px_rgba(0,0,0,0.3)]'
+const MELD_TILE_FACE_CLASSES = 'border-neutral-600 bg-neutral-100 text-neutral-900'
+
+function meldTileBoxBase(scale: TileScale): string {
+  return `flex ${TILE_BOX_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded-md border text-sm font-semibold ${MELD_TILE_3D_CONTEXT}`
 }
 
-// Numeric px twin of TILE_BACK_COMPACT_SIZE — see TILE_BOX_PX's comment.
-export const TILE_BACK_COMPACT_PX: Record<TileScale, { width: number; height: number }> = {
-  normal: { width: 32, height: 44 },
-  large: { width: 40, height: 56 },
-  xlarge: { width: 48, height: 64 },
+export function meldTileFaceClassName(opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {}): string {
+  return [meldTileBoxBase(opts.scale ?? 'normal'), MELD_TILE_FACE_CLASSES, opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '', opts.extra ?? '']
+    .filter(Boolean)
+    .join(' ')
 }
 
-export function tileBackCompactClassName(scale: TileScale = 'normal'): string {
-  return [
-    `flex ${TILE_BACK_COMPACT_SIZE[scale]} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
-    TILE_3D_CONTEXT,
-    TILE_BACK_CLASSES,
-  ].join(' ')
+// Item 4's concealed-kong outer two tiles, at full human-hand size (unlike
+// seatLineBackClassName's compact bot-seat size) — same flattened meld
+// shadow/border as meldTileFaceClassName above, TILE_BACK_CLASSES fill.
+export function meldBackTileClassName(opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {}): string {
+  return [meldTileBoxBase(opts.scale ?? 'normal'), TILE_BACK_CLASSES, opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '', opts.extra ?? '']
+    .filter(Boolean)
+    .join(' ')
 }
 
-// A discard river's job is to show what's already been played, not to
-// invite interaction the way a hand tile does — its click-to-inspect
-// (SPEC.md §5's tile inspector) is a secondary bonus on top of that, not
-// the reason it exists. That earns it the same compact-and-exempt-from-
-// 44px treatment as tileBackCompactClassName above, sized a touch wider to
-// keep 2-character labels (WE, DR, C5) legible. A discard river that grows
-// to 10+ tiles at full hand-tile size was consuming a lot of vertical
-// space across every seat's panel.
+// Item 1: melds sit on a lower baseline than concealed tiles — held up
+// toward the player vs. laid flat on the table. Applied as a CSS transform
+// on the meld tile's own div (HandTiles.tsx), never by touching
+// packGroupsMajor/placeGroup's own math (stageLayout.ts's geometry is
+// covered by golden tests, and the row's width solve must stay untouched).
+//
+// Solved separately per tileScale against HUMAN_ROW_H's (140px) real
+// vertical slack, not one number for both: `normal`'s 92px-tall tile leaves
+// 48px total (24 above/below center); `large`'s 116px-tall tile leaves only
+// 24px (12 above/below) — reusing normal's 10px at large would leave just
+// 6px before the tile's bottom edge reaches the human header band
+// immediately below the row. Deliberately a different magnitude than
+// TILE_JUST_DRAWN_LIFT_CLASSES's -translate-y-1 (4px) so the two cues (just
+// drawn vs. melded) can't be confused for each other.
+export const MELD_BASELINE_OFFSET_PX: Record<TileScale, number> = {
+  normal: 10,
+  large: 6,
+}
+
+// Item 2: a recessed shelf behind each meld — darker fill, inner shadow,
+// sized to that meld's own tiles by the caller (HandTiles.tsx derives the
+// rect from meldPlaced, not from anything here). Background only, rendered
+// as its own Positioned sibling BEFORE the meld's tiles in DOM order (these
+// are absolutely-positioned siblings with no z-index) — adds zero width
+// demand of its own.
+export const MELD_SHELF_CLASSES = 'rounded-md border border-neutral-700/60 bg-neutral-950/70 shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]'
+
+// Small-icon compact size — still used by the hint tabs (BestMoveTab,
+// TileSafetyTab, WaitsPanel), which render a handful of tiles inline in
+// prose/panel UI, not on the stage. Board rendering (discard field, seat
+// lines) moved to its own Phase 7 sizing below — this one predates that
+// split and is unrelated to it now.
 const TILE_FACE_COMPACT_SIZE: Record<TileScale, string> = {
-  normal: 'h-11 w-9',
-  large: 'h-14 w-11',
-  xlarge: 'h-16 w-14',
+  normal: 'h-[54px] w-[44px]',
+  large: 'h-[54px] w-[44px]',
 }
 
 // Numeric px twin of TILE_FACE_COMPACT_SIZE — see TILE_BOX_PX's comment.
 export const TILE_FACE_COMPACT_PX: Record<TileScale, { width: number; height: number }> = {
-  normal: { width: 36, height: 44 },
-  large: { width: 44, height: 56 },
-  xlarge: { width: 56, height: 64 },
+  normal: { width: 44, height: 54 },
+  large: { width: 44, height: 54 },
 }
 
 export function tileFaceCompactClassName(
@@ -143,6 +185,110 @@ export function tileFaceCompactClassName(
     `flex ${TILE_FACE_COMPACT_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
     TILE_3D_CONTEXT,
     TILE_FACE_CLASSES,
+    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
+    opts.extra ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7 (KICKOFF-phase7-board-rebuild.md) board tile sizes — the shared
+// discard field's 5x5-per-zone grid, and every seat line's hand(backs)/
+// meld/flower content. Neither varies by tileScale: the geometry they sit
+// in (stageLayout.ts's getBoardRegions) is a fixed design-px constant, and
+// there isn't slack in it for a larger tileScale to buy anything (the west/
+// east seat column is width-bound with only a few px of margin — see
+// stageLayout.test.ts's slack assertion). Kept as Record<TileScale, ...>
+// for API consistency with TILE_BOX_PX/TILE_FACE_COMPACT_PX above (and so
+// the "monotonic non-decreasing across tileScale" test has something real
+// to assert, even though every entry here is currently equal) rather than
+// a bare constant.
+// These are NOMINAL (ceiling) sizes, not the literal render size — Phase 7's
+// discard field width is a function of designWidth (getBoardRegions' anchor
+// policy grows/shrinks the center field; only the reference designWidth,
+// 1768, actually achieves this nominal). stageLayout.ts's fitGridTileWidth
+// solves the real per-designWidth size against these as the cap; callers
+// pass its result as an inline style, same pattern HandTiles.tsx already
+// uses for the human hand row's own shrink-to-fit.
+export const DISCARD_FIELD_PX: Record<TileScale, { width: number; height: number }> = {
+  normal: { width: 67, height: 82 },
+  large: { width: 67, height: 82 },
+}
+// Below this, a discard/seat-line tile is no longer worth calling
+// "compact" — a floor of last resort for extreme narrow designWidths, not
+// a value normally reached (see stageLayout.test.ts's own designWidth-range
+// property test for the actual achieved range).
+export const DISCARD_FIELD_WIDTH_FLOOR = 28
+
+const DISCARD_FIELD_SIZE: Record<TileScale, string> = {
+  normal: 'h-[82px] w-[67px]',
+  large: 'h-[82px] w-[67px]',
+}
+
+export function discardFieldTileClassName(
+  opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {},
+): string {
+  return [
+    `flex ${DISCARD_FIELD_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-sm font-semibold`,
+    TILE_3D_CONTEXT,
+    TILE_FACE_CLASSES,
+    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
+    opts.extra ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+// Nominal (ceiling) size — north's seat line shares the field's own
+// designWidth-dependent width (west/east's own width happens to be a true
+// constant, SIDE_WIDTH, so theirs is safe as a fixed value regardless, but
+// solving it through the same fitGridTileWidth call keeps every seat line
+// on one code path rather than two). See DISCARD_FIELD_PX's own comment.
+//
+// Bumped >=10% over the original 44x54 (49/44 = +11.4%, 60/54 = +11.1%) so
+// bot hands/melds/flowers read more clearly — stageLayout.ts's SIDE_WIDTH,
+// NORTH_LINE_H, and FIELD_H were widened/grown alongside this so the west/
+// east 3x9 grid and north's row still hit fit-scale 1.0 at the documented
+// worst-case occupancy, not silently re-clamped back down to the old size.
+export const SEAT_LINE_PX: Record<TileScale, { width: number; height: number }> = {
+  normal: { width: 49, height: 60 },
+  large: { width: 49, height: 60 },
+}
+export const SEAT_LINE_WIDTH_FLOOR = 28
+
+const SEAT_LINE_SIZE: Record<TileScale, string> = {
+  normal: 'h-[60px] w-[49px]',
+  large: 'h-[60px] w-[49px]',
+}
+
+export function seatLineFaceClassName(
+  opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {},
+): string {
+  return [
+    `flex ${SEAT_LINE_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
+    TILE_3D_CONTEXT,
+    TILE_FACE_CLASSES,
+    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
+    opts.extra ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+// `highlighted`/`extra` (both unused before KICKOFF-phase9-human-melds.md
+// item 4) let a concealed kong's face-down outer tiles stay interactive —
+// the tile inspector must keep working on them: a kong is always 4 identical
+// tiles, so the meld's other 2 (always face-up) already reveal the type,
+// meaning treating the back tiles as inert would just be an inconsistent
+// gap, not an actual information-hiding measure. A genuinely concealed hand
+// tile (this function's other caller) never passes either option — it has
+// no onClick to begin with.
+export function seatLineBackClassName(opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {}): string {
+  return [
+    `flex ${SEAT_LINE_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
+    TILE_3D_CONTEXT,
+    TILE_BACK_CLASSES,
     opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
     opts.extra ?? '',
   ]

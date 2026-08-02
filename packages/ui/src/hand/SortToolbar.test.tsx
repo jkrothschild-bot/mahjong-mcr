@@ -1,45 +1,47 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { SortToolbar } from './SortToolbar.js'
-import type { SortMode } from './handOrder.js'
 
 describe('SortToolbar', () => {
-  it('renders a button for all 6 sort modes, grouped under one label', () => {
+  it('renders a single Sort button, not a mode picker', () => {
     render(<SortToolbar onSort={() => {}} />)
-    const group = screen.getByRole('group', { name: 'Sort hand' })
-    for (const label of ['Suit', 'Number', 'Honors', 'Simples', 'Odds', 'Evens']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sort hand' })).toHaveTextContent('Sort')
+    // The 6-mode control this replaced is gone in both its historical shapes
+    // (a <select>, and before that 6 buttons) — asserted so a partial revert
+    // that leaves both on screen fails here.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    for (const label of ['Number', 'Honors', 'Simples', 'Odds', 'Evens']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
     }
-    expect(group).toBeInTheDocument()
   })
 
-  it('calls onSort with the right mode for each button', () => {
+  it('sorts by suit', () => {
     const onSort = vi.fn()
     render(<SortToolbar onSort={onSort} />)
 
-    const cases: [string, SortMode][] = [
-      ['Suit', 'suit'],
-      ['Number', 'number'],
-      ['Honors', 'honors'],
-      ['Simples', 'simples'],
-      ['Odds', 'odds'],
-      ['Evens', 'evens'],
-    ]
-    for (const [label, mode] of cases) {
-      fireEvent.click(screen.getByRole('button', { name: label }))
-      expect(onSort).toHaveBeenLastCalledWith(mode)
-    }
-    expect(onSort).toHaveBeenCalledTimes(6)
+    fireEvent.click(screen.getByRole('button', { name: 'Sort hand' }))
+
+    expect(onSort).toHaveBeenCalledTimes(1)
+    expect(onSort).toHaveBeenCalledWith('suit')
   })
 
-  it('fires onSort again when the same mode is picked twice in a row (no persistent selected state to dedupe against)', () => {
+  it('fires onSort again on a second press (a one-shot action, not a toggled mode)', () => {
     const onSort = vi.fn()
     render(<SortToolbar onSort={onSort} />)
+    const button = screen.getByRole('button', { name: 'Sort hand' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suit' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Suit' }))
+    fireEvent.click(button)
+    fireEvent.click(button)
 
     expect(onSort).toHaveBeenCalledTimes(2)
     expect(onSort).toHaveBeenLastCalledWith('suit')
+  })
+
+  it('meets the iPad touch-target floor (SPEC.md §5a)', () => {
+    render(<SortToolbar onSort={() => {}} />)
+    // min-h-11 is 44px — the control is placed on the scaled stage
+    // (Seat.tsx's own SORT_CONTROL_HEIGHT slot), so this asserts the class
+    // contract rather than a rendered box jsdom can't measure.
+    expect(screen.getByRole('button', { name: 'Sort hand' }).className).toContain('min-h-11')
   })
 })
