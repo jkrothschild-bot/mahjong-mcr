@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveFanConflicts, scoreHand } from './score-hand.js'
+import { resolveFanConflicts, scoreHand, scoreHandDetailed } from './score-hand.js'
 import type { Meld } from '../meld.js'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileTypeId } from '../tiles.js'
 
@@ -196,5 +196,61 @@ describe('scoreHand', () => {
     const result = scoreHand({ concealedTiles, melds: [] })
     expect(result.basicPoints).toBe(88)
     expect(result.fanMatches).toEqual([{ fanId: 6, count: 1 }])
+  })
+})
+
+// scoreHandDetailed reports WHICH candidate parse scoreHand ended up
+// scoring, so the board can lay a revealed winning hand out in its real
+// groups. It was always computed and thrown away; nothing about candidate
+// generation or selection changed.
+describe('scoreHandDetailed', () => {
+  // The guarantee that matters most. If these two ever disagree, every
+  // rulebook fixture and the PyMahjongGB cross-check are testing a different
+  // code path from the one the app actually runs.
+  it.each([
+    ['Big Four Winds', { concealedTiles: idsFor('C5', 2), melds: [pungMeld('0-0', idsFor('WE', 3)), pungMeld('0-1', idsFor('WS', 3)), pungMeld('0-2', idsFor('WW', 3)), pungMeld('0-3', idsFor('WN', 3))] }],
+    ['Seven Shifted Pairs', { concealedTiles: [...idsFor('D1', 2), ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2), ...idsFor('D5', 2), ...idsFor('D6', 2), ...idsFor('D7', 2)], melds: [] }],
+    ['no valid win at all', { concealedTiles: idsFor('C1', 3), melds: [] }],
+  ])('scores %s identically to scoreHand', (_label, params) => {
+    const narrow = scoreHand(params)
+    const { winningShape, ...detailed } = scoreHandDetailed(params)
+    expect(detailed).toEqual(narrow)
+  })
+
+  it('exposes no extra keys on scoreHand — the fixture suite asserts its exact shape', () => {
+    const result = scoreHand({ concealedTiles: idsFor('C1', 3), melds: [] })
+    expect(Object.keys(result).sort()).toEqual(['basicPoints', 'fanMatches'])
+  })
+
+  it('reports the standard parse that was scored, covering the concealed tiles only', () => {
+    // One meld, so decomposeHand needs 3 more sets plus a pair from the
+    // concealed tiles — and must NOT echo the meld back in `sets`.
+    const melds = [pungMeld('0-0', idsFor('WE', 3))]
+    const concealedTiles = [
+      ...idsFor('C1', 1), ...idsFor('C2', 1), ...idsFor('C3', 1),
+      ...idsFor('D4', 1), ...idsFor('D5', 1), ...idsFor('D6', 1),
+      ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1),
+      ...idsFor('DR', 2),
+    ]
+    const { winningShape } = scoreHandDetailed({ concealedTiles, melds })
+
+    expect(winningShape?.specialShape).toBeNull()
+    expect(winningShape?.decomposition?.pair).toBe('DR')
+    expect(winningShape?.decomposition?.sets).toHaveLength(3)
+  })
+
+  it('reports sevenPairs rather than a decomposition when the pairs shape is what scored', () => {
+    const concealedTiles = [
+      ...idsFor('D1', 2), ...idsFor('D2', 2), ...idsFor('D3', 2), ...idsFor('D4', 2),
+      ...idsFor('D5', 2), ...idsFor('D6', 2), ...idsFor('D7', 2),
+    ]
+    const { winningShape } = scoreHandDetailed({ concealedTiles, melds: [] })
+
+    expect(winningShape?.specialShape).toBe('sevenPairs')
+    expect(winningShape?.decomposition).toBeNull()
+  })
+
+  it('reports no shape when nothing scored', () => {
+    expect(scoreHandDetailed({ concealedTiles: idsFor('C1', 3), melds: [] }).winningShape).toBeNull()
   })
 })

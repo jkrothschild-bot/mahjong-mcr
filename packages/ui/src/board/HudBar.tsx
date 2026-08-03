@@ -1,28 +1,23 @@
-import type { Hand, Wind } from '@mahjong-mcr/engine'
-import { FanTrackerPanel } from '../hand/FanTrackerPanel.js'
-import { WaitsPanel } from '../hand/WaitsPanel.js'
-
-export interface HudBarProps {
-  hand: Hand
-  prevailingWind: Wind
-  seatWind: Wind
-}
-
-// The human player's always-visible fan/waits info, directly below their
-// hand. Everything else that used to live here (the Sort control, then a
-// "Discard selected" button before that) has since moved onto the board
-// itself: Sort now sits in the human row's own reserved slot next to the
-// hand (Seat.tsx), and discarding is a double-click/drag directly on a
-// tile. Both FanTrackerPanel and WaitsPanel render nothing when there's
-// nothing noteworthy yet, so this row is usually near-zero height — letting
-// GameStage (which measures its own available height from whatever's left
-// in this flex column, GameStage.tsx's ResizeObserver) claim essentially
-// all the remaining space, right to the bottom of the screen.
-export function HudBar({ hand, prevailingWind, seatWind }: HudBarProps) {
-  return (
-    <div className="flex w-full flex-wrap items-center justify-center gap-2 px-2 pb-1">
-      <FanTrackerPanel hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />
-      <WaitsPanel hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />
-    </div>
-  )
-}
+// REMOVED — do not reinstate.
+//
+// This component rendered FanTrackerPanel + WaitsPanel in flow, directly
+// beneath the board. Both render nothing until they have something to report
+// and then appear at roughly 150px. Because GameStage measures the leftover
+// height of Board.tsx's flex column, and computeDesignWidth derives
+// designWidth from that element's aspect ratio, their appearing physically
+// resized the entire board mid-hand — smaller tiles, re-laid-out discard
+// field — at exactly the moment a fan locked in or the hand became ready.
+//
+// The panels now live in HandInfoPanel.tsx, opened on demand from App.tsx's
+// "Hand info" button, where they cost no layout at all.
+//
+// The general rule this is an instance of: nothing in Board.tsx's flex column
+// may change height at runtime. If you need to surface something new, put it
+// in a modal, or inside the stage as a Positioned sibling with a
+// permanently-reserved slot (see Seat.tsx's SORT_CONTROL_WIDTH and
+// DiscardHint.tsx for a worked example of the latter).
+//
+// This file is kept as a tombstone rather than deleted so the reasoning is
+// findable from the name — several past sessions' comments still refer to
+// "HudBar's dedicated button-row height".
+export {}

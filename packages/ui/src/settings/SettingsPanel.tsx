@@ -71,29 +71,6 @@ export function SettingsPanel({ open, onClose, settings, onUpdate }: SettingsPan
           </div>
         </fieldset>
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.confirmBeforeDiscard}
-            onChange={(e) => onUpdate({ confirmBeforeDiscard: e.target.checked })}
-          />
-          Confirm before discard
-        </label>
-
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={settings.stepMode} onChange={(e) => onUpdate({ stepMode: e.target.checked })} />
-          Step mode (advance bots one decision at a time)
-        </label>
-
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.colorBlindPalette}
-            onChange={(e) => onUpdate({ colorBlindPalette: e.target.checked })}
-          />
-          Color-blind-safe palette
-        </label>
-
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 font-semibold">Tile size</legend>
           <div role="radiogroup" aria-label="Tile size" className="flex gap-2">
@@ -113,15 +90,6 @@ export function SettingsPanel({ open, onClose, settings, onUpdate }: SettingsPan
             <p className="text-xs text-neutral-400">Larger tiles may require scrolling to see the full board.</p>
           )}
         </fieldset>
-
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.reducedMotion}
-            onChange={(e) => onUpdate({ reducedMotion: e.target.checked })}
-          />
-          Reduce motion
-        </label>
       </div>
     </div>
   )

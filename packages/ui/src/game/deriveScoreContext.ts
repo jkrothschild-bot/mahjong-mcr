@@ -2,11 +2,13 @@ import {
   FAN_REGISTRY,
   computeSettlement,
   deriveWinLegalityContext,
-  scoreHand,
+  scoreHandDetailed,
   type GameState,
   type ScoreHandParams,
   type ScoreResult,
+  type Seat,
   type SettlementResult,
+  type WinningShape,
 } from '@mahjong-mcr/engine'
 
 const FLOWER_FAN_ID = 81
@@ -49,6 +51,15 @@ export function deriveScoreHandParams(state: GameState): ScoreHandParams | null 
 export interface HandOutcome {
   scoreResult: ScoreResult
   settlement: SettlementResult
+  // Which seat won, and the parse its score was actually computed from —
+  // used by the board to lay the winner's revealed hand out in its real
+  // groups (revealOrder.ts). Comes from the SAME scoring pass the points
+  // came from, deliberately: re-deriving "the winning shape" separately
+  // could pick a different tie-broken parse from the one that was scored,
+  // and the board would then illustrate a hand that isn't the one on the
+  // score screen.
+  winnerSeat: Seat
+  winningShape: WinningShape | null
 }
 
 // Combines scoreHand + computeSettlement for a finished hand — the single
@@ -63,7 +74,7 @@ export function deriveHandOutcome(state: GameState): HandOutcome | null {
   const winnerSeat = result.winnerSeats![0]!
   const winner = state.players[winnerSeat]
 
-  const scoreResult = scoreHand(params)
+  const { winningShape, ...scoreResult } = scoreHandDetailed(params)
   const flowerPoints = winner.hand.flowers.length * FAN_REGISTRY[FLOWER_FAN_ID]!.points
   const settlement = computeSettlement({
     winnerSeat,
@@ -73,5 +84,5 @@ export function deriveHandOutcome(state: GameState): HandOutcome | null {
     discarderSeat: result.loserSeat,
   })
 
-  return { scoreResult, settlement }
+  return { scoreResult, settlement, winnerSeat, winningShape }
 }

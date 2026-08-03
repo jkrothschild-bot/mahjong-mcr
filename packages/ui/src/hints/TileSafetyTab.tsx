@@ -11,21 +11,18 @@ export interface TileSafetyTabProps {
   selectedTypeId: TileTypeId | null
 }
 
-// Default red/amber/emerald triad — a classic red-green pair that's hard to
-// tell apart under deuteranopia/protanopia. The color-blind alternative
-// below is an Okabe-Ito-derived triad (blue/orange/reddish-purple) chosen to
-// stay mutually distinguishable under the common CVD types; LEVEL_LABEL's
-// text is the non-color channel either way and doesn't change.
+// Red/amber/emerald triad. Note this is a classic red-green pair, hard to
+// tell apart under deuteranopia/protanopia — an Okabe-Ito alternative triad
+// and a settings toggle to reach it both existed here and were removed on
+// the owner's call while cutting the settings count. LEVEL_LABEL's text
+// ("Low/Medium/High risk") is therefore now the ONLY channel carrying this
+// information for those users; do not make the rating colour-only.
+// SPEC.md §8/§9 and PLAN.md M7 still list a colour-blind palette as a goal,
+// so this is a deliberate regression against them, not an oversight.
 const LEVEL_STYLE: Record<DangerLevel, string> = {
   low: 'border-emerald-600 bg-emerald-950/40 text-emerald-300',
   medium: 'border-amber-600 bg-amber-950/40 text-amber-300',
   high: 'border-red-600 bg-red-950/40 text-red-300',
-}
-
-const LEVEL_STYLE_COLOR_BLIND: Record<DangerLevel, string> = {
-  low: 'border-[#0072B2] bg-[#0072B2]/20 text-[#7fb8e0]',
-  medium: 'border-[#E69F00] bg-[#E69F00]/20 text-[#f0c674]',
-  high: 'border-[#CC79A7] bg-[#CC79A7]/20 text-[#e3a8c8]',
 }
 
 const LEVEL_LABEL: Record<DangerLevel, string> = { low: 'Low risk', medium: 'Medium risk', high: 'High risk' }
@@ -38,7 +35,7 @@ const LEVEL_LABEL: Record<DangerLevel, string> = { low: 'Low risk', medium: 'Med
 // board (lifted to App.tsx), so tapping a tile before opening the Hint
 // panel already has this tab ready.
 export function TileSafetyTab({ state, forSeat, selectedTypeId }: TileSafetyTabProps) {
-  const { colorBlindPalette, tileScale } = useSettingsContext()
+  const { tileScale } = useSettingsContext()
 
   if (!selectedTypeId) {
     return <p className="text-sm text-neutral-400">Tap any tile on the board to see its safety here.</p>
@@ -47,7 +44,7 @@ export function TileSafetyTab({ state, forSeat, selectedTypeId }: TileSafetyTabP
   const unseenCounts = computeUnseenCounts(state, forSeat)
   const unseen = unseenCounts[selectedTypeId] ?? 0
   const safety = assessTileSafety(state, forSeat, selectedTypeId)
-  const levelStyle = colorBlindPalette ? LEVEL_STYLE_COLOR_BLIND : LEVEL_STYLE
+  const levelStyle = LEVEL_STYLE
 
   return (
     <div className="flex flex-col gap-3">

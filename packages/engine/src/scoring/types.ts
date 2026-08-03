@@ -58,6 +58,37 @@ export interface ScoreResult {
   basicPoints: number // sum of fanMatches' points * count
 }
 
+// WHICH parse scoreHand ended up scoring — the structural half of the
+// candidate HandContext that won, with the win-circumstance fields dropped
+// (those are inputs, not findings).
+//
+// scoreHand trials every decomposition plus each valid special shape and
+// keeps the highest total; before this it returned only the total and threw
+// the winning parse away. The UI needs it to lay a revealed winning hand out
+// the way it was actually won — four sets and a pair in their real groups,
+// or seven pairs as pairs — rather than as an undifferentiated sorted run.
+//
+// Deliberately exposed through scoreHandDetailed, NOT by widening
+// ScoreResult: dozens of scoring fixtures assert `toEqual({ fanMatches,
+// basicPoints })` and an extra key would fail every one of them. This is
+// display metadata; it must not be able to perturb a single scored value.
+export interface WinningShape {
+  // Standard four-sets-plus-pair parse. Covers the CONCEALED tiles only —
+  // decomposeHand counts melds toward setsNeeded but never emits them in
+  // `sets` — so this maps directly onto the concealed block a seat renders.
+  decomposition: Decomposition | null
+  // Non-null instead of `decomposition` for the two shapes that have no set
+  // structure at all. A consumer has to regroup these from tile counts
+  // (7 pairs; 13 distinct terminals/honors with one doubled).
+  specialShape: 'sevenPairs' | 'thirteenOrphans' | null
+}
+
+export interface DetailedScoreResult extends ScoreResult {
+  // Null only when nothing scored at all (no valid candidate) — a real win
+  // always has a winning shape.
+  winningShape: WinningShape | null
+}
+
 export interface SettlementResult {
   winnerSeat: Seat
   basicPoints: number

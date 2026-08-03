@@ -7,6 +7,7 @@ import { SortToolbar } from '../hand/SortToolbar.js'
 import { useStageMetrics } from '../stage/StageMetricsContext.js'
 import { Positioned } from '../stage/Positioned.js'
 import { getBoardRegions, type SeatLineRegion, type SeatRole } from '../stage/stageLayout.js'
+import { SEAT_LINE_MELD_SHIFT_PX } from '../tiles/tileStyles.js'
 import { SeatLine } from './SeatLine.js'
 
 // The sort control's own reserved slot at the left edge of the human row —
@@ -38,6 +39,24 @@ const SORT_CONTROL_WIDTH = 150
 const SORT_CONTROL_HEIGHT = 44
 // Fixed offsets within the slot, NOT a flex stack: the button must not move
 // when the hint unmounts. Both are measured from the slot's own top edge.
+// Which way each bot seat's revealed melds are nudged, perpendicular to that
+// seat's own line and always TOWARD THE TABLE CENTRE — the compact echo of
+// the human row's own downward meld offset.
+//
+// Toward the centre, not away from it, for two reasons: it reads as the meld
+// having been pushed out onto the table, which is physically what melding is;
+// and it moves away from the wood rail, where that seat's identity label
+// lives (stageLayout.ts's SIDE HEADER PLACEMENT), rather than into it.
+//
+// The side seats' lines run vertically (a 3x9 column-major grid), so their
+// perpendicular is horizontal; north's line is a single row, so its
+// perpendicular is vertical.
+const SEAT_MELD_SHIFT: Record<SeatRole, { dx: number; dy: number }> = {
+  west: { dx: SEAT_LINE_MELD_SHIFT_PX, dy: 0 }, // left seat, nudged right
+  east: { dx: -SEAT_LINE_MELD_SHIFT_PX, dy: 0 }, // right seat, nudged left
+  north: { dx: 0, dy: SEAT_LINE_MELD_SHIFT_PX }, // top seat, nudged down
+}
+
 const SORT_BUTTON_TOP = 4
 const DISCARD_HINT_TOP = SORT_BUTTON_TOP + SORT_CONTROL_HEIGHT + 8
 const DISCARD_HINT_HEIGHT = 72
@@ -94,13 +113,26 @@ export interface SeatProps {
   // additionally for the human's own hand tiles (see onTileClick above).
   // Discards are no longer this seat's own concern (Phase 7: DiscardField
   // is one shared board-level component, not per-seat) — Board.tsx wires
-  // its own onTileClick/onOpenDiscardOverlay directly onto DiscardField.
+  // its own onTileClick directly onto DiscardField.
   onInspectTile?: (id: number) => void
   // Only meaningful for a bot seat (isHuman's own hand is never hidden from
   // itself) — true once the hand has ended (win or exhaustive draw), so
   // every seat's concealed tiles turn face-up for review instead of staying
   // hidden behind their backs. See SeatLine's own prop of the same name.
   revealConcealed?: boolean
+  // Display order for this seat's concealed tiles once the hand has ended
+  // (revealOrder.ts). Applies to bots via SeatLine and, when isHuman, to the
+  // hand row itself — the one moment the player's own arrangement is
+  // deliberately overridden, since the hand is over and the tiles are now
+  // there to be read rather than played. Their stored order is untouched;
+  // this only changes what's drawn.
+  revealOrder?: readonly number[]
+  // The claimed winning discard, moved into this (winning) seat's revealed
+  // display — see SeatLine.extraConcealedTiles. For the human winner it's
+  // already folded into revealOrder by Board, so HandTiles needs no extra.
+  revealExtraTiles?: readonly number[]
+  // The tile that completed this seat's win — ring-marked at reveal.
+  revealWinningTileId?: number | null
 }
 
 // Phase 7 (KICKOFF-phase7-board-rebuild.md): a player's identity header plus
@@ -131,6 +163,9 @@ export function Seat({
   justDrawnTileId,
   onInspectTile,
   revealConcealed,
+  revealOrder,
+  revealExtraTiles,
+  revealWinningTileId,
 }: SeatProps) {
   const { designWidth } = useStageMetrics()
   const board = getBoardRegions(designWidth)
@@ -235,7 +270,14 @@ export function Seat({
             </>
           )}
           <HandTiles
-            order={handOrder ?? []}
+            // At reveal the player's own arrangement is replaced by the
+            // read-oriented one (suit-sorted, or the winning groups if they
+            // won). This is a render-time substitution only — handOrder,
+            // which is the player's actual stored order, is not written to,
+            // so nothing about CLAUDE.md's "never auto-sort" rule is
+            // violated: the engine and the stored order both stay untouched
+            // and the next deal starts clean either way.
+            order={(revealConcealed ? revealOrder : undefined) ?? handOrder ?? []}
             region={onSort ? handRegion : board.human.row}
             melds={player.hand.melds}
             flowers={player.hand.flowers}
@@ -246,6 +288,7 @@ export function Seat({
             selectedTileId={selectedTileId}
             highlightedTypeId={selectedTypeId}
             justDrawnTileId={justDrawnTileId}
+            winningTileId={revealConcealed ? revealWinningTileId : undefined}
           />
         </>
       ) : (
@@ -255,6 +298,10 @@ export function Seat({
           region={seatLine.line}
           grid={role === 'north' ? undefined : { columns: 3, rows: 9 }}
           revealConcealed={revealConcealed}
+          concealedOrder={revealOrder}
+          extraConcealedTiles={revealExtraTiles}
+          winningTileId={revealWinningTileId}
+          meldShiftDirection={SEAT_MELD_SHIFT[role as SeatRole]}
           selectedTypeId={selectedTypeId}
           onTileClick={onInspectTile}
         />

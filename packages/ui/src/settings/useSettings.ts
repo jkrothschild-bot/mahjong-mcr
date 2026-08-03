@@ -2,26 +2,29 @@ import { useCallback, useState } from 'react'
 
 export type TileScale = 'normal' | 'large'
 
+// Deliberately small. Three settings were removed on the owner's call to cut
+// the control count, each for its own reason:
+//
+// - `confirmBeforeDiscard`: discarding already needs a deliberate
+//   double-click or drag-to-river, so the modal was belt-and-braces.
+// - `reducedMotion`: this only ever OR'd with the OS-level
+//   prefers-reduced-motion query, which App.tsx still honours on its own —
+//   so removing the toggle costs nobody the behaviour.
+// - `colorBlindPalette`: removed with its Okabe-Ito alternative triad. See
+//   TileSafetyTab.tsx's own note; the danger levels remain labelled in text
+//   ("Low/Medium/High risk"), which is the non-colour channel that keeps
+//   them readable, but the colour cue itself is now red/amber/emerald only.
+//   Recorded here rather than silently dropped because SPEC.md §8/§9 and
+//   PLAN.md M7 both still list a colour-blind palette as a goal.
+// - `stepMode`: advanced bots one decision per tap instead of on the speed
+//   timer. Removed as not earning its place — the Instant/Fast/Normal/Relaxed
+//   presets already cover pacing, and "Relaxed" gives thinking time without a
+//   second mechanism (and without a "Next" button appearing mid-board).
 export interface Settings {
   botSpeedMs: number
-  confirmBeforeDiscard: boolean
-  // When true, bot decisions (discards, claim declarations — never the
-  // mandatory draw, which isn't a real decision) wait for an explicit
-  // "Next" tap instead of the botSpeedMs timer, one bot decision per tap —
-  // for studying claim-priority/discard choices one at a time.
-  stepMode: boolean
-  // SPEC.md §8/§9: swaps the Tile Safety tab's low/medium/high danger
-  // colors (a red/amber/emerald triad) for a palette mutually
-  // distinguishable under common color-vision deficiencies.
-  colorBlindPalette: boolean
   // SPEC.md §8's "tile size / zoom" — a named preset, not a continuous
   // value, matching BOT_SPEED_PRESETS below.
   tileScale: TileScale
-  // M8 Step 3: force-disables Framer Motion's layout animations (tile
-  // movement) regardless of the OS-level prefers-reduced-motion media
-  // query — App.tsx ORs this with motion/react's own useReducedMotion()
-  // result, so either trigger alone is enough to turn animation off.
-  reducedMotion: boolean
 }
 
 // SPEC.md §7's bot-speed presets. A named preset, not a raw slider value,
@@ -37,11 +40,7 @@ export const TILE_SCALE_VALUES: readonly TileScale[] = ['normal', 'large']
 
 export const DEFAULT_SETTINGS: Settings = {
   botSpeedMs: BOT_SPEED_PRESETS.normal,
-  confirmBeforeDiscard: false,
-  stepMode: false,
-  colorBlindPalette: false,
   tileScale: 'normal',
-  reducedMotion: false,
 }
 
 const STORAGE_KEY = 'mcr-mahjong:settings:v1'
@@ -69,15 +68,15 @@ export function loadSettings(raw: string | null): Settings {
   }
   if (typeof parsed !== 'object' || parsed === null) return DEFAULT_SETTINGS
   const candidate = parsed as Partial<Record<keyof Settings, unknown>>
+  // Unknown keys in stored JSON are ignored rather than rejected, which is
+  // what makes dropping a setting a non-event for anyone who already has one
+  // persisted: a v1 blob still carrying confirmBeforeDiscard,
+  // colorBlindPalette, reducedMotion or stepMode loads fine — those keys are
+  // simply never read again. That's also why STORAGE_KEY doesn't need a
+  // version bump for any of these removals.
   return {
     botSpeedMs: isNumber(candidate.botSpeedMs) ? candidate.botSpeedMs : DEFAULT_SETTINGS.botSpeedMs,
-    confirmBeforeDiscard:
-      typeof candidate.confirmBeforeDiscard === 'boolean' ? candidate.confirmBeforeDiscard : DEFAULT_SETTINGS.confirmBeforeDiscard,
-    stepMode: typeof candidate.stepMode === 'boolean' ? candidate.stepMode : DEFAULT_SETTINGS.stepMode,
-    colorBlindPalette:
-      typeof candidate.colorBlindPalette === 'boolean' ? candidate.colorBlindPalette : DEFAULT_SETTINGS.colorBlindPalette,
     tileScale: isTileScale(candidate.tileScale) ? candidate.tileScale : DEFAULT_SETTINGS.tileScale,
-    reducedMotion: typeof candidate.reducedMotion === 'boolean' ? candidate.reducedMotion : DEFAULT_SETTINGS.reducedMotion,
   }
 }
 

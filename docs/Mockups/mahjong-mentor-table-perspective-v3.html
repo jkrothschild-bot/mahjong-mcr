@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mahjong Mentor — Table Perspective UX Mock-up</title>
+<style>
+:root{
+  --bg:#07100e;
+  --felt:#0a4239;
+  --felt-mid:#0b5747;
+  --felt-light:#116956;
+  --wood:#7b4826;
+  --wood-light:#ae7448;
+  --wood-dark:#3d2113;
+  --ivory:#fffaf0;
+  --ivory-2:#eee0c1;
+  --green-side:#2d9a72;
+  --green-side-dark:#146747;
+  --gold:#f2bd5b;
+  --gold-2:#ffdda0;
+  --ink:#14231e;
+  --muted:#9cb6ad;
+  --line:rgba(255,255,255,.12);
+  --panel:rgba(10,25,21,.92);
+  --teal:#63d8c4;
+  --danger:#dc675d;
+}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden}
+body{
+  min-width:1180px;
+  color:#f2f7f5;
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 50% 20%,rgba(44,105,86,.18),transparent 35%),
+    linear-gradient(180deg,#0a1512 0%,#050a09 100%);
+}
+button{font:inherit}
+.app{height:100vh;display:grid;grid-template-rows:64px 1fr}
+.topbar{
+  position:relative;z-index:50;display:flex;align-items:center;gap:18px;padding:0 20px;
+  background:rgba(4,12,10,.96);border-bottom:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.38)
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:240px}
+.brand-mark{
+  width:39px;height:39px;border-radius:10px;display:grid;place-items:center;
+  color:#3a2708;background:linear-gradient(145deg,var(--gold-2),var(--gold));
+  font-family:"Noto Serif CJK SC","Microsoft YaHei",serif;font-size:23px;font-weight:900;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 7px 18px rgba(242,189,91,.18)
+}
+.brand b{display:block;font-size:15px}.brand span{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.mode{display:flex;background:#10211c;border:1px solid var(--line);border-radius:11px;padding:4px}
+.mode button{border:0;background:transparent;color:#89a69c;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}
+.mode button.active{background:#244138;color:white;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.meta{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pill{height:34px;display:flex;align-items:center;gap:7px;padding:0 11px;border-radius:9px;background:#10211c;border:1px solid var(--line);color:#9fb8af;font-size:11px}
+.pill strong{color:#fff}.wind{width:21px;height:21px;border-radius:6px;display:grid;place-items:center;background:var(--gold);color:#3a2708;font-weight:1000}
+.top-btn{height:36px;border-radius:9px;border:1px solid var(--line);background:#11241e;color:#dceae5;padding:0 12px;cursor:pointer;font-size:11px;font-weight:800}
+.top-btn.primary{background:linear-gradient(180deg,var(--gold-2),var(--gold));border-color:#e3a93e;color:#3a2708}
+
+.stage{position:relative;min-height:0;padding:10px 14px 14px}
+.room{
+  position:relative;width:100%;height:100%;overflow:hidden;border-radius:25px;
+  background:
+    radial-gradient(ellipse at 50% 8%,rgba(78,142,116,.16),transparent 42%),
+    linear-gradient(180deg,#0d1916 0%,#07100e 74%,#030706 100%);
+  box-shadow:inset 0 0 120px rgba(0,0,0,.65)
+}
+.room:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.16;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='none' stroke='%2382b6a1' stroke-opacity='.18'%3E%3Cpath d='M-20 120C20 78 56 72 96 18M60 180c10-38 44-71 103-91'/%3E%3Ccircle cx='28' cy='32' r='3'/%3E%3Ccircle cx='134' cy='120' r='2'/%3E%3C/g%3E%3C/svg%3E")
+}
+
+/* Table / first-person camera */
+.table-wrap{position:absolute;inset:20px 20px 28px 20px;perspective:1350px;perspective-origin:50% 27%}
+.table{
+  position:absolute;left:50%;top:1%;width:min(1280px,88vw);height:84%;transform:translateX(-50%) rotateX(8deg);
+  transform-origin:50% 95%;filter:drop-shadow(0 32px 30px rgba(0,0,0,.55));
+}
+.rail{
+  position:absolute;inset:0;clip-path:polygon(9.5% 0,90.5% 0,100% 100%,0 100%);
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 2px,transparent 2px 12px),
+    linear-gradient(160deg,var(--wood-light) 0%,var(--wood) 45%,var(--wood-dark) 100%);
+  border-radius:32px;box-shadow:inset 0 2px 0 rgba(255,255,255,.18),inset 0 -16px 26px rgba(0,0,0,.35)
+}
+.rail:before{content:"";position:absolute;inset:8px 10px 12px;clip-path:polygon(9% 0,91% 0,100% 100%,0 100%);border:1px solid rgba(255,255,255,.15);border-radius:25px;pointer-events:none}
+.felt{
+  position:absolute;left:3.2%;right:3.2%;top:4.7%;bottom:5.2%;clip-path:polygon(7.8% 0,92.2% 0,100% 100%,0 100%);
+  background:
+    radial-gradient(ellipse at 50% 44%,rgba(33,138,110,.7),transparent 49%),
+    repeating-linear-gradient(137deg,rgba(255,255,255,.017) 0 1px,transparent 1px 4px),
+    linear-gradient(170deg,var(--felt-light),var(--felt-mid) 45%,var(--felt));
+  box-shadow:inset 0 0 100px rgba(0,0,0,.52),inset 0 3px 14px rgba(255,255,255,.04);
+  overflow:hidden
+}
+.felt:after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(0,0,0,.28) 100%);pointer-events:none}
+
+/* tile walls */
+.wall{position:absolute;display:flex;gap:3px;z-index:3}
+.wall.top{top:5.2%;left:50%;transform:translateX(-50%) scale(.74);transform-origin:50% 0}
+.wall.left{left:4.8%;top:35%;transform:rotate(90deg) scale(.75);transform-origin:0 50%}
+.wall.right{right:4.8%;top:35%;transform:rotate(-90deg) scale(.75);transform-origin:100% 50%}
+.wall-piece{width:37px;height:51px;border-radius:5px;background:linear-gradient(180deg,#edd5ab 0 8%,#b57845 9% 20%,#8f582f 22% 100%);border:1px solid #a36c42;box-shadow:0 3px 0 #5b341e,0 7px 10px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.42)}
+.wall-piece:nth-child(4n){margin-right:4px}
+
+/* seats */
+.seat{position:absolute;z-index:7;color:#dbece5;font-size:11px}
+.seat .seat-label{display:flex;align-items:center;gap:7px;margin-bottom:6px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.55))}
+.seat .avatar{width:25px;height:25px;border-radius:8px;background:#e7f0ec;color:#213c34;display:grid;place-items:center;font-weight:1000}
+.seat .name b{display:block;font-size:11px}.seat .name span{font-size:9px;color:#a6c2b7}
+.seat.north{left:50%;top:8.3%;transform:translateX(-50%) scale(.79);transform-origin:50% 0}
+.seat.west{left:8.2%;top:45%;transform:translateY(-50%) rotate(90deg) scale(.78)}
+.seat.east{right:8.2%;top:45%;transform:translateY(-50%) rotate(-90deg) scale(.78)}
+.concealed{display:flex;gap:2px}
+.back{width:29px;height:40px;border-radius:5px;background:linear-gradient(180deg,#f5e9cc 0 10%,#3aab81 11% 78%,#197453 79%);border:1px solid #c4b385;box-shadow:0 3px 0 #9a875b,0 6px 8px rgba(0,0,0,.42),inset 0 1px 0 white}
+.meld-strip{display:flex;gap:3px;margin-top:7px}
+
+/* central tabletop */
+.core{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:128px;height:95px;border-radius:20px;background:rgba(3,34,27,.68);border:1px solid rgba(255,255,255,.13);display:grid;place-items:center;text-align:center;z-index:4;box-shadow:0 16px 28px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.05)}
+.core span{display:block;font-size:9px;color:#9ab8ad;text-transform:uppercase;letter-spacing:1px}.core strong{display:block;font-size:26px;line-height:1.05}.core small{font-size:9px;color:#9eb9af}
+.river{position:absolute;z-index:5;display:grid;grid-template-columns:repeat(6,31px);gap:4px}
+.river.n{top:18%;left:50%;transform:translateX(-50%) scale(.82)}
+.river.s{bottom:22%;left:50%;transform:translateX(-50%) scale(.88)}
+.river.w{left:22%;top:42%;transform:translateY(-50%) rotate(90deg) scale(.84)}
+.river.e{right:22%;top:42%;transform:translateY(-50%) rotate(-90deg) scale(.84)}
+
+/* tile visual */
+.tile{
+  --tw:42px;--th:57px;position:relative;width:var(--tw);height:var(--th);flex:0 0 auto;border-radius:7px;
+  background:linear-gradient(180deg,#fffef9 0%,#fffaf0 59%,#eadcbe 100%);
+  border:1px solid #d2c091;color:#17261f;box-shadow:inset 0 1px 0 white,inset 0 -4px 5px rgba(112,83,38,.19),0 3px 0 #b3a06e,0 8px 10px rgba(0,0,0,.42);overflow:visible;user-select:none
+}
+.tile:before{content:"";position:absolute;z-index:-1;left:4px;right:4px;bottom:-7px;height:10px;border-radius:0 0 6px 6px;background:linear-gradient(180deg,var(--green-side),var(--green-side-dark));box-shadow:0 2px 0 #0d5138}
+.tile.small{--tw:31px;--th:42px;border-radius:5px;box-shadow:inset 0 1px 0 white,inset 0 -3px 4px rgba(112,83,38,.17),0 2px 0 #b3a06e,0 5px 7px rgba(0,0,0,.35)}
+.tile.small:before{bottom:-5px;height:7px;left:3px;right:3px}
+.tile.hand{--tw:62px;--th:84px;border-radius:9px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+.tile.hand:before{bottom:-10px;height:14px;left:5px;right:5px;border-radius:0 0 8px 8px}
+.tile.hand:hover{transform:translateY(-8px);box-shadow:inset 0 1px 0 white,inset 0 -4px 5px rgba(112,83,38,.19),0 4px 0 #b3a06e,0 18px 20px rgba(0,0,0,.5)}
+.tile.hand.recommended{transform:translateY(-8px);box-shadow:0 0 0 3px var(--gold),0 0 28px rgba(242,189,91,.38),inset 0 1px 0 white,inset 0 -4px 5px rgba(112,83,38,.19),0 4px 0 #b3a06e,0 18px 20px rgba(0,0,0,.5)}
+.tile.hand.recommended .best{display:block}
+.tile.hand.selected{transform:translateY(-13px);box-shadow:0 0 0 3px var(--teal),0 0 26px rgba(99,216,196,.34),inset 0 1px 0 white,inset 0 -4px 5px rgba(112,83,38,.19),0 4px 0 #b3a06e,0 20px 22px rgba(0,0,0,.53)}
+.best{display:none;position:absolute;z-index:5;top:-16px;left:50%;transform:translateX(-50%);font-size:7px;letter-spacing:.5px;font-weight:1000;background:var(--gold);color:#382607;padding:3px 5px;border-radius:5px;white-space:nowrap;box-shadow:0 3px 7px rgba(0,0,0,.3)}
+.corner{position:absolute;z-index:3;left:4px;top:2px;font-family:Georgia,serif;font-size:7px;font-weight:900;color:#8e805f}.tile.hand .corner{left:5px;top:4px;font-size:10px}
+.en{display:none;position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:6px;font-weight:900;letter-spacing:.6px;color:#7c7056}.labels .en{display:block}
+.face{position:absolute;inset:4px 3px 5px;display:grid;place-items:center}.tile.hand .face{inset:8px 5px 9px}
+.face svg{display:block;width:100%;height:100%;overflow:visible}
+.char-face{font-family:"Noto Serif CJK SC","SimSun","Microsoft YaHei",serif;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:.84;font-weight:900;text-shadow:0 .4px 0 rgba(0,0,0,.1)}
+.char-face .num{font-size:24px;color:#171f1b}.char-face .wan{font-size:16px;color:#bd3d32;margin-top:4px}.tile.hand .char-face .num{font-size:37px}.tile.hand .char-face .wan{font-size:23px;margin-top:6px}
+.honor{font-family:"Noto Serif CJK SC","SimSun","Microsoft YaHei",serif;font-size:29px;font-weight:1000}.tile.hand .honor{font-size:49px}.honor.wind-t{color:#1b2a24}.honor.red{color:#c93f34}.honor.green{color:#258457}
+.white-dragon{width:66%;height:58%;border:4px double #3c6da7;border-radius:2px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.75)}.tile.hand .white-dragon{border-width:6px}
+
+/* player area */
+.player-zone{position:absolute;z-index:20;left:50%;bottom:8px;transform:translateX(-50%);width:min(1140px,88vw)}
+.rack{position:relative;padding:17px 26px 20px;border-radius:22px 22px 14px 14px;background:linear-gradient(180deg,rgba(74,44,27,.96),rgba(41,23,14,.98));border:1px solid rgba(255,255,255,.13);box-shadow:0 22px 32px rgba(0,0,0,.56),inset 0 2px 0 rgba(255,255,255,.12)}
+.rack:before{content:"";position:absolute;left:22px;right:22px;top:9px;height:7px;border-radius:10px;background:linear-gradient(180deg,#c28a59,#714025);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.player-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 5px}
+.player-id{display:flex;align-items:center;gap:9px}.player-id .avatar{width:31px;height:31px;border-radius:9px;background:var(--gold);color:#3a2708;display:grid;place-items:center;font-weight:1000}.player-id b{font-size:12px}.player-id span{display:block;color:#a9c2b9;font-size:9px;margin-top:2px}
+.hand-tools{display:flex;gap:6px}.hand-tools button{height:28px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#b9cec6;padding:0 9px;font-size:9px;font-weight:800;cursor:pointer}.hand-tools button.active{border-color:rgba(99,216,196,.35);background:rgba(99,216,196,.13);color:#e6fff9}
+.hand{display:flex;align-items:flex-end;justify-content:center;gap:6px;min-height:96px}.tile.drawn{margin-left:17px}
+.action-row{display:flex;align-items:center;gap:10px;margin-top:13px;padding-top:11px;border-top:1px solid rgba(255,255,255,.1)}
+.turn-text b{display:block;font-size:12px}.turn-text span{font-size:9px;color:#9eb8ae}
+.actions{margin-left:auto;display:flex;gap:8px}.action{height:39px;min-width:78px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:#183329;color:#dcebe5;font-size:10px;font-weight:900;cursor:pointer}.action.primary{min-width:132px;color:#3a2708;background:linear-gradient(180deg,var(--gold-2),var(--gold));border-color:#dfa33b;box-shadow:0 7px 16px rgba(242,189,91,.18)}
+
+/* coach as overlay, table stays full width */
+.coach{
+  position:absolute;z-index:40;right:25px;top:20px;width:355px;max-height:calc(100% - 42px);overflow:auto;border-radius:18px;
+  background:linear-gradient(180deg,rgba(18,39,33,.96),rgba(8,22,18,.97));border:1px solid rgba(255,255,255,.13);box-shadow:0 24px 60px rgba(0,0,0,.5);backdrop-filter:blur(16px);transition:transform .2s ease,opacity .2s ease
+}
+.coach.hidden{transform:translateX(390px);opacity:0;pointer-events:none}
+.coach-head{padding:14px 15px 11px;border-bottom:1px solid var(--line)}
+.coach-title{display:flex;align-items:center;justify-content:space-between}.coach-title b{font-size:14px}.confidence{font-size:9px;color:#8cf0d5;background:rgba(99,216,196,.12);border:1px solid rgba(99,216,196,.24);padding:4px 7px;border-radius:999px}
+.coach-head p{margin:4px 0 0;color:#9bb5ab;font-size:9px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:10px;padding:4px;background:#091914;border-radius:9px}.tabs button{border:0;background:transparent;color:#78968b;border-radius:6px;padding:7px 4px;font-size:9px;font-weight:900;cursor:pointer}.tabs button.active{background:#213b33;color:white}
+.coach-body{padding:14px}
+.recommend{border-radius:13px;padding:12px;background:linear-gradient(145deg,rgba(242,189,91,.18),rgba(242,189,91,.06));border:1px solid rgba(242,189,91,.35)}
+.rec-label{font-size:8px;color:#f4ca78;text-transform:uppercase;letter-spacing:1px;font-weight:900}.rec-main{display:flex;align-items:center;gap:12px;margin-top:8px}.rec-main .tile{transform:scale(.94);transform-origin:center}.rec-copy strong{display:block;font-size:17px}.rec-copy span{font-size:9px;color:#b9cfc6;line-height:1.4;display:block;margin-top:3px}
+.why{margin-top:12px}.why h3,.route h3,.alternatives h3{font-size:10px;margin:0 0 8px;color:#dceae5;text-transform:uppercase;letter-spacing:.75px}.reason{display:flex;gap:9px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)}.reason:last-child{border-bottom:0}.num-badge{width:19px;height:19px;flex:0 0 19px;border-radius:6px;background:#1f3d34;color:#80e6cd;display:grid;place-items:center;font-size:9px;font-weight:1000}.reason b{display:block;font-size:10px}.reason span{display:block;color:#94aea4;font-size:8.5px;line-height:1.45;margin-top:2px}
+.route{margin-top:12px;padding:11px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}
+.route-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.08);font-size:9px}.route-row:last-child{border-bottom:0}.route-row span:last-child{color:#f4c970;font-weight:900}.route-row.done span:first-child{color:#7ce0c6}
+.route-total{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;font-weight:900}
+.alternatives{margin-top:12px}.alt{display:flex;align-items:center;gap:9px;padding:8px;border-radius:9px;margin-top:6px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.mini-chip{width:30px;height:39px;border-radius:5px;background:linear-gradient(180deg,#fffdf7,#eadcbd);color:#213129;display:grid;place-items:center;font-family:"Noto Serif CJK SC","SimSun",serif;font-size:18px;font-weight:900;box-shadow:0 2px 0 #ae9b6c}.alt b{display:block;font-size:9px}.alt span{font-size:8px;color:#90aa9f;display:block;margin-top:2px}.alt-score{margin-left:auto;color:#dfb962;font-size:9px;font-weight:900}
+.coach-foot{padding:10px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;color:#829f94;font-size:8px}.coach-foot button{border:0;background:transparent;color:#9ed5c5;font-size:8px;cursor:pointer}
+
+.toast{position:absolute;z-index:80;left:50%;top:82px;transform:translateX(-50%) translateY(-12px);opacity:0;background:#132a23;border:1px solid rgba(255,255,255,.14);box-shadow:0 12px 25px rgba(0,0,0,.42);border-radius:10px;padding:9px 13px;font-size:10px;transition:.2s}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:1320px){.coach{width:330px}.tile.hand{--tw:56px;--th:76px}.hand{gap:5px}.player-zone{width:min(1030px,86vw)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">麻</div><div><b>Mahjong Mentor</b><span>MCR — learn while you play</span></div></div>
+    <div class="mode"><button>Play</button><button class="active">Learn</button><button>Review</button></div>
+    <div class="meta">
+      <div class="pill"><span class="wind">E</span> Prevailing wind</div>
+      <div class="pill">Hand <strong>2 of 16</strong></div>
+      <div class="pill">Wall <strong>45</strong></div>
+      <button class="top-btn" id="labelsBtn">English labels</button>
+      <button class="top-btn primary" id="coachBtn">Hide coach</button>
+    </div>
+  </header>
+  <main class="stage">
+    <div class="room" id="room">
+      <div class="table-wrap">
+        <div class="table">
+          <div class="rail"></div>
+          <div class="felt">
+            <div class="wall top" id="wallTop"></div>
+            <div class="wall left" id="wallLeft"></div>
+            <div class="wall right" id="wallRight"></div>
+
+            <div class="seat north">
+              <div class="seat-label"><div class="avatar">N</div><div class="name"><b>North · Mia</b><span>10 tiles concealed</span></div></div>
+              <div class="concealed" id="northHand"></div>
+              <div class="meld-strip" id="northMeld"></div>
+            </div>
+            <div class="seat west">
+              <div class="seat-label"><div class="avatar">W</div><div class="name"><b>West · Alex</b><span>13 tiles</span></div></div>
+              <div class="concealed" id="westHand"></div>
+            </div>
+            <div class="seat east">
+              <div class="seat-label"><div class="avatar">E</div><div class="name"><b>East · Chen</b><span>Dealer</span></div></div>
+              <div class="concealed" id="eastHand"></div>
+              <div class="meld-strip" id="eastMeld"></div>
+            </div>
+
+            <div class="river n" id="riverN"></div>
+            <div class="river w" id="riverW"></div>
+            <div class="river e" id="riverE"></div>
+            <div class="river s" id="riverS"></div>
+            <div class="core"><div><span>East round</span><strong>45</strong><small>tiles remain</small></div></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="player-zone">
+        <div class="rack">
+          <div class="player-meta">
+            <div class="player-id"><div class="avatar">S</div><div><b>You · South seat</b><span>Your turn — choose a discard</span></div></div>
+            <div class="hand-tools"><button class="active">Sort by suit</button><button id="matchBtn">Highlight visible</button><button>Undo sort</button></div>
+          </div>
+          <div class="hand" id="playerHand"></div>
+          <div class="action-row">
+            <div class="turn-text"><b id="selectionTitle">Coach recommends 2 Bamboo</b><span id="selectionText">It is isolated and does not support your strongest scoring route.</span></div>
+            <div class="actions"><button class="action">Pass</button><button class="action">Declare Kong</button><button class="action primary" id="discardBtn">Discard 2 Bamboo</button></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="coach" id="coach">
+        <div class="coach-head">
+          <div class="coach-title"><b>Strategy coach</b><span class="confidence">86% confidence</span></div>
+          <p>Advice is based on your hand, exposed sets, visible tiles and MCR scoring.</p>
+          <div class="tabs"><button class="active">Best move</button><button>Hand plan</button><button>Tile safety</button></div>
+        </div>
+        <div class="coach-body">
+          <div class="recommend">
+            <div class="rec-label">Recommended discard</div>
+            <div class="rec-main"><div id="coachTile"></div><div class="rec-copy"><strong>2 Bamboo</strong><span>Lowest-value singleton. Discarding it keeps all three pairs and your East pung intact.</span></div></div>
+          </div>
+          <div class="why">
+            <h3>Why this is the strongest move</h3>
+            <div class="reason"><div class="num-badge">1</div><div><b>It has no support</b><span>No neighbouring bamboo tiles and only two useful bamboo draws improve it.</span></div></div>
+            <div class="reason"><div class="num-badge">2</div><div><b>Your hand already leans towards pungs</b><span>You have a completed East pung plus pairs of 1 Characters, 7 Circles and 8 Circles.</span></div></div>
+            <div class="reason"><div class="num-badge">3</div><div><b>It preserves flexibility</b><span>The 2 Character can still connect with 1–3 Characters, while the circle block has several chow and pung routes.</span></div></div>
+          </div>
+          <div class="route">
+            <h3>Route to eight points</h3>
+            <div class="route-row done"><span>✓ East wind pung</span><span>4 pts*</span></div>
+            <div class="route-row"><span>Develop All Pungs</span><span>6 pts</span></div>
+            <div class="route-row"><span>Keep one pair as eyes</span><span>Needed</span></div>
+            <div class="route-total"><span>Likely total</span><span>10 points</span></div>
+            <div style="font-size:7px;color:#78968b;margin-top:6px">*Counts as both seat wind and prevailing wind in this training example.</div>
+          </div>
+          <div class="alternatives">
+            <h3>Other reasonable choices</h3>
+            <div class="alt"><div class="mini-chip">二萬</div><div><b>2 Character</b><span>Also isolated, but has more connecting draws.</span></div><div class="alt-score">74%</div></div>
+            <div class="alt"><div class="mini-chip">九筒</div><div><b>9 Circles</b><span>Weakens the 7–8–9 chow route and circle concentration.</span></div><div class="alt-score">61%</div></div>
+          </div>
+        </div>
+        <div class="coach-foot"><span>Teaching level: guided</span><button>Why confidence is not 100%</button></div>
+      </aside>
+      <div class="toast" id="toast">2 Bamboo discarded — strong choice.</div>
+    </div>
+  </main>
+</div>
+<script>
+const C={1:'一',2:'二',3:'三',4:'四',5:'五',6:'六',7:'七',8:'八',9:'九'};
+const names={m:'Character',p:'Circle',s:'Bamboo',E:'East',S:'South',W:'West',N:'North',C:'Red Dragon',F:'Green Dragon',P:'White Dragon'};
+const hand=[
+  {s:'s',v:2,id:'s2'},
+  {s:'m',v:1,id:'m1a'},{s:'m',v:1,id:'m1b'},{s:'m',v:2,id:'m2'},
+  {s:'p',v:5,id:'p5'},{s:'p',v:6,id:'p6'},{s:'p',v:7,id:'p7a'},{s:'p',v:7,id:'p7b'},{s:'p',v:8,id:'p8a'},{s:'p',v:8,id:'p8b'},
+  {s:'E',id:'e1'},{s:'E',id:'e2'},{s:'E',id:'e3'},
+  {s:'p',v:9,id:'p9',drawn:true}
+];
+const rivers={
+ n:[{s:'m',v:6},{s:'p',v:3},{s:'N'},{s:'s',v:7},{s:'p',v:1},{s:'F'}],
+ w:[{s:'S'},{s:'m',v:4},{s:'p',v:2},{s:'s',v:5},{s:'C'},{s:'p',v:6}],
+ e:[{s:'m',v:9},{s:'P'},{s:'s',v:3},{s:'p',v:4},{s:'W'},{s:'m',v:5}],
+ s:[{s:'p',v:1},{s:'N'},{s:'m',v:7},{s:'s',v:9},{s:'p',v:2},{s:'C'}]
+};
+function pips(n){
+ const pos={1:[[50,50]],2:[[30,30],[70,70]],3:[[28,27],[50,50],[72,73]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[26,26],[74,26],[50,50],[26,74],[74,74]],6:[[27,22],[73,22],[27,50],[73,50],[27,78],[73,78]],7:[[27,20],[73,20],[27,45],[50,45],[73,45],[27,76],[73,76]],8:[[28,18],[72,18],[28,39],[72,39],[28,61],[72,61],[28,82],[72,82]],9:[[22,22],[50,22],[78,22],[22,50],[50,50],[78,50],[22,78],[50,78],[78,78]]}[n]||[];
+ return `<svg viewBox="0 0 100 100">${pos.map((p,i)=>{
+   const cols=['#2f7f58','#c8463d','#3d6fa5'];const c=cols[(i+n)%3];
+   return `<g transform="translate(${p[0]} ${p[1]})"><circle r="11" fill="#f6dfb8" stroke="${c}" stroke-width="5"/><circle r="6.2" fill="none" stroke="${c}" stroke-width="2.3" stroke-dasharray="2 2"/><circle r="2.6" fill="${c}"/></g>`
+ }).join('')}</svg>`
+}
+function bams(n){
+ if(n===1) return `<svg viewBox="0 0 100 100"><g transform="translate(50 52)"><path d="M-4 26C-22 10-23-10-9-23C-1-31 9-28 14-18C21-4 11 12-4 26Z" fill="#2c7e58" stroke="#15553a" stroke-width="3"/><circle cx="7" cy="-18" r="4" fill="#c9443c"/><path d="M-10-8C-30-17-33-34-20-42C-5-51 9-34 7-18" fill="none" stroke="#3979a1" stroke-width="6" stroke-linecap="round"/><path d="M-10-8C-26-3-31 11-21 18" fill="none" stroke="#bd473e" stroke-width="5" stroke-linecap="round"/><path d="M-4 26L-12 36M0 26L6 36" stroke="#9b5f2f" stroke-width="3" stroke-linecap="round"/></g></svg>`;
+ const pos={2:[[35,33],[65,67]],3:[[35,25],[65,50],[35,75]],4:[[32,28],[68,28],[32,72],[68,72]],5:[[30,25],[70,25],[50,50],[30,75],[70,75]],6:[[31,20],[69,20],[31,50],[69,50],[31,80],[69,80]],7:[[31,18],[69,18],[31,44],[50,44],[69,44],[31,78],[69,78]],8:[[31,17],[69,17],[31,39],[69,39],[31,61],[69,61],[31,83],[69,83]],9:[[25,18],[50,18],[75,18],[25,50],[50,50],[75,50],[25,82],[50,82],[75,82]]}[n]||[];
+ return `<svg viewBox="0 0 100 100">${pos.map((p,i)=>{const red=(n===2&&i===0)||(n===5&&i===2)||(n===7&&i===3)||(n===9&&i===4);const c=red?'#c6463c':'#2d8055';return `<g transform="translate(${p[0]} ${p[1]})"><rect x="-5" y="-12" width="10" height="24" rx="5" fill="${c}"/><path d="M-6-5H6M-6 5H6" stroke="#f0ddac" stroke-width="2"/></g>`}).join('')}</svg>`
+}
+function tileFace(t){
+ if(t.s==='m') return `<div class="char-face"><span class="num">${C[t.v]}</span><span class="wan">萬</span></div>`;
+ if(t.s==='p') return pips(t.v);
+ if(t.s==='s') return bams(t.v);
+ if(t.s==='P') return `<div class="white-dragon"></div>`;
+ const map={E:'東',S:'南',W:'西',N:'北',C:'中',F:'發'};
+ const cls=t.s==='C'?'red':t.s==='F'?'green':'wind-t';
+ return `<div class="honor ${cls}">${map[t.s]}</div>`;
+}
+function tileHTML(t,cl=''){
+ const label=t.v?`${t.v} ${names[t.s]}`:names[t.s];
+ const corner=t.v?`${t.v}${t.s.toUpperCase()}`:t.s;
+ return `<div class="tile ${cl}" data-id="${t.id||''}" data-label="${label}"><span class="best">BEST DISCARD</span><span class="corner">${corner}</span><div class="face">${tileFace(t)}</div><span class="en">${label.toUpperCase()}</span></div>`;
+}
+function backs(id,n){document.getElementById(id).innerHTML=Array.from({length:n},()=>'<div class="back"></div>').join('')}
+function walls(id,n){document.getElementById(id).innerHTML=Array.from({length:n},()=>'<div class="wall-piece"></div>').join('')}
+function renderRiver(id,data){document.getElementById(id).innerHTML=data.map(t=>tileHTML(t,'small')).join('')}
+backs('northHand',13);backs('westHand',13);backs('eastHand',10);walls('wallTop',18);walls('wallLeft',15);walls('wallRight',15);
+document.getElementById('northMeld').innerHTML=[{s:'s',v:3},{s:'s',v:4},{s:'s',v:5}].map(t=>tileHTML(t,'small')).join('');
+document.getElementById('eastMeld').innerHTML=[{s:'C'},{s:'C'},{s:'C'}].map(t=>tileHTML(t,'small')).join('');
+renderRiver('riverN',rivers.n);renderRiver('riverW',rivers.w);renderRiver('riverE',rivers.e);renderRiver('riverS',rivers.s);
+let selected='s2';
+function renderHand(){
+ document.getElementById('playerHand').innerHTML=hand.map(t=>tileHTML(t,`hand ${t.id==='s2'?'recommended':''} ${selected===t.id?'selected':''} ${t.drawn?'drawn':''}`)).join('');
+ document.querySelectorAll('.tile.hand').forEach(el=>el.onclick=()=>selectTile(el.dataset.id));
+}
+function selectTile(id){selected=id;renderHand();const t=hand.find(x=>x.id===id);const label=t.v?`${t.v} ${names[t.s]}`:names[t.s];document.getElementById('selectionTitle').textContent=`Selected: ${label}`;document.getElementById('selectionText').textContent=id==='s2'?'This matches the coach recommendation.':'Compare this choice with the coach recommendation before discarding.';document.getElementById('discardBtn').textContent=`Discard ${label}`}
+renderHand();document.getElementById('coachTile').innerHTML=tileHTML({s:'s',v:2},'');
+document.getElementById('labelsBtn').onclick=()=>{document.getElementById('room').classList.toggle('labels');document.getElementById('labelsBtn').classList.toggle('primary')};
+document.getElementById('coachBtn').onclick=()=>{const c=document.getElementById('coach');c.classList.toggle('hidden');document.getElementById('coachBtn').textContent=c.classList.contains('hidden')?'Show coach':'Hide coach'};
+document.getElementById('matchBtn').onclick=()=>{document.getElementById('matchBtn').classList.toggle('active');document.querySelectorAll('.river .tile').forEach((e,i)=>e.style.filter=document.getElementById('matchBtn').classList.contains('active')&&i%5===0?'drop-shadow(0 0 7px #63d8c4) brightness(1.15)':'')};
+document.getElementById('discardBtn').onclick=()=>{const toast=document.getElementById('toast');toast.textContent=(selected==='s2'?'2 Bamboo discarded — strong choice.':'Tile discarded — review the effect on your hand plan.');toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1800)};
+</script>
+</body>
+</html>

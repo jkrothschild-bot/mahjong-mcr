@@ -142,12 +142,6 @@ export interface UseGameLoopResult {
   // random seed — the "Restart" button. Never touches session stats (see
   // loopReducer's 'reset' case).
   resetMatch: () => void
-  // True whenever a non-human seat has a real decision pending (a draw
-  // never counts — it isn't a real decision and always auto-resolves
-  // regardless of step mode). Only meaningful for gating the "Next" button;
-  // advanceOneBotMove is a no-op if nothing is actually pending.
-  hasPendingBotMove: boolean
-  advanceOneBotMove: () => void
 }
 
 export interface UseGameLoopParams {
@@ -155,11 +149,12 @@ export interface UseGameLoopParams {
   // Delay before a bot's move is dispatched, per SPEC §7's speed presets
   // (Instant/Fast/Normal/Relaxed) — owned by the settings module (Phase 3).
   botSpeedMs: number
-  // When true, a bot's real decisions (discard, claim declarations) wait
-  // for an explicit advanceOneBotMove() call instead of the botSpeedMs
-  // timer — one bot decision per call, for studying them one at a time.
-  // Draws still auto-resolve immediately regardless (see the effect below).
-  stepMode: boolean
+  // Step mode (bots advancing one decision per explicit tap instead of on
+  // this timer) lived here and was removed on the owner's call — the speed
+  // presets already cover pacing, and "Relaxed" gives thinking time without
+  // a second mechanism or a "Next" button appearing mid-board. It took
+  // `hasPendingBotMove` / `advanceOneBotMove` with it.
+  //
   // KICKOFF-phase4-discard-overlay.md: while true, no timer is scheduled at
   // all — every seat's turn (bot AND the human's own auto-draw) sits still
   // until this goes false. Set by the discard overlay so a player can't lose
@@ -167,7 +162,7 @@ export interface UseGameLoopParams {
   // scratch (does not resume a partially-elapsed timer) — bots have no
   // stateful "thinking in progress" to preserve, so this is simplest and
   // correct. Defaults to false via the `?? false` below so existing callers
-  // (tests, PracticeView) that never pass it behave exactly as before.
+  // (tests, ReplayView) that never pass it behave exactly as before.
   paused?: boolean
 }
 
@@ -189,15 +184,12 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     // A draw is never a real decision (legalMoves' 'awaitingDraw' case is
     // always exactly [{kind:'draw'}], for every seat including the human) —
     // it's auto-dispatched immediately, same as a bot's move, just with no
-    // artificial delay, regardless of step mode. The human's genuine
-    // decisions (discard, claim declarations) always wait for explicit
-    // input via submitHumanMove. A bot's genuine decisions wait for
-    // advanceOneBotMove instead of this timer when step mode is on.
-    const autoSeats = pendingSeatsNeedingDecision(gameState).filter((seat) => {
-      if (gameState.phase === 'awaitingDraw') return true
-      if (seat === HUMAN_SEAT) return false
-      return !params.stepMode
-    })
+    // artificial delay. The human's genuine decisions (discard, claim
+    // declarations) always wait for explicit input via submitHumanMove;
+    // every bot decision runs on the botSpeedMs timer.
+    const autoSeats = pendingSeatsNeedingDecision(gameState).filter(
+      (seat) => gameState.phase === 'awaitingDraw' || seat !== HUMAN_SEAT,
+    )
     const timers = autoSeats.map((seat) =>
       setTimeout(
         () => {
@@ -210,10 +202,9 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     return () => {
       timers.forEach(clearTimeout)
     }
-  }, [gameState, params.botSpeedMs, params.stepMode, params.paused])
+  }, [gameState, params.botSpeedMs, params.paused])
 
   const pendingSeats = pendingSeatsNeedingDecision(gameState)
-  const pendingBotSeat = gameState.phase !== 'awaitingDraw' ? pendingSeats.find((seat) => seat !== HUMAN_SEAT) : undefined
   // 'awaitingDraw' is deliberately excluded here even though it's the
   // human's currentSeat — there's no decision to make in that phase (see
   // the auto-draw effect above), so treating it as "your turn" let the
@@ -243,23 +234,12 @@ export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
     dispatch({ type: 'reset', matchSeed: Math.floor(Math.random() * 4294967296) })
   }, [])
 
-  // Dispatches exactly one pending bot seat's move immediately — the
-  // step-mode "Next" button's action. A no-op if nothing is actually
-  // pending (e.g. the button was somehow clicked mid-transition).
-  const advanceOneBotMove = useCallback(() => {
-    if (pendingBotSeat === undefined) return
-    const move = chooseBotMove(gameState, pendingBotSeat)
-    dispatch({ type: 'apply', seat: pendingBotSeat, move })
-  }, [gameState, pendingBotSeat])
-
   return {
     state: gameState,
     matchState,
     matchScores,
     matchMoveLogs,
     humanPendingClaim: isHumanClaimTurn ? gameState.pendingClaim : undefined,
-    hasPendingBotMove: pendingBotSeat !== undefined,
-    advanceOneBotMove,
     isHumanTurn,
     submitHumanMove,
     startNextHand,

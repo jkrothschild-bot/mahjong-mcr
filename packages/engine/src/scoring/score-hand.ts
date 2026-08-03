@@ -15,7 +15,7 @@ import { FANS_48_DETECTORS } from './fans-48.js'
 import { FANS_64_DETECTORS } from './fans-64.js'
 import { FANS_88_DETECTORS } from './fans-88.js'
 import { FAN_REGISTRY } from './registry.js'
-import type { FanMatch, HandContext, ScoreResult } from './types.js'
+import type { DetailedScoreResult, FanMatch, HandContext, ScoreResult } from './types.js'
 
 const CHICKEN_HAND_FAN_ID = 43
 
@@ -111,7 +111,13 @@ export interface ScoreHandParams {
 // — "Freedom to Choose the Highest Points" applied at the whole-hand level,
 // on top of the same principle applying within one candidate's own fan
 // conflicts (resolveFanConflicts above).
-export function scoreHand(params: ScoreHandParams): ScoreResult {
+//
+// Additionally reports WHICH candidate won, as winningShape. That parse was
+// always computed here and simply discarded; the selection logic below is
+// unchanged, so no hand's score can move as a result of exposing it. See
+// scoreHand below for why this is a second entry point rather than a wider
+// return type on the existing one.
+export function scoreHandDetailed(params: ScoreHandParams): DetailedScoreResult {
   const {
     concealedTiles,
     melds,
@@ -146,12 +152,37 @@ export function scoreHand(params: ScoreHandParams): ScoreResult {
     candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'thirteenOrphans', ...winCircumstance })
   }
 
-  if (candidates.length === 0) return { fanMatches: [], basicPoints: 0 }
+  if (candidates.length === 0) return { fanMatches: [], basicPoints: 0, winningShape: null }
 
-  let best = scoreOneCandidate(candidates[0]!)
+  // Strictly `>`, so the FIRST candidate wins a tie — preserved exactly as
+  // it was before winningShape existed. Tie-breaking is now observable
+  // (which parse gets reported, not just the total), so this is no longer
+  // an arbitrary implementation detail: changing it would change what the
+  // board draws even though every score stays identical.
+  let bestCandidate = candidates[0]!
+  let best = scoreOneCandidate(bestCandidate)
   for (const candidate of candidates.slice(1)) {
     const result = scoreOneCandidate(candidate)
-    if (result.basicPoints > best.basicPoints) best = result
+    if (result.basicPoints > best.basicPoints) {
+      best = result
+      bestCandidate = candidate
+    }
   }
-  return best
+  return {
+    ...best,
+    winningShape: { decomposition: bestCandidate.decomposition, specialShape: bestCandidate.specialShape },
+  }
+}
+
+// The scoring entry point everything except the reveal display uses.
+//
+// Deliberately reconstructs a bare { fanMatches, basicPoints } object rather
+// than returning scoreHandDetailed's result directly: ScoreResult is asserted
+// with toEqual across the whole fixture suite and the PyMahjongGB cross-check,
+// and an extra `winningShape` key would fail all of it. Narrowing here — one
+// place, one line — keeps the detailed variant purely additive and guarantees
+// no caller can accidentally start depending on display metadata.
+export function scoreHand(params: ScoreHandParams): ScoreResult {
+  const { fanMatches, basicPoints } = scoreHandDetailed(params)
+  return { fanMatches, basicPoints }
 }

@@ -1,23 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MotionConfig, useReducedMotion } from 'motion/react'
-import { typeIdOfInstance, type ScenarioPreset, type TileTypeId } from '@mahjong-mcr/engine'
+import { typeIdOfInstance, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
-import { DiscardOverlay } from './board/DiscardOverlay.js'
 import { ScoreScreen } from './board/ScoreScreen.js'
 import { TileCountGrid } from './board/TileCountGrid.js'
 import { computeUnseenCounts } from './board/unseenCounts.js'
 import { applyDevOccupancy, parseDevOccupancyMode } from './dev/devOccupancy.js'
 import { ExportPositionModal } from './export/ExportPositionModal.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
-import { DiscardConfirmModal } from './game/DiscardConfirmModal.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
 import { RestartConfirmModal } from './game/RestartConfirmModal.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop, type HandMoveLog } from './game/useGameLoop.js'
+import { HandInfoPanel } from './hand/HandInfoPanel.js'
 import { FanEncyclopedia } from './hints/FanEncyclopedia.js'
 import { HintPanel } from './hints/HintPanel.js'
-import { PracticePicker } from './practice/PracticePicker.js'
-import { PracticeView } from './practice/PracticeView.js'
 import { ReplayView } from './replay/ReplayView.js'
 import { SettingsContext } from './settings/SettingsContext.js'
 import { SettingsPanel } from './settings/SettingsPanel.js'
@@ -27,18 +24,18 @@ import { useSessionStats } from './stats/useSessionStats.js'
 
 function App() {
   const { settings, update } = useSettings()
-  // M8 Step 3: either trigger — the app's own setting, or the OS-level
-  // prefers-reduced-motion media query motion/react's useReducedMotion()
-  // already watches — is enough to turn off tile-movement animation.
-  const osPrefersReducedMotion = useReducedMotion()
-  const reducedMotion = settings.reducedMotion || osPrefersReducedMotion
+  // M8 Step 3: tile-movement animation follows the OS-level
+  // prefers-reduced-motion media query, which motion/react's
+  // useReducedMotion() watches. There used to be an app-level toggle OR'd
+  // with this; it was removed while cutting the settings count, and removing
+  // it costs nobody the behaviour precisely because the OS query was always
+  // sufficient on its own.
+  const reducedMotion = useReducedMotion()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
-  const [discardOverlayOpen, setDiscardOverlayOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
+  const [handInfoOpen, setHandInfoOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [practicePickerOpen, setPracticePickerOpen] = useState(false)
-  const [practicePreset, setPracticePreset] = useState<ScenarioPreset | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const { stats, recordHandResult } = useSessionStats()
@@ -68,18 +65,19 @@ function App() {
     humanPendingClaim,
     submitHumanMove,
     startNextHand,
-    hasPendingBotMove,
-    advanceOneBotMove,
     resetMatch,
   } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
-    stepMode: settings.stepMode,
-    // KICKOFF-phase4-discard-overlay.md: a player must not lose a claim
-    // window while looking at the overlay — turns here are strictly
-    // timer-driven (see useGameLoop's own effect), so pausing the timer is
-    // both necessary and sufficient; there's no other clock to stop.
-    paused: discardOverlayOpen,
+    // No `paused` any more: the "All discards" overlay was its only caller,
+    // and it's gone (the discard field is readable in place now, so a
+    // separate full-viewport view of the same tiles wasn't earning its
+    // button). useGameLoop keeps the capability — it's tested and defaults
+    // to false — because the underlying concern is still live: turns are
+    // strictly timer-driven, so ANY modal a player sits on can cost them a
+    // claim window. Hint / Hand info / Tile counts have always had that
+    // problem and have never paused; if that's worth fixing, this is the
+    // hook to fix it with.
   })
   // Dev-only worst-case occupancy override (KICKOFF-phase5-melds-backs.md's
   // prerequisite harness) — ?occupancy=worst, DEV builds only, read once at
@@ -124,11 +122,7 @@ function App() {
     },
     [submitHumanMove],
   )
-  const { selectedTileId, selectTile, pendingConfirmTileId, requestDiscardTile, confirmDiscard, cancelDiscard } =
-    useDiscardFlow({
-      confirmBeforeDiscard: settings.confirmBeforeDiscard,
-      onSubmitDiscard,
-    })
+  const { selectedTileId, selectTile, requestDiscardTile } = useDiscardFlow({ onSubmitDiscard })
 
   return (
     <SettingsContext.Provider value={settings}>
@@ -143,7 +137,10 @@ function App() {
         content fit, rather than manually-tuned per-component pixel budgets. */}
     <div className="h-svh overflow-hidden bg-neutral-900 text-neutral-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-1 border-b border-neutral-700">
-        <h1 className="text-lg font-semibold tracking-tight">MCR Mahjong Trainer</h1>
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-lg font-semibold tracking-tight">MCR Mahjong Mentor</h1>
+          <span className="text-xs text-neutral-400">Learn while you play</span>
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
@@ -159,12 +156,15 @@ function App() {
           >
             Hint
           </button>
+          {/* The fan tracker + waits, which used to sit in flow under the
+              board and resize it whenever they had something to say. See
+              HandInfoPanel.tsx / the HudBar.tsx tombstone. */}
           <button
             type="button"
-            onClick={() => setDiscardOverlayOpen(true)}
+            onClick={() => setHandInfoOpen(true)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
-            All discards
+            Hand info
           </button>
           <button
             type="button"
@@ -186,13 +186,6 @@ function App() {
             className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Export
-          </button>
-          <button
-            type="button"
-            onClick={() => setPracticePickerOpen(true)}
-            className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
-          >
-            Practice
           </button>
           <button
             type="button"
@@ -236,7 +229,6 @@ function App() {
           onRequestDiscardTile={isHumanTurn ? requestDiscardTile : undefined}
           selectedTypeId={selectedTypeId}
           onInspectTile={inspectTile}
-          onOpenDiscardOverlay={() => setDiscardOverlayOpen(true)}
           showDiscardHint={!hasHumanDiscarded}
         />
 
@@ -255,34 +247,13 @@ function App() {
           />
         )}
 
-        {settings.stepMode && hasPendingBotMove && (
-          <button
-            type="button"
-            onClick={advanceOneBotMove}
-            className="min-h-11 rounded-md border border-sky-400 bg-sky-500 px-6 text-sm font-semibold text-neutral-900 hover:bg-sky-400"
-          >
-            Next
-          </button>
-        )}
       </main>
-
-      <DiscardConfirmModal tileId={pendingConfirmTileId} onConfirm={confirmDiscard} onCancel={cancelDiscard} />
 
       <TileCountGrid
         open={tileCountGridOpen}
         unseenCounts={computeUnseenCounts(state, HUMAN_SEAT)}
         onClose={() => setTileCountGridOpen(false)}
       />
-
-      {/* KICKOFF-phase4-discard-overlay.md's THE critical instruction: this
-          must render outside GameStage's transform:scale() — a sibling of
-          <main>/<Board>, same as every other overlay here, not a descendant
-          of Board passed down into GameStage. Nesting it inside would (a)
-          inherit the stage's non-integer ~1.077 scale, the exact mechanism
-          that caused this project's earlier tile-blur bug, and (b) cap it at
-          DESIGN_HEIGHT/the middle band instead of the full viewport, which
-          is the entire reason it can be readable when the table can't. */}
-      <DiscardOverlay open={discardOverlayOpen} state={displayState} onClose={() => setDiscardOverlayOpen(false)} />
 
       <ScoreScreen
         state={state}
@@ -298,24 +269,13 @@ function App() {
 
       <ExportPositionModal open={exportOpen} state={state} forSeat={HUMAN_SEAT} onClose={() => setExportOpen(false)} />
 
-      {practicePickerOpen && (
-        <PracticePicker
-          onSelect={(preset) => {
-            setPracticePreset(preset)
-            setPracticePickerOpen(false)
-          }}
-          onClose={() => setPracticePickerOpen(false)}
-        />
-      )}
-
-      {practicePreset && (
-        <PracticeView
-          preset={practicePreset}
-          botSpeedMs={settings.botSpeedMs}
-          confirmBeforeDiscard={settings.confirmBeforeDiscard}
-          onExit={() => setPracticePreset(null)}
-        />
-      )}
+      <HandInfoPanel
+        open={handInfoOpen}
+        hand={state.players[HUMAN_SEAT].hand}
+        prevailingWind={state.prevailingWind}
+        seatWind={state.players[HUMAN_SEAT].seatWind}
+        onClose={() => setHandInfoOpen(false)}
+      />
 
       <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
 

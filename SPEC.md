@@ -1,4 +1,4 @@
-# MCR Mahjong Trainer — Game Specification (v5)
+# MCR Mahjong Mentor — Game Specification (v5)
 
 ## 1. Purpose
 
@@ -152,8 +152,8 @@ Features common to the stronger mahjong clients on the market, or general traine
 - **Full match replay ("kifu") with scrubber:** record every draw/discard/claim; after a hand (or match) ends, step back through it move by move, not just a 2–3-line post-hand summary. This is the core study loop in serious mahjong clients and is worth more long-term than live hints.
 - **"Ask about this position" export:** a button that turns the current hand + visible board state into a clean, structured text (or image) summary — built specifically to replace the screenshot-into-Claude/ChatGPT workaround already in use. Kept as a copy/export-only feature (no live in-app API call) — see PLAN.md's cost discussion.
 - **Defense/danger indicator:** a subtle per-tile risk rating in hand based on what's visible (e.g., an opponent showing two pungs in one suit, a tile no one has discarded late in the hand) — teaches the defensive half of strategy, which the hint system otherwise under-serves.
-- **Scenario/practice mode:** start from a specific preset hand (e.g., "two away from Mixed Triple Chow") instead of always a random deal — turns the fan encyclopedia from reference material into hands-on drills.
-- **Confirm-before-discard toggle:** optional tap-to-confirm before a discard commits, to prevent misclick regret — small thing, matters a lot for a beginner still reading tiles carefully.
+- ~~**Scenario/practice mode:** start from a specific preset hand (e.g., "two away from Mixed Triple Chow") instead of always a random deal — turns the fan encyclopedia from reference material into hands-on drills.~~ **Shipped in M6, then removed by owner decision** along with its toolbar button, while simplifying the UI. The engine side (`scenario.ts` and `scenarios/library.ts`, 7 curated preset hands) is deliberately KEPT despite now having no UI consumer: it is the project's only way to construct a contrived hand on demand, which the Phase 10 hint work explicitly needs for fixtures. Restoring the mode later is UI-only work.
+- ~~**Confirm-before-discard toggle:** optional tap-to-confirm before a discard commits, to prevent misclick regret — small thing, matters a lot for a beginner still reading tiles carefully.~~ **Removed by owner decision** while cutting the settings count — discarding already requires a deliberate double-click or drag-to-river. See `useDiscardFlow.ts` for the seam it would go back on.
 - **Claim call-outs:** brief animation/sound when a bot pungs, kongs, or wins off your discard, with a one-line explanation ("West ponged your 5-dot") — avoids the "wait, what just happened" confusion common in fast clients.
 - **Session stats:** win rate, average points per win, deal-in rate, and which fans you actually complete most/least often over time — motivating, and shows learning progress the hint system alone can't.
 - **Accessibility beyond color-blind palette:** adjustable tile/text scaling, and text labels/aria-attributes on tiles so the board is usable with screen magnification on iPad.

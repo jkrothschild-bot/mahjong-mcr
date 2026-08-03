@@ -2,59 +2,45 @@ import { useCallback, useState } from 'react'
 import type { TileInstanceId } from '@mahjong-mcr/engine'
 
 export interface UseDiscardFlowParams {
-  confirmBeforeDiscard: boolean
   onSubmitDiscard: (tile: TileInstanceId) => void
 }
 
 export interface UseDiscardFlowResult {
-  // Still tracks a single-click selection — used for the tile-inspector/
-  // highlight ring, not for committing a discard (that's requestDiscardTile
-  // below; there's no separate select-then-press-a-button step anymore).
+  // Tracks a single-click selection — used for the tile-inspector/highlight
+  // ring, not for committing a discard (that's requestDiscardTile below;
+  // there's no separate select-then-press-a-button step).
   selectedTileId: TileInstanceId | null
   selectTile: (id: TileInstanceId) => void
-  // Set only while the confirm modal should be showing.
-  pendingConfirmTileId: TileInstanceId | null
-  // Select-and-request in one step — the only way to submit a discard now:
-  // double-click on a hand tile, or dragging one onto the discard field.
-  // Goes through the same confirmBeforeDiscard branch either trigger needs.
+  // Select-and-submit in one step — the only way to discard: double-click a
+  // hand tile, or drag one onto the discard field.
   requestDiscardTile: (id: TileInstanceId) => void
-  confirmDiscard: () => void
-  cancelDiscard: () => void
 }
 
 // Selecting a hand tile (for the inspector/highlight) and committing a
-// discard are two separate pieces of state so that confirm-before-discard
-// can intercept the commit step without changing how tile selection itself
-// works.
-export function useDiscardFlow({ confirmBeforeDiscard, onSubmitDiscard }: UseDiscardFlowParams): UseDiscardFlowResult {
+// discard stay two separate concerns, even though nothing intercepts the
+// commit any more.
+//
+// The confirm-before-discard setting and its modal were removed on the
+// owner's call while cutting the settings count — discarding already
+// requires a deliberate double-click or a drag to the river, so a
+// confirmation step was belt-and-braces. What went with it: this hook's
+// pendingConfirmTileId / confirmDiscard / cancelDiscard, and
+// DiscardConfirmModal. If a confirm step is ever wanted again, this is the
+// seam it belongs on — both discard triggers already funnel through
+// requestDiscardTile.
+export function useDiscardFlow({ onSubmitDiscard }: UseDiscardFlowParams): UseDiscardFlowResult {
   const [selectedTileId, setSelectedTileId] = useState<TileInstanceId | null>(null)
-  const [pendingConfirmTileId, setPendingConfirmTileId] = useState<TileInstanceId | null>(null)
 
   const selectTile = useCallback((id: TileInstanceId) => setSelectedTileId(id), [])
 
   const requestDiscardTile = useCallback(
     (id: TileInstanceId) => {
       setSelectedTileId(id)
-      if (confirmBeforeDiscard) {
-        setPendingConfirmTileId(id)
-        return
-      }
       onSubmitDiscard(id)
       setSelectedTileId(null)
     },
-    [confirmBeforeDiscard, onSubmitDiscard],
+    [onSubmitDiscard],
   )
 
-  const confirmDiscard = useCallback(() => {
-    if (pendingConfirmTileId === null) return
-    onSubmitDiscard(pendingConfirmTileId)
-    setPendingConfirmTileId(null)
-    setSelectedTileId(null)
-  }, [pendingConfirmTileId, onSubmitDiscard])
-
-  const cancelDiscard = useCallback(() => {
-    setPendingConfirmTileId(null)
-  }, [])
-
-  return { selectedTileId, selectTile, pendingConfirmTileId, requestDiscardTile, confirmDiscard, cancelDiscard }
+  return { selectedTileId, selectTile, requestDiscardTile }
 }

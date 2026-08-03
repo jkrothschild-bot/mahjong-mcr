@@ -1,3 +1,11 @@
+// NOTE: this module and scenarios/library.ts currently have NO UI consumer.
+// Practice mode shipped in M6 and was later removed in a UI-simplification
+// pass (SPEC.md §9 records that decision). They are kept deliberately, not by
+// oversight: this is the project's only way to construct a contrived hand on
+// demand, which KICKOFF-phase10-strategy-coach.md's fixture work needs and
+// which the dev occupancy harness benefits from. Both stay fully tested.
+// Delete only alongside a decision that contrived hands aren't needed.
+
 import { dealHandFromWall, type GameState, type StartHandParams } from './game-state.js'
 import type { Seat } from './meld.js'
 import { mulberry32, shuffle } from './rng.js'

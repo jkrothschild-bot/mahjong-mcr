@@ -24,9 +24,9 @@ import { typeIdOfInstance, TILE_TYPE_BY_ID, type GameState, type Meld, type Play
 // test, but it does for "does one chow's shelf/offset actually read right").
 export type DevOccupancyMode = 'worst' | 'oneChow' | 'threeMelds'
 
-// Phase 4's own 83-total fixture (DiscardOverlay.test.tsx's
-// "83 shared across seats... skewed toward seat 0" case), reused verbatim
-// per that doc's own instruction — also exercises DiscardField's per-zone
+// Phase 4's own 83-total fixture ("83 shared across seats... skewed toward
+// seat 0"), carried over from the removed DiscardOverlay's tests so the
+// worst-case numbers stay pinned somewhere — also exercises DiscardField's per-zone
 // "additive, never rescaling" overflow (a 30-tile pile exceeds a zone's own
 // 25-tile/5x5 nominal capacity).
 const DISCARD_COUNTS: Record<number, number> = { 0: 30, 1: 30, 2: 15, 3: 8 }

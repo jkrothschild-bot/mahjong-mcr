@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { typeIdOfInstance } from '@mahjong-mcr/engine'
 import App from './App'
 import { sortByMode } from './hand/handOrder.js'
@@ -9,11 +9,28 @@ describe('App', () => {
   it('renders the header and all four seats', () => {
     render(<App />)
 
-    expect(screen.getByText('MCR Mahjong Trainer')).toBeInTheDocument()
+    expect(screen.getByText('MCR Mahjong Mentor')).toBeInTheDocument()
+    expect(screen.getByText('Learn while you play')).toBeInTheDocument()
     expect(screen.getByTestId('game-stage')).toBeInTheDocument()
     for (const seat of [0, 1, 2, 3]) {
       expect(screen.getByTestId(`seat-${seat}`)).toBeInTheDocument()
     }
+  })
+
+  // The fan tracker and waits used to render in flow beneath the board, and
+  // appeared the moment they had something to report — which changed
+  // GameStage's leftover height, changed designWidth, and resized the whole
+  // board mid-hand. They are now behind the "Hand info" button. This asserts
+  // nothing puts them back in flow.
+  it('keeps the fan tracker and waits out of the page flow until Hand info is opened', () => {
+    render(<App />)
+
+    expect(screen.queryByRole('dialog', { name: 'Hand info' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Locked in')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Ready hand — waits')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hand info' }))
+    expect(screen.getByRole('dialog', { name: 'Hand info' })).toBeInTheDocument()
   })
 
   it('marks the dealer and current-turn seat identically for every seat (no human-only treatment)', () => {
@@ -102,10 +119,15 @@ describe('App', () => {
     expect(screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[data-testid^="hand-tile-"]')).toHaveLength(14)
   })
 
-  it('shows a confirmation modal before discarding when the setting is on, and only commits on confirm', () => {
+  // Both confirm-before-discard and step mode were removed. Their tests are
+  // replaced by one asserting the simplified behaviour: a double-click
+  // commits immediately, with no modal in the way and no "Next" button ever
+  // appearing on the board. A stored settings blob still carrying the old
+  // keys must not resurrect either.
+  it('discards immediately on double-click, with no confirm modal and no step-mode Next button', () => {
     window.localStorage.setItem(
       'mcr-mahjong:settings:v1',
-      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: true }),
+      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: true, stepMode: true }),
     )
     render(<App />)
 
@@ -113,44 +135,9 @@ describe('App', () => {
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
     fireEvent.doubleClick(firstTile!)
 
-    expect(screen.getByRole('dialog', { name: 'Confirm discard' })).toBeInTheDocument()
-    // Not committed yet — the modal intercepted it.
-    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
     expect(screen.queryByRole('dialog', { name: 'Confirm discard' })).not.toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
-  })
-
-  it('step mode: shows a "Next" button once a bot has a real decision pending, and clicking it advances the board', () => {
-    vi.useFakeTimers()
-    window.localStorage.setItem(
-      'mcr-mahjong:settings:v1',
-      JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: false, stepMode: true }),
-    )
-    render(<App />)
-
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
-
-    const hand = screen.getByRole('list', { name: 'Your hand' })
-    const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-    fireEvent.doubleClick(firstTile!)
-
-    // Let any pending (non-decision) draws auto-resolve; the bot's own
-    // discard/claim decision should NOT auto-resolve under step mode.
-    act(() => {
-      vi.advanceTimersByTime(10_000)
-    })
-
-    const nextButton = screen.getByRole('button', { name: 'Next' })
-    const board = screen.getByTestId('game-stage')
-    const boardBefore = board.innerHTML
-
-    fireEvent.click(nextButton)
-
-    expect(board.innerHTML).not.toBe(boardBefore)
-
-    vi.useRealTimers()
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
   })
 
   it('clicking a tile shows the tile inspector with its name and unseen count', () => {
@@ -216,80 +203,29 @@ describe('App', () => {
     expect(screen.queryByTestId('replay-view')).not.toBeInTheDocument()
   })
 
-  describe('discard overlay (KICKOFF-phase4-discard-overlay.md)', () => {
-    it('opens via the toolbar button, and via clicking a discard on the board', () => {
+  // The "All discards" full-viewport overlay (Phase 4) is gone — the discard
+  // field became readable in place, so a second view of the same tiles wasn't
+  // earning its toolbar button. What has to survive its removal: clicking a
+  // discard still inspects that tile, and it no longer opens anything.
+  describe('discard interaction after the All-discards overlay was removed', () => {
+    it('offers no All discards button', () => {
       render(<App />)
-      expect(screen.queryByTestId('discard-overlay')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'All discards' })).not.toBeInTheDocument()
+    })
 
-      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
-      expect(screen.getByTestId('discard-overlay')).toBeInTheDocument()
-      fireEvent.click(screen.getByTestId('discard-overlay-close'))
-      expect(screen.queryByTestId('discard-overlay')).not.toBeInTheDocument()
+    it('clicking a discard inspects its type and opens no overlay', () => {
+      render(<App />)
 
-      // Second trigger: clicking an actual discard tile on the board.
       const hand = screen.getByRole('list', { name: 'Your hand' })
       const [firstTile] = hand.querySelectorAll('[role="listitem"]')
       fireEvent.doubleClick(firstTile!)
+
       const discardTile = screen.getByRole('list', { name: 'You discards' }).querySelector('[role="listitem"]')!
       fireEvent.click(discardTile)
-      expect(screen.getByTestId('discard-overlay')).toBeInTheDocument()
-    })
 
-    it('renders outside the game stage — not nested inside it in the DOM', () => {
-      render(<App />)
-      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
-      const overlay = screen.getByTestId('discard-overlay')
-      const stage = screen.getByTestId('game-stage')
-      expect(stage.contains(overlay)).toBe(false)
-      expect(overlay.contains(stage)).toBe(false)
-    })
-
-    it('pauses bot turns while open, and resumes them once closed', () => {
-      vi.useFakeTimers()
-      window.localStorage.setItem('mcr-mahjong:settings:v1', JSON.stringify({ botSpeedMs: 20 }))
-      render(<App />)
-
-      const hand = screen.getByRole('list', { name: 'Your hand' })
-      const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-      fireEvent.doubleClick(firstTile!)
-
-      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
-      const board = screen.getByTestId('game-stage')
-      const boardWhilePaused = board.innerHTML
-      act(() => {
-        vi.advanceTimersByTime(5_000)
-      })
-      expect(board.innerHTML).toBe(boardWhilePaused)
-
-      fireEvent.click(screen.getByTestId('discard-overlay-close'))
-      act(() => {
-        vi.advanceTimersByTime(5_000)
-      })
-      expect(board.innerHTML).not.toBe(boardWhilePaused)
-
-      vi.useRealTimers()
-    })
-
-    it('opening and closing leaves hand order and selection state untouched', () => {
-      render(<App />)
-
-      const hand = screen.getByRole('list', { name: 'Your hand' })
-      const tilesBefore = [...hand.querySelectorAll('[role="listitem"]')].map((el) => el.textContent)
-      const [firstTile] = hand.querySelectorAll('[role="listitem"]')
-      fireEvent.click(firstTile!) // select it (selectedTileId + tile inspector)
-      expect(firstTile!.className).toContain('ring-2')
-
-      fireEvent.click(screen.getByRole('button', { name: 'All discards' }))
-      fireEvent.click(screen.getByTestId('discard-overlay-close'))
-
-      // Selection survived the overlay's open/close round trip — the same
-      // tile is still highlighted as selected.
-      expect(screen.getByTestId(`hand-tile-${firstTile!.getAttribute('data-tile-id')}`).className).toContain('ring-2')
-      const tilesAfter = [...screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[role="listitem"]')].map(
-        (el) => el.textContent,
-      )
-      expect(tilesAfter).toEqual(tilesBefore)
-      expect(screen.getByTestId('hand-end-zone')).toBeInTheDocument()
+      expect(screen.queryByTestId('discard-overlay')).not.toBeInTheDocument()
+      // The tile inspector picked it up — its own chip names the clicked type.
+      expect(screen.getByTestId('tile-inspector')).toBeInTheDocument()
     })
   })
 })

@@ -9,16 +9,17 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { GameState, MatchState, Seat as SeatId, TileTypeId } from '@mahjong-mcr/engine'
+import { deriveHandOutcome } from '../game/deriveScoreContext.js'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
 import { DISCARD_ZONE_ID, END_ZONE_ID, resolveDragEndAction } from '../hand/resolveReorderTarget.js'
+import { revealOrder } from '../hand/revealOrder.js'
 import { useHandOrder } from '../hand/useHandOrder.js'
 import { GameStage } from '../stage/GameStage.js'
 import type { SeatRole } from '../stage/stageLayout.js'
 import { CallOutToast } from '../game/CallOutToast.js'
 import { DiscardField } from './DiscardField.js'
-import { HudBar } from './HudBar.js'
 import { Seat } from './Seat.js'
 import { TableSurface } from './TableSurface.js'
 import { TileInspector } from './TileInspector.js'
@@ -47,17 +48,11 @@ export interface BoardProps {
   // of maintaining an independent one.
   selectedTypeId: TileTypeId | null
   onInspectTile: (id: number) => void
-  // KICKOFF-phase4-discard-overlay.md's secondary trigger — tapping any
-  // discard also opens the full-viewport overlay, layered on top of (not
-  // instead of) that tile's existing tile-inspector behavior. Optional:
-  // PracticeView/ReplayView render a Board without a live overlay to open,
-  // and tests that don't care about it shouldn't need to stub it.
-  onOpenDiscardOverlay?: () => void
   // Shows the one-time "how do I discard?" cue beside the Sort button. Owned
   // by App (session-scoped, latched on the human's first discard) rather than
   // derived here from the current hand's discard pile — a per-hand derivation
   // would make the hint reappear at the start of every one of the 16 hands.
-  // Optional: PracticeView/ReplayView don't carry the latch and shouldn't
+  // Optional: ReplayView doesn't carry the latch and shouldn't
   // need to stub it.
   showDiscardHint?: boolean
 }
@@ -85,7 +80,6 @@ export function Board({
   onRequestDiscardTile,
   selectedTypeId,
   onInspectTile,
-  onOpenDiscardOverlay,
   showDiscardHint,
 }: BoardProps) {
   // state.seed, not state.handNumber — see useHandOrder's own comment on
@@ -98,10 +92,6 @@ export function Board({
     onTileClick(id)
     onInspectTile(id)
   }
-  const handleDiscardTileClick = (id: number) => {
-    onInspectTile(id)
-    onOpenDiscardOverlay?.()
-  }
   const unseenCounts = computeUnseenCounts(state, HUMAN_SEAT)
   // Once a hand ends (win or exhaustive draw), every seat's concealed tiles
   // turn face-up on the board itself so bots' (and, for a draw, everyone's)
@@ -109,11 +99,69 @@ export function Board({
   // in ScoreScreen.
   const revealConcealed = state.phase === 'handEnded'
 
+  // The winning tile's display move at reveal. On a real table a discard win
+  // ends with the claimed tile laid WITH the winner's hand — in engine state
+  // it stays in the discarder's river (finalizeWin never moves it), which
+  // left the winner's revealed hand a tile short and made a correct win look
+  // broken (the live case: Pure Shifted Chows showing "6,7" where 5-6-7
+  // should be, the 5 sitting across the table in the river).
+  //
+  // So, display only: for a discard win the tile is appended to the winner's
+  // reveal order, DiscardField omits it (it is by construction the LAST tile
+  // of the discarder's river, so nothing else moves), and its shared
+  // layoutId animates it across the table. Self-draw needs no move — the
+  // tile is already in the winner's hand — and a robbed-kong win gets NO
+  // treatment at all: its tile sits inside the robbed player's meld, and
+  // plucking a tile out of a rendered meld would misrepresent that meld.
+  // Engine state is untouched in every case.
+  const winInfo =
+    revealConcealed && state.result?.outcome === 'win'
+      ? {
+          winnerSeat: state.result.winnerSeats![0]!,
+          winningTile: state.result.winningTile!,
+          winMethod: state.result.winMethod!,
+        }
+      : null
+  const claimedWinningTile = winInfo?.winMethod === 'discard' ? winInfo.winningTile : null
+  // Marked for discard and self-draw wins (both render the tile in the
+  // winner's hand); never for robKong (its tile isn't rendered there).
+  const markedWinningTile = winInfo && winInfo.winMethod !== 'robKong' ? winInfo.winningTile : null
+
+  // Reveal-time display order per seat (revealOrder.ts): the winner's hand in
+  // the groups it was actually won with, everyone else suit-sorted so 13
+  // face-up tiles can be read rather than scanned one at a time.
+  //
+  // Memoised on `state` because deriving the winning shape means running the
+  // full scorer (every decomposition x every fan detector). That's cheap
+  // once, wasteful on every render of a hand-ended board — and this component
+  // re-renders on hover, selection, and drag. Returns an empty map while a
+  // hand is in progress, so the cost is only ever paid at hand end.
+  const revealOrders = useMemo<Record<number, readonly number[]>>(() => {
+    if (state.phase !== 'handEnded') return {}
+    // Null for an exhaustive draw — nobody won, so nobody gets grouped and
+    // all four seats fall through to the plain suit sort below.
+    const outcome = deriveHandOutcome(state)
+    const orders: Record<number, readonly number[]> = {}
+    const result = state.result
+    const claimed =
+      result?.outcome === 'win' && result.winMethod === 'discard' ? result.winningTile! : null
+    for (const player of state.players) {
+      const isWinner = outcome !== null && player.seat === outcome.winnerSeat
+      const shape = isWinner ? outcome.winningShape : null
+      // The claimed winning tile joins the winner's ordered display — this is
+      // the tile the scorer already counted (deriveScoreHandParams appends
+      // it), so with it present the winning group finally renders complete.
+      const tiles =
+        isWinner && claimed !== null ? [...player.hand.concealedTiles, claimed] : player.hand.concealedTiles
+      orders[player.seat] = revealOrder(tiles, shape)
+    }
+    return orders
+  }, [state])
+
   // GameState.lastDrawnTile is only meaningful while its owner is actually
   // sitting on it awaiting a discard — isHumanTurn already encodes exactly
   // that condition for the human seat, so reuse it rather than re-deriving.
   const justDrawnTileId = isHumanTurn ? (state.lastDrawnTile ?? null) : null
-  const humanPlayer = state.players[HUMAN_SEAT]
 
   // Drag-and-drop, lifted from HandTiles.tsx (Phase 7): the human's hand and
   // DiscardField's own drop target (its "you" zone) are separate stage
@@ -189,7 +237,12 @@ export function Board({
         <GameStage>
           <TableSurface />
           <WallRing />
-          <DiscardField state={state} selectedTypeId={selectedTypeId ?? undefined} onTileClick={handleDiscardTileClick} />
+          <DiscardField
+            state={state}
+            selectedTypeId={selectedTypeId ?? undefined}
+            onTileClick={onInspectTile}
+            omitTileId={claimedWinningTile}
+          />
           {state.players.map((player) => {
             const offset = (player.seat - HUMAN_SEAT + 4) % 4
             const role = OFFSET_ROLE[offset]!
@@ -216,13 +269,27 @@ export function Board({
                 justDrawnTileId={isHuman ? justDrawnTileId : undefined}
                 onInspectTile={onInspectTile}
                 revealConcealed={revealConcealed}
+                revealOrder={revealOrders[player.seat]}
+                revealExtraTiles={
+                  winInfo && player.seat === winInfo.winnerSeat && claimedWinningTile !== null
+                    ? [claimedWinningTile]
+                    : undefined
+                }
+                revealWinningTileId={winInfo && player.seat === winInfo.winnerSeat ? markedWinningTile : undefined}
               />
             )
           })}
         </GameStage>
       </DndContext>
 
-      <HudBar hand={humanPlayer.hand} prevailingWind={state.prevailingWind} seatWind={humanPlayer.seatWind} />
+      {/* Nothing else goes in this flex column. HudBar (the fan tracker +
+          waits panels) used to live here and was removed deliberately: both
+          panels render nothing until they have something to report and then
+          appear at ~150px, which changed GameStage's own leftover height,
+          which changed designWidth, which resized the whole board mid-hand.
+          They're now on demand in HandInfoPanel (App.tsx's "Hand info"
+          button). Anything added below the stage reintroduces that bug —
+          put it in a modal instead. */}
     </div>
   )
 }

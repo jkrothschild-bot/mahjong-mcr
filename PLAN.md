@@ -1,4 +1,4 @@
-# MCR Mahjong Trainer — Project Plan (v2, aligned to SPEC.md v2)
+# MCR Mahjong Mentor — Project Plan (v2, aligned to SPEC.md v2)
 
 ## 1. Technology choices (and why)
 
@@ -41,7 +41,7 @@ mahjong-mcr/
 
 **M5 — Hints, fan tracker & defense (week 6–8) — complete:** 3-level hint system, live fan tracker panel, fan encyclopedia, and a basic **defense/danger indicator** per tile (reuses the M4 evaluator plus visible-tile counts from M3). Also closed a real gap found during this milestone: `moves.ts` now enforces the §3.9.1.1 8-point minimum to declare Hu, which nothing previously checked.
 
-**M6 — Replay, practice mode & export (week 8–10) — complete:** full match replay ("kifu") with a scrubber built on M1's serializable state; scenario/practice mode (7 curated preset hands instead of a random deal); the **"ask about this position" export** (plain-text summary with copy-to-clipboard — the built-in replacement for pasting screenshots into an AI chat); session stats (win rate, deal-in rate, avg points per win, top fans completed). Also closed two real layout gaps found during this milestone: Tailwind's `grid-rows-3` was forcing all three board rows to equal height (fixed via `grid-rows-[auto_auto_auto]`), and `ClaimPrompt` was rendering in normal document flow instead of as a fixed overlay like every other modal — both could push the board past the iPad viewport during extended real play, which SPEC.md §5a's no-scroll rule forbids.
+**M6 — Replay, practice mode & export (week 8–10) — complete:** full match replay ("kifu") with a scrubber built on M1's serializable state; scenario/practice mode (7 curated preset hands instead of a random deal) — *shipped, then removed in a later UI-simplification pass; the engine-side preset builder is retained for hint fixtures, see SPEC.md §9* —; the **"ask about this position" export** (plain-text summary with copy-to-clipboard — the built-in replacement for pasting screenshots into an AI chat); session stats (win rate, deal-in rate, avg points per win, top fans completed). Also closed two real layout gaps found during this milestone: Tailwind's `grid-rows-3` was forcing all three board rows to equal height (fixed via `grid-rows-[auto_auto_auto]`), and `ClaimPrompt` was rendering in normal document flow instead of as a fixed overlay like every other modal — both could push the board past the iPad viewport during extended real play, which SPEC.md §5a's no-scroll rule forbids.
 
 **M7 — Polish (ongoing):** finalize tile art choice, iPad touch tuning, accessibility scaling (tile/text size, screen-magnification labels), color-blind palette, save/resume.
 

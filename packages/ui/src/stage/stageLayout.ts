@@ -321,10 +321,22 @@ export function computeGridPositions(
   return { positions, scale: fitScale(naturalWidth, naturalHeight, region.width, region.height), naturalWidth, naturalHeight }
 }
 
+// NO CURRENT CONSUMER. The west/east seat lines used this and moved to
+// packGroupsMajor's vertical axis: this function places tile i at
+// (col = floor(i/rows), row = i % rows) with no concept of groups, so a meld
+// straddled a column break whenever it started fewer than 3-4 rows from the
+// bottom and had to be read around a corner. packGroupsMajor guarantees a
+// group is never split across a wrap, which is what the seat lines need.
+//
+// Kept because the "fill down, then over" reading order it documents below
+// is still the right model for a stacked hand, and because a future
+// group-free column layout would want exactly this. Delete freely if that
+// never materialises — it is fully tested, so removal is cheap either way.
+//
 // Column-major counterpart to computeGridPositions above — fills DOWN one
 // column before starting the next, rather than across a row before
 // wrapping. Phase 7's west/east seat lines (KICKOFF-phase7-board-
-// rebuild.md: "3 columns x 9 rows") need this specifically: a bot's own
+// rebuild.md: "3 columns x 9 rows") needed this specifically: a bot's own
 // tile count grows one at a time through a hand (draw, claim, flower), and
 // reading "down, then over" matches how a real stacked hand of tiles
 // physically fills — computeGridPositions' row-major fill would instead
@@ -359,11 +371,14 @@ export function computeColumnMajorGridPositions(
 }
 
 // The 4 seat positions relative to the human, counter-clockwise: 0 = human,
-// 1 = left/west, 2 = across/north, 3 = right/east. Still used by
-// DiscardOverlay.tsx (Phase 4's full-viewport "All discards" view, an
-// independent full-screen overlay unrelated to the on-board Phase 7 layout
-// below) — kept as a small standalone type for that, not tied to
-// BoardRegions' own named roles.
+// 1 = left/west, 2 = across/north, 3 = right/east.
+//
+// Its only consumer was DiscardOverlay.tsx (Phase 4's full-viewport "All
+// discards" view), removed once the on-board discard field became readable
+// in place. Kept because DiscardField.tsx still works in exactly this
+// offset space (its own ZONE_OFFSETS) and would otherwise re-declare the
+// concept locally — but nothing imports the type today, so it's fair game
+// to delete alongside ZONE_OFFSETS if that ever gets tidied.
 export type SeatOffset = 0 | 1 | 2 | 3
 
 export interface PlacedTile {

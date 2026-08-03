@@ -13,7 +13,7 @@ How to start the project in VS Code with Claude Code. Do these in order.
 ## CLAUDE.md (paste into repo root)
 
 ```markdown
-# MCR Mahjong Trainer
+# MCR Mahjong Mentor
 
 Single-player web game for learning Chinese Official Mahjong (MCR rules),
 playable in browser and on iPad Safari. Built per SPEC.md and PLAN.md — read

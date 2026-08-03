@@ -23,13 +23,18 @@ describe('TileSafetyTab', () => {
     expect(screen.getByRole('list', { name: 'Safety reasons' })).toBeInTheDocument()
   })
 
-  it('swaps the danger-rating colors when the color-blind palette is on', () => {
+  // The colour-blind palette (an Okabe-Ito alternative triad, reached via a
+  // setting) was removed, leaving only the red/amber/emerald triad — a
+  // red-green pair that deuteranopes and protanopes cannot separate. The
+  // text label is therefore the only channel carrying the danger level for
+  // those users, so it has to stay: this asserts the rating is never
+  // colour-only. See TileSafetyTab.tsx's own note.
+  it('always states the danger level in words, not colour alone', () => {
     render(
-      <SettingsContext.Provider value={{ ...DEFAULT_SETTINGS, colorBlindPalette: true }}>
+      <SettingsContext.Provider value={DEFAULT_SETTINGS}>
         <TileSafetyTab state={baseState()} forSeat={0} selectedTypeId="C5" />
       </SettingsContext.Provider>,
     )
-    const rating = screen.getByTestId('tile-safety-rating')
-    expect(rating.className).not.toMatch(/emerald|amber|red-/)
+    expect(screen.getByTestId('tile-safety-rating').textContent).toMatch(/(Low|Medium|High) risk/)
   })
 })

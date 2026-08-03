@@ -201,6 +201,27 @@ describe('deriveHandOutcome', () => {
     expect(outcome.settlement.payments[0]).toBeGreaterThan(0)
   })
 
+  // The board lays a revealed winning hand out in the groups it was won with
+  // (revealOrder.ts), and it must be the parse the points were actually
+  // computed from — a separately re-derived one could tie-break differently
+  // and illustrate a hand that doesn't match the score screen beside it.
+  it('reports the winner and the parse its own score came from', () => {
+    const [c5] = idsFor('C5', 1)
+    let state = baseState([handWith(tenpaiWaitingOnC5()), handWith([]), handWith([]), handWith([])], {
+      phase: 'awaitingDraw',
+      wall: wallWithNext([c5!, ...idsFor('C6', 4)]),
+    })
+    state = applyMove(state, 0, { kind: 'draw' })
+    state = applyMove(state, 0, { kind: 'selfDrawWin' })
+
+    const outcome = deriveHandOutcome(state)!
+    expect(outcome.winnerSeat).toBe(0)
+    expect(outcome.winningShape).not.toBeNull()
+    // Exactly one of the two is populated — they're alternatives, never both.
+    const { decomposition, specialShape } = outcome.winningShape!
+    expect(decomposition === null).not.toBe(specialShape === null)
+  })
+
   it('a discard win charges the discarder extra, matching computeSettlement\'s discard formula', () => {
     const [c5] = idsFor('C5', 1)
     let state = baseState([handWith([c5!]), handWith([]), handWith([]), handWith(tenpaiWaitingOnC5())], { currentSeat: 0 })

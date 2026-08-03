@@ -15,6 +15,7 @@ import {
   HAND_TILE_WIDTH_FLOOR,
   MELD_BASELINE_OFFSET_PX,
   MELD_SHELF_CLASSES,
+  WINNING_TILE_RING_CLASSES,
   discardFieldTileClassName,
   meldBackTileClassName,
   meldTileFaceClassName,
@@ -69,13 +70,18 @@ export interface HandTilesProps {
   // distinguishable from the rest of the hand once it lands, so it gets its
   // own marker independent of selection/highlighting.
   justDrawnTileId?: TileInstanceId | null
+  // At reveal (hand ended), the tile that completed the human's own win —
+  // ring-marked so the player can see which tile did it. For a discard win
+  // Board.tsx folds the claimed tile into `order` itself (it isn't in the
+  // engine hand), so this component needs no other knowledge of the case.
+  winningTileId?: TileInstanceId | null
 }
 
 const TILE_GAP = 4
 // The "visible gap" KICKOFF-phase7-board-rebuild.md specifies between the
 // concealed block and the melds that follow it — bigger than the uniform
 // intra-row tile gap, same "rhythm" role INTER_GAP plays elsewhere
-// (Discards' 6-tile groups, DiscardOverlay's bands).
+// (Discards' 6-tile groups, and the removed all-discards view's bands).
 const MELD_GAP = 16
 // Deliberately much narrower than a real tile — see the end-zone placement
 // comment below for why a full tile-width drop slot risks overflowing the
@@ -101,6 +107,7 @@ interface SortableHandTileProps {
   scale: number
   highlighted: boolean
   justDrawn: boolean
+  winning: boolean
   tileScale: TileScale
   onTileClick?: (id: TileInstanceId) => void
   onRequestDiscardTile?: (id: TileInstanceId) => void
@@ -123,6 +130,7 @@ function SortableHandTile({
   scale,
   highlighted,
   justDrawn,
+  winning,
   tileScale,
   onTileClick,
   onRequestDiscardTile,
@@ -158,11 +166,12 @@ function SortableHandTile({
           width: naturalWidth,
           height: naturalHeight,
         }}
+        title={winning ? 'Winning tile' : undefined}
         className={tileFaceClassName({
           dimmed: isDragging,
           highlighted,
           justDrawn,
-          extra: 'cursor-grab',
+          extra: winning ? `cursor-grab ${WINNING_TILE_RING_CLASSES}` : 'cursor-grab',
           scale: tileScale,
         })}
       >
@@ -184,6 +193,7 @@ export function HandTiles({
   selectedTileId,
   highlightedTypeId,
   justDrawnTileId,
+  winningTileId,
 }: HandTilesProps) {
   const { tileScale } = useSettingsContext()
   const { scale: stageScale } = useStageMetrics()
@@ -237,7 +247,7 @@ export function HandTiles({
   // comment) so this bug class can't recur from a future off-by-one.
   // Phase 7: concealed tiles are one atomic group (dnd-kit owns their
   // internal order; packGroupsMajor never reorders within a group), melds
-  // each their own — the same group-major primitive Discards/DiscardOverlay
+  // each their own — the same group-major primitive the discard piles
   // use, reused here per KICKOFF's own instruction rather than hand-rolling
   // a second gap-aware row layout.
   const groups = [...(order.length > 0 ? [order.length] : []), ...melds.map((meld) => meld.tiles.length)]
@@ -312,6 +322,7 @@ export function HandTiles({
               scale={layout.scale}
               highlighted={selectedTileId === id || highlightedTypeId === typeIdOfInstance(id)}
               justDrawn={justDrawnTileId === id}
+              winning={winningTileId === id}
               tileScale={tileScale}
               onRequestDiscardTile={onRequestDiscardTile}
               onTileClick={onTileClick}

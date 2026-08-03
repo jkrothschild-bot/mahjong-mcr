@@ -309,6 +309,25 @@ corrected to match. See each item's status.
     shared ring. The rulebook does not itself dictate a convention for a single shared ring, so
     this is documented here as an explicit UI decision, not a rules citation.
 
+18. **Route-aware discard ranking, Stage 1 (`packages/engine/src/bots/policy.ts`'s
+    `rankDiscards`/`computeRouteRegret`, KICKOFF-phase10-strategy-coach.md) — deliberately NOT
+    rulebook-sourced.** Like item #15's shanten calculator, this is mahjong-strategy theory
+    (a discard-ranking heuristic), not anything `mcr_EN.pdf` addresses — the rulebook defines
+    what a legal/winning hand and its score are, never how a player *should* choose among legal
+    discards. Two hand-tuned constants govern it, both named and commented in `policy.ts` as
+    explicitly Stage-2-replaceable, not derived from theory:
+    - `EARLY_GAME_MIN_SHANTEN = 3` — at or above this many shanten from tenpai, ranking
+      considers which alternate hand-shape "routes" (Standard/Seven Pairs/Thirteen Orphans) a
+      candidate discard keeps alive, not just raw outs; below it, ranking is exactly the
+      pre-Stage-1 greedy rule (most outs, then honor/terminal-first, then fixed type order).
+    - `VIABLE_ROUTE_SHANTEN_MARGIN = 1` — a route counts as "in play" this turn if the best any
+      candidate discard could achieve for it is within this many shanten of the overall best
+      achievable shanten.
+    Both were picked and verified against this phase's own fixture hands (`hints.test.ts`,
+    `policy.test.ts`), not by feel alone, and checked via a several-hundred-seed self-play A/B
+    (`bots/selfplay-compare.test.ts`, gated behind `SELFPLAY_COMPARE=1` — not part of the
+    default suite) against the old ranking, per the doc's own merge gate.
+
 ## Open follow-up work
 
 - Implement Thirteen Orphans in `win-detection.ts` (this fix pass).

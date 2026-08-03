@@ -6,12 +6,13 @@ import type { TileInstanceId } from '@mahjong-mcr/engine'
 // end" has exactly one meaning across both.
 export const END_ZONE_ID = '__end__'
 
-// Sentinel id for the discard drop target (DiscardField's own "you" zone) —
-// dropping a hand tile here submits a discard instead of reordering the
-// hand. Lives alongside END_ZONE_ID rather than in board/DiscardField.tsx
-// because both are "what does dnd-kit's `over.id` mean" vocabulary the
-// lifted DndContext (Board.tsx) needs to distinguish, the same role
-// END_ZONE_ID already plays for the reorder case.
+// Sentinel id for the discard drop target — DiscardField's own full shared
+// field (every zone combined, not just "your" own pile: dropping a hand
+// tile anywhere within the wall ring's boundary submits a discard instead
+// of reordering the hand). Lives alongside END_ZONE_ID rather than in
+// board/DiscardField.tsx because both are "what does dnd-kit's `over.id`
+// mean" vocabulary the lifted DndContext (Board.tsx) needs to distinguish,
+// the same role END_ZONE_ID already plays for the reorder case.
 export const DISCARD_ZONE_ID = '__discard__'
 
 // Translates a dnd-kit drag-end event (active/over ids, index-based) into

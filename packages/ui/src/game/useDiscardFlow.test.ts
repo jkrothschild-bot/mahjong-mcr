@@ -2,10 +2,15 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useDiscardFlow } from './useDiscardFlow.js'
 
+// The confirm-before-discard branch (pendingConfirmTileId / confirmDiscard /
+// cancelDiscard, and DiscardConfirmModal) was removed with its setting. What
+// remains is the part that always mattered: selection and commitment are
+// separate, and requestDiscardTile is the single commit path both triggers
+// (double-click, drag-to-river) go through.
 describe('useDiscardFlow', () => {
   it('selectTile tracks a selection without submitting a discard', () => {
     const onSubmitDiscard = vi.fn()
-    const { result } = renderHook(() => useDiscardFlow({ confirmBeforeDiscard: false, onSubmitDiscard }))
+    const { result } = renderHook(() => useDiscardFlow({ onSubmitDiscard }))
 
     act(() => result.current.selectTile(7))
 
@@ -13,13 +18,11 @@ describe('useDiscardFlow', () => {
     expect(onSubmitDiscard).not.toHaveBeenCalled()
   })
 
-  // requestDiscardTile — double-click / drag-onto-the-discard-zone's single-
-  // step trigger: it doesn't need selectTile called first, since the caller
-  // already knows exactly which tile it means. It's the only way to commit a
-  // discard now (the old select-then-press-a-button flow is gone).
-  it('requestDiscardTile submits immediately when confirmBeforeDiscard is off, without a prior selectTile call', () => {
+  // requestDiscardTile doesn't need selectTile called first — the caller
+  // already knows exactly which tile it means.
+  it('requestDiscardTile submits immediately, without a prior selectTile call', () => {
     const onSubmitDiscard = vi.fn()
-    const { result } = renderHook(() => useDiscardFlow({ confirmBeforeDiscard: false, onSubmitDiscard }))
+    const { result } = renderHook(() => useDiscardFlow({ onSubmitDiscard }))
 
     act(() => result.current.requestDiscardTile(9))
 
@@ -27,22 +30,9 @@ describe('useDiscardFlow', () => {
     expect(result.current.selectedTileId).toBeNull()
   })
 
-  it('requestDiscardTile opens the confirm step instead of submitting when confirmBeforeDiscard is on', () => {
-    const onSubmitDiscard = vi.fn()
-    const { result } = renderHook(() => useDiscardFlow({ confirmBeforeDiscard: true, onSubmitDiscard }))
-
-    act(() => result.current.requestDiscardTile(9))
-
-    expect(onSubmitDiscard).not.toHaveBeenCalled()
-    expect(result.current.pendingConfirmTileId).toBe(9)
-    // The tile also shows as selected, so DiscardConfirmModal/the highlighted
-    // hand tile agree with each other while the modal is up.
-    expect(result.current.selectedTileId).toBe(9)
-  })
-
   it('requestDiscardTile overrides whatever was previously selected', () => {
     const onSubmitDiscard = vi.fn()
-    const { result } = renderHook(() => useDiscardFlow({ confirmBeforeDiscard: false, onSubmitDiscard }))
+    const { result } = renderHook(() => useDiscardFlow({ onSubmitDiscard }))
 
     act(() => result.current.selectTile(3))
     act(() => result.current.requestDiscardTile(9))
@@ -51,27 +41,13 @@ describe('useDiscardFlow', () => {
     expect(onSubmitDiscard).not.toHaveBeenCalledWith(3)
   })
 
-  it('confirmDiscard submits the pending tile and clears both selection states', () => {
+  it('submits every time — a repeated request is never swallowed as a duplicate', () => {
     const onSubmitDiscard = vi.fn()
-    const { result } = renderHook(() => useDiscardFlow({ confirmBeforeDiscard: true, onSubmitDiscard }))
+    const { result } = renderHook(() => useDiscardFlow({ onSubmitDiscard }))
 
-    act(() => result.current.requestDiscardTile(7))
-    act(() => result.current.confirmDiscard())
+    act(() => result.current.requestDiscardTile(9))
+    act(() => result.current.requestDiscardTile(9))
 
-    expect(onSubmitDiscard).toHaveBeenCalledWith(7)
-    expect(result.current.selectedTileId).toBeNull()
-    expect(result.current.pendingConfirmTileId).toBeNull()
-  })
-
-  it('cancelDiscard closes the confirm step without submitting, keeping the tile selected', () => {
-    const onSubmitDiscard = vi.fn()
-    const { result } = renderHook(() => useDiscardFlow({ confirmBeforeDiscard: true, onSubmitDiscard }))
-
-    act(() => result.current.requestDiscardTile(7))
-    act(() => result.current.cancelDiscard())
-
-    expect(onSubmitDiscard).not.toHaveBeenCalled()
-    expect(result.current.pendingConfirmTileId).toBeNull()
-    expect(result.current.selectedTileId).toBe(7)
+    expect(onSubmitDiscard).toHaveBeenCalledTimes(2)
   })
 })

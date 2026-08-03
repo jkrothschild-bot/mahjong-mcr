@@ -31,8 +31,6 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={() => {}} />)
     expect(botSpeedGroup().getByRole('radio', { name: 'Normal' })).toBeChecked()
     expect(tileSizeGroup().getByRole('radio', { name: 'Normal' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Confirm before discard' })).not.toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Color-blind-safe palette' })).not.toBeChecked()
   })
 
   it('selecting a bot-speed preset calls onUpdate with the right ms value', () => {
@@ -42,29 +40,6 @@ describe('SettingsPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith({ botSpeedMs: BOT_SPEED_PRESETS.relaxed })
   })
 
-  it('toggling confirm-before-discard calls onUpdate', () => {
-    const onUpdate = vi.fn()
-    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Confirm before discard' }))
-    expect(onUpdate).toHaveBeenCalledWith({ confirmBeforeDiscard: true })
-  })
-
-  it('toggling step mode calls onUpdate', () => {
-    const onUpdate = vi.fn()
-    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
-    const checkbox = screen.getByRole('checkbox', { name: /Step mode/ })
-    expect(checkbox).not.toBeChecked()
-    fireEvent.click(checkbox)
-    expect(onUpdate).toHaveBeenCalledWith({ stepMode: true })
-  })
-
-  it('toggling the color-blind palette calls onUpdate', () => {
-    const onUpdate = vi.fn()
-    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Color-blind-safe palette' }))
-    expect(onUpdate).toHaveBeenCalledWith({ colorBlindPalette: true })
-  })
-
   it('selecting a tile-size preset calls onUpdate with the right value', () => {
     const onUpdate = vi.fn()
     render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
@@ -72,10 +47,15 @@ describe('SettingsPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith({ tileScale: 'large' })
   })
 
-  it('toggling reduce motion calls onUpdate', () => {
-    const onUpdate = vi.fn()
-    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion' }))
-    expect(onUpdate).toHaveBeenCalledWith({ reducedMotion: true })
+  // Settings was cut to bot speed and tile size. Asserting the removals is
+  // what stops one drifting back in unnoticed: each had its own reason for
+  // going (see useSettings.ts), so a reappearance should be a decision, not
+  // an accident.
+  it('offers only the two settings that survived — no checkboxes at all', () => {
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={vi.fn()} />)
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    for (const name of ['Confirm before discard', 'Step mode', 'Color-blind-safe palette', 'Reduce motion']) {
+      expect(screen.queryByText(new RegExp(name))).not.toBeInTheDocument()
+    }
   })
 })

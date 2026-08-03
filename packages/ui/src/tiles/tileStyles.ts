@@ -86,6 +86,16 @@ export const TILE_HIGHLIGHT_CLASSES = 'ring-2 ring-amber-400'
 export const TILE_JUST_DRAWN_RING_CLASSES = 'ring-2 ring-sky-400'
 export const TILE_JUST_DRAWN_LIFT_CLASSES = '-translate-y-1'
 
+// The tile that actually completed the winning hand, marked at reveal —
+// without it, a hand won off a discard looks broken (the claimed tile lives
+// in the discarder's river, so one of the winner's groups renders a tile
+// short; the live case: a Pure Shifted Chows win showing "6,7" where 5-6-7
+// should be). At reveal the tile is drawn WITH the winner's hand (as on a
+// real table, where the claimed discard is laid with the hand) and carries
+// this ring. Emerald: amber already means inspector-highlight and sky means
+// just-drawn, and this must read as neither.
+export const WINNING_TILE_RING_CLASSES = 'ring-2 ring-emerald-400'
+
 export function tileFaceClassName(
   opts: { highlighted?: boolean; dimmed?: boolean; justDrawn?: boolean; extra?: string; scale?: TileScale } = {},
 ): string {
@@ -275,6 +285,56 @@ export function seatLineFaceClassName(
     .filter(Boolean)
     .join(' ')
 }
+
+// Bot-seat counterpart of meldTileFaceClassName. Only needed once a hand is
+// REVEALED: mid-hand a bot's concealed tiles are indigo backs, so face vs.
+// back already carries the melded/concealed distinction on its own. At reveal
+// every tile turns face-up and that distinction disappears — which is exactly
+// when a bot's melds stop being identifiable, since (unlike the human row)
+// the seat line has no MELD_GAP either; it's one uniform TILE_GAP throughout.
+//
+// Same footprint as seatLineFaceClassName (SEAT_LINE_SIZE): the seat line's
+// own fit solve sizes every tile identically and must not see a difference.
+// Only the shadow and border change.
+const SEAT_LINE_MELD_3D_CONTEXT = 'relative [perspective:500px] shadow-[1px_1px_2px_rgba(0,0,0,0.3)]'
+
+export function seatLineMeldFaceClassName(
+  opts: { highlighted?: boolean; extra?: string; scale?: TileScale } = {},
+): string {
+  return [
+    `flex ${SEAT_LINE_SIZE[opts.scale ?? 'normal']} shrink-0 select-none items-center justify-center overflow-hidden rounded border text-xs font-semibold`,
+    SEAT_LINE_MELD_3D_CONTEXT,
+    MELD_TILE_FACE_CLASSES,
+    opts.highlighted ? TILE_HIGHLIGHT_CLASSES : '',
+    opts.extra ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+// The seat-line shelf's own padding, deliberately 2 and not HandTiles'
+// 4/3: 2px on each side consumes EXACTLY the 4px inter-tile gap, so a shelf
+// meets its neighbour's edge without overlapping the adjacent tile. The seat
+// line has no room for more — the west/east column is width-bound (156px
+// against a 155px worst-case 3-column line) and north's band is exactly one
+// tile tall.
+export const SEAT_LINE_MELD_SHELF_PAD_PX = 2
+
+// How far a revealed bot meld is nudged perpendicular to its own seat line,
+// the compact counterpart of MELD_BASELINE_OFFSET_PX.
+//
+// Small (4px) because neither bot region has real slack: north's band is
+// 60px for a 60px tile, and the side column's 3-column worst case leaves
+// ~1px. Direction is always TOWARD THE TABLE CENTRE (Seat.tsx derives the
+// sign from the seat's role), for two reasons: it reads as the meld being
+// pushed out onto the table, which is what melding physically is; and it
+// moves away from the wood rail, where that seat's own identity label sits.
+//
+// At the usual occupancy the side column uses 2 of its 3 columns and has
+// ~27px spare, so this is invisible-cost in practice. In the documented 19+
+// tile worst case it can graze the decorative wall ring — the same trade
+// already recorded for the rail labels in SPEC.md §5b.
+export const SEAT_LINE_MELD_SHIFT_PX = 4
 
 // `highlighted`/`extra` (both unused before KICKOFF-phase9-human-melds.md
 // item 4) let a concealed kong's face-down outer tiles stay interactive —
