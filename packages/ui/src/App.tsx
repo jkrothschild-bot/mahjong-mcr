@@ -10,6 +10,7 @@ import { ExportPositionModal } from './export/ExportPositionModal.js'
 import { ClaimPrompt } from './game/ClaimPrompt.js'
 import { HUMAN_SEAT } from './game/humanSeat.js'
 import { RestartConfirmModal } from './game/RestartConfirmModal.js'
+import { TurnActionPrompt } from './game/TurnActionPrompt.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
 import { useGameLoop, type HandMoveLog } from './game/useGameLoop.js'
 import { HandInfoPanel } from './hand/HandInfoPanel.js'
@@ -233,6 +234,12 @@ function App() {
         />
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
+
+        {/* The human's own-turn declarations (self-drawn win, concealed and
+            added kongs). Without this they are computed as legal by the
+            engine and usable by every bot, but unreachable for the player —
+            see TurnActionPrompt.tsx. */}
+        <TurnActionPrompt state={state} isHumanTurn={isHumanTurn} onDeclare={submitHumanMove} />
 
         {hintOpen && (
           <HintPanel

@@ -33,6 +33,22 @@ describe('App', () => {
     expect(screen.getByRole('dialog', { name: 'Hand info' })).toBeInTheDocument()
   })
 
+  // Found in live play: a player drew the tile completing Four Concealed
+  // Pungs (64 pts) and nothing happened. The engine had the move; App only
+  // ever submitted { kind: 'discard' }, and ClaimPrompt only covers another
+  // seat's discard — so on your own turn a discard was the only move you
+  // could make. Bots were unaffected (chooseBotMove reads legalMoves), which
+  // is why it went unnoticed. This asserts the prompt is wired up at all.
+  it('mounts the own-turn declaration prompt so self-drawn wins and kongs are reachable', () => {
+    render(<App />)
+    // Hand 1 opens on the human's own discard decision. The prompt renders
+    // nothing for an ordinary hand, so this asserts the wiring rather than a
+    // visible button — TurnActionPrompt.test.tsx covers the offers
+    // themselves against real winning/kong-able hands.
+    expect(screen.queryByRole('group', { name: 'Declare a move' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('game-stage')).toBeInTheDocument()
+  })
+
   it('marks the dealer and current-turn seat identically for every seat (no human-only treatment)', () => {
     render(<App />)
     // Hand 1's dealer is seat 0 (== HUMAN_SEAT), and startHand's first
