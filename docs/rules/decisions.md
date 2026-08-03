@@ -324,9 +324,23 @@ corrected to match. See each item's status.
       candidate discard could achieve for it is within this many shanten of the overall best
       achievable shanten.
     Both were picked and verified against this phase's own fixture hands (`hints.test.ts`,
-    `policy.test.ts`), not by feel alone, and checked via a several-hundred-seed self-play A/B
-    (`bots/selfplay-compare.test.ts`, gated behind `SELFPLAY_COMPARE=1` — not part of the
-    default suite) against the old ranking, per the doc's own merge gate.
+    `policy.test.ts`), not by feel alone.
+
+    **Self-play merge gate — INCONCLUSIVE, not confirmed either way (2026-08-03).** The doc's own
+    merge gate (`bots/selfplay-compare.test.ts`, `SELFPLAY_COMPARE=1` — not part of the default
+    suite) was actually run at the specified "several hundred seeds": 300 seeds, `newWins=122
+    oldWins=142 draws=36`. This entry previously claimed the gate was "checked... per the doc's
+    own merge gate" without citing that number — that was wrong; the number was never a pass.
+    Read honestly, though, it is *not* a confirmed regression either: 264 decisive games, and
+    under a null of "no real difference" (p=0.5 each) the expected split is 132/132 with sd ≈
+    √(264 × 0.25) ≈ 8.1. 122 is (132 − 122) / 8.1 ≈ 1.2 sd below expectation, two-tailed p ≈ 0.22
+    — well short of significant. The earlier pre-cap diagnostic cited above the constants
+    (119 vs 145, same 300-seed scale) is ≈ 1.6 sd, also not significant on its own. Critically,
+    the two runs are **not independent confirmations** of each other — same seed range, same
+    engine, one is just the other with `MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY` added — so they
+    don't compound into stronger evidence of a real effect. Resolving this properly needs on the
+    order of 2000 seeds — not yet run. See KICKOFF-phase10-strategy-coach.md's "State of play"
+    section for the decision this blocks and what to do once a real number exists.
 
 ## Open follow-up work
 

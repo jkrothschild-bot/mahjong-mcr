@@ -30,7 +30,13 @@ both before any work.
 - packages/engine must stay pure TypeScript: no React/DOM imports, seeded RNG,
   fully serializable state (this also enables replay in M6 — don't shortcut it).
 - Scoring changes are not done until validated: rulebook fixtures pass AND the
-  PyMahjongGB cross-check in validation/ passes.
+  PyMahjongGB cross-check in validation/ passes. **Currently unsatisfiable:**
+  validation/ contains only .gitkeep — no Python harness has ever been built,
+  despite PLAN.md §1/§4 describing one. Until it exists, this rule can only be
+  half-checked (rulebook fixtures only); treat that as a known gap, not a pass,
+  and don't cite this rule as satisfied without saying so. Building the harness
+  is outstanding work — see KICKOFF-phase10-strategy-coach.md's "State of play"
+  section, which flags it as the right place to start next, ahead of Stage 2.
 - Run typecheck + full test suite before every commit. Never commit red.
 - Every scoring bug found becomes a permanent test fixture before it is fixed.
 - Record any rulebook-ambiguity ruling in docs/rules/decisions.md.

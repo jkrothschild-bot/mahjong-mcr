@@ -7,6 +7,57 @@ session's deliverable.** Stages 2 and 3 are specified so the Stage 1 data
 shapes don't have to be reworked to accommodate them, but do NOT start them
 until Stage 1 is merged, validated, and reviewed by the owner.
 
+## State of play / resume here (2026-08-03)
+
+**Stage 1 (1a-1f) is complete**, including the Hand Plan tab's route table
+(`computeHandPlan`'s `routes`/`primaryRoute`, `HandPlanTab.tsx`) — a gap this
+doc's original 1a-1f list didn't call out explicitly (it only named the Best
+Move tab) but which had the identical bug: `HandPlanTab.tsx` was rendering a
+single crowned-min shape from `calculateShanten`, the same collapse Stage 1a
+undid for discard ranking. Fixed the same way: both routes shown when they're
+within `VIABLE_ROUTE_SHANTEN_MARGIN` of each other, a primary route named only
+when one is clearly ahead. Full suite + typecheck green throughout.
+
+**One open question, unresolved: does the regret-aware `rankDiscards` cost
+winrate?** A 300-seed self-play A/B (the doc's own §1e gate) came back
+`newWins=122 oldWins=142 draws=36` — read honestly this is *inconclusive*
+(≈1.2 sd from a null of no difference, p≈0.22 — see decisions.md #18), not a
+confirmed regression, but it's also nowhere near a confirmed pass. Two
+under-powered runs at this same seed count (this one and the pre-cap
+diagnostic already in `policy.ts`'s comments) don't compound into stronger
+evidence either, since they share the same seed range and engine. Resolving
+it needs roughly 2000 seeds, not yet run (§6 below covers whether/when this
+session ran that).
+
+**Decision tree once a real number exists:**
+- **Negative at 2000 seeds** (regret-aware ranking genuinely costs winrate):
+  revert `rankDiscards` in `policy.ts` to the pre-Stage-1 greedy comparator
+  (`legacyDiscardCompare` alone, no regret/threshold logic), but KEEP
+  everything display-side — the route table (1a), `BestMoveHint`'s structured
+  output (1c), confidence/alternatives, and both rebuilt tabs. Those are what
+  actually fixed the reported problem (the coach now SHOWS both routes and
+  their real cost, e.g. "3 fewer outs to stay flexible" — a human player can
+  read that and choose; the bot doesn't need to auto-commit to the flexible
+  choice for the fix to have worked). `computeRouteRegret` and the two
+  Stage-1b constants would go with the revert; `hints.ts`'s features/routeTable
+  computation doesn't depend on `rankDiscards`' comparator logic itself, only
+  on `evaluateDiscards`' per-candidate routes, so this split is clean.
+- **Neutral at 2000 seeds:** keep the ranking as-is, and record "no measurable
+  effect on winrate" in decisions.md #18 rather than leaving it unresolved.
+- Either way, this result also directly informs Stage 2's premise (depth-2
+  evaluation "so flexibility falls out of the arithmetic instead of a penalty
+  constant") — a confirmed-neutral Stage 1 makes Stage 2 a pure quality
+  improvement; a confirmed-negative Stage 1 makes Stage 2's depth-2 approach
+  the thing actually being bet on to make route-awareness pay for itself.
+
+**Stages 2 and 3 remain gated** — do not start either until the above is
+resolved and the owner has reviewed Stage 1.
+
+**Next session should start with the `validation/` PyMahjongGB harness**, not
+Stage 2 — it's been outstanding since PLAN.md's original scope and CLAUDE.md's
+scoring-validation rule is currently unsatisfiable without it (see CLAUDE.md).
+That's unrelated to this phase's ranking question but is a bigger, older gap.
+
 ## The problem, from a live hand
 
 Opening hand: 2C triplet, 5B pair, eight isolated tiles. The coach
