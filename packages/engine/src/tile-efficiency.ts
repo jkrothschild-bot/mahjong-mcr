@@ -133,7 +133,12 @@ export interface RouteAssessment {
 // interactive-feel budgets (well under the ~100ms "instant" threshold) for a
 // once-per-hint-open computation, not a per-frame one, so this is fine as-is
 // without needing Stage 2's depth-2 profiling concerns yet.
-function routeTableFor(
+// Exported for hints.ts's Hand Plan tab (KICKOFF-phase10 gap: it was showing
+// a single crowned-min shape/shanten via calculateShanten, the exact
+// collapse Stage 1a undid for discard ranking) — same per-shape table,
+// computed directly on a hand's current counts rather than a post-discard
+// candidate.
+export function routeTableFor(
   counts: Readonly<Record<TileTypeId, number>>,
   meldCount: number,
   cache: Map<string, number>,

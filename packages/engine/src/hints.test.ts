@@ -238,4 +238,49 @@ describe('computeHandPlan', () => {
     expect(plan.bestCaseReachesMinimum).toBe(true)
     expect(plan.worstCaseReachesMinimum).toBe(false)
   })
+
+  // KICKOFF-phase10 gap fix: HandPlanTab used to render a single crowned-min
+  // shape/shanten line (plan.shanten.shape), exactly the collapse Stage 1a
+  // undid for discard ranking — just never undone here. Same live hand as
+  // the computeBestMoveHint fixtures above (1C 2C2C2C 6C 9C 4D 3B 5B5B 8B WE
+  // WS WN): Standard sits 5-shanten, Seven Pairs 4-shanten, a 1-shanten gap
+  // — inside VIABLE_ROUTE_SHANTEN_MARGIN, so both must stay listed as
+  // viable and NEITHER gets crowned primary.
+  it('both routes stay viable and neither is named primary when they sit within the margin of each other', () => {
+    const concealed = [
+      ...idsFor('C1', 1), ...idsFor('C2', 3), ...idsFor('C6', 1), ...idsFor('C9', 1),
+      ...idsFor('D4', 1),
+      ...idsFor('B3', 1), ...idsFor('B5', 2), ...idsFor('B8', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WN', 1),
+    ]
+    const plan = computeHandPlan(handWith(concealed), { prevailingWind: 'east', seatWind: 'north' })
+
+    const standardRow = plan.routes.find((r) => r.shape === 'standard')!
+    const sevenPairsRow = plan.routes.find((r) => r.shape === 'sevenPairs')!
+    expect(standardRow.shanten).toBe(5)
+    expect(standardRow.viable).toBe(true)
+    expect(sevenPairsRow.shanten).toBe(4)
+    expect(sevenPairsRow.viable).toBe(true)
+    expect(plan.primaryRoute).toBeNull()
+  })
+
+  // The other half: once a route genuinely clears the margin, it — and only
+  // it — is named primary. Reuses the "every wait reaches 8+" tenpai fixture
+  // above (Standard tenpai at 0-shanten; Seven Pairs is several shanten back
+  // with only 3 of its 8 pairs formed — well outside the margin).
+  it('names the primary route once it clearly pulls ahead of every other route', () => {
+    const concealed = [
+      ...idsFor('C3', 1),
+      ...idsFor('C4', 1),
+      ...idsFor('B7', 1),
+      ...idsFor('B8', 1),
+      ...idsFor('B9', 1),
+      ...idsFor('DW', 3),
+      ...idsFor('DG', 3),
+      ...idsFor('C9', 2),
+    ]
+    const plan = computeHandPlan(handWith(concealed), { prevailingWind: 'east', seatWind: 'north' })
+    expect(plan.shanten.shanten).toBe(0)
+    expect(plan.primaryRoute).toBe('standard')
+  })
 })

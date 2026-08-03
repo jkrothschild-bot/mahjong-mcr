@@ -5,8 +5,8 @@ import type { Meld } from './meld.js'
 import { MINIMUM_POINTS_TO_WIN } from './scoring/derive-context.js'
 import { isDragonTypeId, isWindTypeId, parseSuited } from './scoring/set-helpers.js'
 import type { FanMatch } from './scoring/types.js'
-import { calculateShanten, type ShantenResult } from './shanten.js'
-import { ALL_SHANTEN_SHAPES, evaluateDiscards, type DiscardEvaluation, type RouteAssessment } from './tile-efficiency.js'
+import { calculateShantenFromCounts, type ShantenResult } from './shanten.js'
+import { ALL_SHANTEN_SHAPES, evaluateDiscards, routeTableFor, type DiscardEvaluation, type RouteAssessment } from './tile-efficiency.js'
 import { typeIdOf, typeIdOfInstance, type TileInstanceId, type TileTypeId } from './tiles.js'
 import { computeWaits, type WaitOption, type WinCircumstanceContext } from './waits.js'
 
@@ -257,6 +257,22 @@ export interface FanProgress {
 
 export interface HandPlanResult {
   shanten: ShantenResult
+  // KICKOFF-phase10 gap close: per-shape shanten/outs for the CURRENT hand
+  // (not a post-discard candidate — that's evaluateDiscards' job), so "how
+  // far is Seven Pairs really" is never crowned away by `shanten` above's own
+  // min-first collapse. `viable` reuses bots/policy.ts's own
+  // VIABLE_ROUTE_SHANTEN_MARGIN — the SAME threshold the Best Move tab's
+  // route table already uses — rather than a second, independently-tuned
+  // number that could drift out of sync with it.
+  routes: RouteRow[]
+  // Set only when exactly one route is viable, i.e. every other route sits
+  // outside VIABLE_ROUTE_SHANTEN_MARGIN of the best. A hand 4-shanten by
+  // Seven Pairs and 5-shanten by Standard has a 1-shanten gap — inside the
+  // margin, so BOTH stay viable and this is null. Shanten counts steps, not
+  // likelihood (a two-sided run partial has roughly triple Seven Pairs'
+  // acceptance per pairing a single), so a 1-shanten numeric lead isn't a
+  // real commitment yet — naming a primary route there would overstate it.
+  primaryRoute: ShantenResult['shape'] | null
   // Fans guaranteed no matter how the hand ends up completing. At tenpai,
   // this is the EXACT intersection of every wait's fanMatches (both win
   // methods) — not a heuristic, since it's built directly from computeWaits,
@@ -342,12 +358,22 @@ function intersectFanMatches(fanMatchLists: readonly FanMatch[][]): FanProgress[
 }
 
 export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}): HandPlanResult {
-  const shanten = calculateShanten(hand.concealedTiles, hand.melds)
+  const cache = new Map<string, number>()
+  const counts = groupConcealedByType(hand.concealedTiles)
+  const shanten = calculateShantenFromCounts(counts, hand.melds.length, cache)
+  const rawRoutes = routeTableFor(counts, hand.melds.length, cache)
+  const bestRouteShanten = Math.min(...rawRoutes.map((r) => r.shanten))
+  const routes: RouteRow[] = rawRoutes.map((r) => ({ ...r, viable: r.shanten <= bestRouteShanten + VIABLE_ROUTE_SHANTEN_MARGIN }))
+  const viableRoutes = routes.filter((r) => r.viable)
+  const primaryRoute = viableRoutes.length === 1 ? viableRoutes[0]!.shape : null
+
   const waits = computeWaits(hand.concealedTiles, hand.melds, context)
 
   if (waits.length === 0) {
     return {
       shanten,
+      routes,
+      primaryRoute,
       lockedInFans: lockedInFansFromMelds(hand.melds, context),
       waits: [],
       bestCaseReachesMinimum: null,
@@ -360,6 +386,8 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
 
   return {
     shanten,
+    routes,
+    primaryRoute,
     lockedInFans: intersectFanMatches(allFanMatchLists),
     waits,
     bestCaseReachesMinimum: allBasicPoints.some((p) => p >= MINIMUM_POINTS_TO_WIN),

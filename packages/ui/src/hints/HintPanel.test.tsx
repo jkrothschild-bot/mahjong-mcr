@@ -32,7 +32,10 @@ describe('HintPanel', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Hand plan' }))
     expect(screen.getByRole('tab', { name: 'Hand plan' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'false')
-    expect(screen.getByText(/shanten/)).toBeInTheDocument()
+    // The route table now repeats shanten numbers per-shape, so a bare
+    // /shanten/ text query is ambiguous — just assert the Hand plan tab's
+    // own content rendered.
+    expect(screen.getByRole('list', { name: 'Route table' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tile safety' }))
     expect(screen.getByRole('tab', { name: 'Tile safety' })).toHaveAttribute('aria-selected', 'true')
