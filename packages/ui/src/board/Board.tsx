@@ -17,6 +17,7 @@ import { DISCARD_ZONE_ID, END_ZONE_ID, resolveDragEndAction } from '../hand/reso
 import { revealOrder } from '../hand/revealOrder.js'
 import { useHandOrder } from '../hand/useHandOrder.js'
 import { GameStage } from '../stage/GameStage.js'
+import { SharedLayoutEnabledContext } from '../stage/Positioned.js'
 import type { SeatRole } from '../stage/stageLayout.js'
 import { CallOutToast } from '../game/CallOutToast.js'
 import { DiscardField } from './DiscardField.js'
@@ -55,6 +56,9 @@ export interface BoardProps {
   // Optional: ReplayView doesn't carry the latch and shouldn't
   // need to stub it.
   showDiscardHint?: boolean
+  // Synthetic occupancy previews reuse tile ids, so their tile positions
+  // cannot safely participate in Motion's shared-layout registry.
+  enableSharedLayout?: boolean
 }
 
 // Physical seat position never changes hand-to-hand (unlike wind labels,
@@ -81,6 +85,7 @@ export function Board({
   selectedTypeId,
   onInspectTile,
   showDiscardHint,
+  enableSharedLayout = true,
 }: BoardProps) {
   // state.seed, not state.handNumber — see useHandOrder's own comment on
   // why handNumber alone can't detect a fresh deal across a Restart (it
@@ -211,7 +216,12 @@ export function Board({
     // viewports (measured designWidth 1424 at 1910px was exactly
     // 768*(1536/827), the cap, not the window) — removing it lets
     // computeDesignWidth read the real available width.
-    <div className="flex w-full min-h-0 flex-1 flex-col items-center gap-1">
+    <SharedLayoutEnabledContext.Provider value={enableSharedLayout}>
+    <div
+      data-testid="game-board"
+      data-shared-layout={enableSharedLayout ? 'enabled' : 'disabled'}
+      className="flex w-full min-h-0 flex-1 flex-col items-center gap-1"
+    >
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <WindIndicator matchState={matchState} />
         <WallCounter wall={state.wall} />
@@ -291,5 +301,6 @@ export function Board({
           button). Anything added below the stage reintroduces that bug —
           put it in a modal instead. */}
     </div>
+    </SharedLayoutEnabledContext.Provider>
   )
 }

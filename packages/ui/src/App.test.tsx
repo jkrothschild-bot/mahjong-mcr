@@ -11,6 +11,7 @@ describe('App', () => {
     const preview = screen.getByRole('button', { name: 'Preview full board' })
     fireEvent.click(preview)
     expect(screen.getByRole('button', { name: 'Exit full board' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('game-board')).toHaveAttribute('data-shared-layout', 'disabled')
     for (const [seat, flowerCount] of [
       [0, 5],
       [1, 8],
@@ -21,6 +22,7 @@ describe('App', () => {
     }
     fireEvent.click(screen.getByRole('button', { name: 'Exit full board' }))
     expect(screen.getByRole('button', { name: 'Preview full board' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('game-board')).toHaveAttribute('data-shared-layout', 'enabled')
   })
   it('renders the header and all four seats', () => {
     render(<App />)

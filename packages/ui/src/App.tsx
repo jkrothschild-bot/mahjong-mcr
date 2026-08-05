@@ -245,6 +245,7 @@ function App() {
           // Sort forced a second update.
           key={boardPreviewOpen ? 'full-board-preview' : 'live-board'}
           state={displayState}
+          enableSharedLayout={!boardPreviewOpen && devOccupancyMode === null}
           matchState={matchState}
           matchScores={matchScores}
           isHumanTurn={boardPreviewOpen ? false : isHumanTurn}

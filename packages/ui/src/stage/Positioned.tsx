@@ -1,5 +1,11 @@
 import { motion } from 'motion/react'
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
+
+// Synthetic full-board previews intentionally reuse the finite set of
+// physical tile ids across several display-only zones. Shared-layout ids
+// must therefore be disabled for that tree or Motion can treat two distinct
+// preview tiles as the same object and temporarily hide one of them.
+export const SharedLayoutEnabledContext = createContext(true)
 
 export interface PositionedProps {
   // Final, already-scaled stage-space center (from stageLayout.ts's
@@ -60,15 +66,16 @@ export function Positioned({
   className,
   children,
 }: PositionedProps) {
+  const sharedLayoutEnabled = useContext(SharedLayoutEnabledContext)
   const swapped = (((rotation % 180) + 180) % 180) === 90
   const boxWidth = (swapped ? naturalHeight : naturalWidth) * scale
   const boxHeight = (swapped ? naturalWidth : naturalHeight) * scale
 
   return (
     <motion.div
-      layout
-      layoutId={layoutId}
-      transition={{ duration: 0.35, ease: 'easeInOut' }}
+      layout={sharedLayoutEnabled}
+      layoutId={sharedLayoutEnabled ? layoutId : undefined}
+      transition={sharedLayoutEnabled ? { duration: 0.35, ease: 'easeInOut' } : { duration: 0 }}
       className={`absolute flex items-center justify-center ${className ?? ''}`}
       style={{
         left: x,
