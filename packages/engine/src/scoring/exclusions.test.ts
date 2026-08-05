@@ -87,13 +87,20 @@ describe('All Simples / Pure Terminal Chows exclude No Honors', () => {
   })
 })
 
-describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-check', () => {
+describe('Out with Replacement Tile excludes Self-Drawn', () => {
   it('Out with Replacement Tile (46) should exclude Self-Drawn (80) — its own definition requires self-draw', () => {
     // fan_calculator.cpp, "杠上开花不计自摸". Same pattern our table already
-    // has for Last Tile Draw ([44,80]) — 46 was missed.
-    expect(areExclusive(46, 80)).toBe(false) // SHOULD be true
+    // has for Last Tile Draw ([44,80]) — 46 was missed. See
+    // score-hand.test.ts for a dedicated isolated integration test —
+    // docs/rules/decisions.md #20 found this pair has zero clean
+    // occurrences in the 1200-hand harness sample (always entangled with
+    // item #13's separate ambiguity), so this table-level unit test alone
+    // isn't enough evidence the real fix works end-to-end.
+    expect(areExclusive(46, 80)).toBe(true)
   })
+})
 
+describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-check', () => {
   it('All Green (3) should exclude Half Flush (50) and One Voided Suit (75) — fan 3 has NO exclusion entries at all currently', () => {
     // fan_calculator.cpp, "绿一色不计混一色、缺一门" ("All Green doesn't count
     // Half Flush, One Voided Suit"). All Green (only Bamboo 2/3/4/6/8 +

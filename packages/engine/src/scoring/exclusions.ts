@@ -244,6 +244,18 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   [40, 75], // One Voided Suit
   // 44. Last Tile Draw
   [44, 80], // Self-Drawn
+  // 46. Out with Replacement Tile — derived, same pattern as [44,80] just
+  // above. Both fans are flat (whole-hand, count always 1), so a whole-fan
+  // exclusion entry is architecturally safe (unlike fan 73's countable
+  // case — see item #24). The kong-replacement-draw path of fan 46
+  // (detectOutWithReplacementTile's `wonOnKongReplacement` branch) requires
+  // winMethod === 'selfDraw' by construction, which is Self-Drawn's (80)
+  // entire definition — every hand reaching fan 46 via that path
+  // unavoidably also satisfies 80 for the same win. (Fan 46's OTHER path,
+  // the last-discard-of-game branch, has winMethod === 'discard' and so
+  // never co-occurs with 80 in the first place — this pair is a no-op for
+  // that path, not a conflict.) docs/rules/decisions.md #28.
+  [46, 80], // Self-Drawn
   // 47. Robbing The Kong
   [47, 58], // Last Tile
   // 53. Melded Hand

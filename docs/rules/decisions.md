@@ -704,13 +704,37 @@ corrected to match. See each item's status.
     as new follow-up, not part of Step 3 proper — out of the originally authorized scope for
     this pass.
 
+28. **Step 3, fix 5/6: Out with Replacement Tile (46) now excludes Self-Drawn (80) —
+    `[46,80]` added to `exclusions.ts`.** Both fans are flat, so a whole-fan exclusion is
+    architecturally safe (same reasoning as item #26, unlike item #24's fan 73 case). Fan 46's
+    kong-replacement-draw path (`detectOutWithReplacementTile`'s `wonOnKongReplacement` branch)
+    requires `winMethod === 'selfDraw'` by construction — exactly fan 80's entire definition —
+    so every hand reaching 46 that way unavoidably also satisfies 80 for the same win. (Fan 46's
+    other path, the last-discard-of-game branch, has `winMethod === 'discard'` and so never
+    co-occurs with 80 at all — this pair is inert for that path, matching item #13's separately-
+    tracked ambiguity, not a new conflict with it.) Evidence: PyMahjongGB's `fan_calculator.cpp`,
+    `"杠上开花不计自摸"` ("Kong-replacement-flower doesn't count Self-Drawn"). Same pattern as the
+    existing `[44,80]` (Last Tile Draw) entry. **Per item #20's flag, this pair had zero clean
+    occurrences in the 1200-hand harness sample** (every apparent hit was actually item #13's
+    unrelated ambiguity) — validated instead with a dedicated, deterministic integration test:
+    `score-hand.test.ts`'s new "scores Out with Replacement Tile alone, not stacked with
+    Self-Drawn, on a kong-replacement self-draw win", constructing a concealed-kong hand won by
+    self-draw on the kong's own replacement tile and asserting fan 46 present, fan 80 absent
+    (`fanIds` = `[46, 67, 73]` — Concealed Kong and Pung of Terminals or Honors are unavoidable
+    structural freebies of using a wind kong at all, not part of what's being isolated). Fixture:
+    `exclusions.test.ts`'s `it` moved out of "KNOWN BUG" into its own describe, flipped to
+    `toBe(true)`. **Harness re-run:** `our_bug` 48 → 16 (−32, including items #25's/#26's own
+    remaining tail plus this fix); `their_bug` 6 → 7 (+1); `ambiguity` 202 → 204 (+2);
+    unclassified unchanged at 57; coverage unchanged at 80/81; the harness's own
+    `targeted-46-out-with-replacement` case, which never isolated this pair before, no longer
+    mismatches at all. Full engine suite green (435 passed, 1 skipped — 1 new integration test).
+
 ## Open follow-up work
 
-- Step 3 (two remaining exclusion/detector bugs from item #19): Out with Replacement Tile vs
-  Self-Drawn (validate with a dedicated isolated case per item #20's note — this sample has
-  never isolated it cleanly), All Green family. Each already has a permanent fixture — see item
-  #19 for the file/line and item #20 for the `[46,80]` isolation caveat. (Tile Hog chow-counting
-  fixed — item #25; All Simples/Pure Terminal Chows vs No Honors fixed — item #26.)
+- Step 3 (one remaining bug from item #19): All Green family (`[3,50]`/`[3,75]`) — already has a
+  permanent fixture, see item #19 for the file/line. (Tile Hog chow-counting fixed — item #25;
+  All Simples/Pure Terminal Chows vs No Honors fixed — item #26; Out with Replacement Tile vs
+  Self-Drawn fixed — item #28.)
 - New, found while verifying item #25/#26 (not part of Step 3's original 6-bug scope):
   `detectTileHog` only reports count 1 even when two separate tile types are each hogged in the
   same hand (item #27, fixture added, not fixed); All Even Pungs (21) and All Fives (31) also

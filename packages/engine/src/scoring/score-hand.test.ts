@@ -16,6 +16,10 @@ function pungMeld(id: string, tiles: number[]): Meld {
   return { id, kind: 'pung', exposure: 'exposed', tiles, ownerSeat: 0 }
 }
 
+function concealedKongMeld(id: string, tiles: number[]): Meld {
+  return { id, kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles, ownerSeat: 0 }
+}
+
 describe('resolveFanConflicts', () => {
   it('drops the lower-scoring fan of a real conflicting pair (Big Four Winds vs Big Three Winds)', () => {
     // fan 1 (Big Four Winds, 88) excludes fan 38 (Big Three Winds, 12) —
@@ -196,6 +200,37 @@ describe('scoreHand', () => {
     const result = scoreHand({ concealedTiles, melds: [] })
     expect(result.basicPoints).toBe(88)
     expect(result.fanMatches).toEqual([{ fanId: 6, count: 1 }])
+  })
+
+  // docs/rules/decisions.md #28 (and #20's note): a dedicated, deterministic
+  // isolation test for exclusions.ts's [46,80] pair, since the validation
+  // harness's 1200-hand sample was found to have ZERO clean occurrences of
+  // it — every harness hit was actually item #13's separate ambiguity
+  // (fan 45/46 textual overlap on a plain last-discard win), not this pair.
+  // Constructs the ONE path that can isolate it cleanly: a concealed kong,
+  // won by self-draw on that kong's own replacement tile (fan 46's
+  // `wonOnKongReplacement` branch, which requires winMethod === 'selfDraw'
+  // by construction — exactly fan 80's own definition).
+  it('scores Out with Replacement Tile alone, not stacked with Self-Drawn, on a kong-replacement self-draw win', () => {
+    const concealedTiles = [...idsFor('D8', 2), ...idsFor('C2', 1), ...idsFor('C3', 1), ...idsFor('C4', 1), ...idsFor('D6', 3), ...idsFor('B3', 1), ...idsFor('B4', 1), ...idsFor('B5', 1)]
+    expect(concealedTiles.length).toBe(11)
+    const kong = concealedKongMeld('0-0', idsFor('WE', 4))
+    const result = scoreHand({
+      concealedTiles,
+      melds: [kong],
+      winMethod: 'selfDraw',
+      wonOnKongReplacement: true,
+    })
+    // Concealed Kong (67, 2pts) and Pung of Terminals or Honors (73, 1pt —
+    // the East wind kong, with no prevailingWind/seatWind set here to
+    // exclude it) are unavoidable structural freebies of using a wind kong
+    // at all, same "verify the correct combined total" approach as the All
+    // Honors/Quadruple Chow tests above — not part of what this test is
+    // isolating. What matters: fan 46 present, fan 80 (Self-Drawn) absent,
+    // even though winMethod really is 'selfDraw'.
+    const fanIds = result.fanMatches.map((m) => m.fanId).sort()
+    expect(fanIds).toEqual([46, 67, 73])
+    expect(fanIds).not.toContain(80)
   })
 })
 
