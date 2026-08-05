@@ -149,6 +149,18 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // 2. Big Three Dragons
   [2, 54], // Two Dragon Pungs
   [2, 59], // Dragon Pung
+  // 3. All Green — derived, same "structurally implies a broader fan"
+  // pattern as the rest of this table; fan 3 had NO exclusion entries at
+  // all before this. All Green (only Bamboo 2/3/4/6/8 + Green Dragon)
+  // trivially satisfies both Half Flush's (50: exactly one suit plus
+  // honors) and One Voided Suit's (75: exactly one suit used) own
+  // definitions for the same tiles. Both fans are flat, so a whole-fan
+  // entry is architecturally safe (unlike fan 73's countable case — item
+  // #24). Evidence: PyMahjongGB's fan_calculator.cpp, "绿一色不计混一色、缺
+  // 一门" ("All Green doesn't count Half Flush, One Voided Suit").
+  // docs/rules/decisions.md #29.
+  [3, 50], // Half Flush
+  [3, 75], // One Voided Suit
   // 4. Nine Gates
   [4, 22], // Full Flush
   [4, 62], // Concealed Hand

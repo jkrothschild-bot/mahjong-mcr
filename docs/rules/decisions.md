@@ -729,17 +729,39 @@ corrected to match. See each item's status.
     `targeted-46-out-with-replacement` case, which never isolated this pair before, no longer
     mismatches at all. Full engine suite green (435 passed, 1 skipped — 1 new integration test).
 
+29. **Step 3, fix 6/6 (last of the original six): All Green (3) now excludes Half Flush (50)
+    and One Voided Suit (75) — `[3,50]`/`[3,75]` added to `exclusions.ts`.** Fan 3 had no
+    exclusion entries at all before this. All three fans are flat, so a whole-fan exclusion is
+    architecturally safe. All Green (only Bamboo 2/3/4/6/8 + Green Dragon) trivially satisfies
+    both Half Flush's (exactly one suit plus honors) and One Voided Suit's (exactly one suit
+    used) own definitions for the same tiles. Evidence: PyMahjongGB's `fan_calculator.cpp`,
+    `"绿一色不计混一色、缺一门"` ("All Green doesn't count Half Flush, One Voided Suit"). Fixture:
+    `exclusions.test.ts`'s `it` moved out of "KNOWN BUG" into its own describe, flipped to
+    `toBe(true)`; the "KNOWN BUG" header comment removed too, since this was the last fixture
+    under it — every `it` in the file now asserts correct, fixed behavior. **Harness re-run:**
+    `our_bug` 16 → 15 (−1); `their_bug`/`ambiguity` unchanged at 7/204; unclassified unchanged at
+    57; coverage unchanged at 80/81. Full engine suite green (435 passed, 1 skipped).
+
+    **Step 3 complete.** All six originally-confirmed exclusion/detector bugs from item #19 are
+    fixed, each in its own commit, fixture-first, with a harness delta reported for every one:
+    `[60,73]`/`[61,73]` (item #22, corrected to a detector-level fix in item #24), Fully
+    Concealed Hand family (item #23), Tile Hog chow-counting (item #25), All Simples/Pure
+    Terminal Chows vs No Honors (item #26), Out with Replacement Tile vs Self-Drawn (item #28),
+    All Green family (this item). `our_bug` fell from 449 (item #19's original count, now
+    understood as 7 bugs not 6 per CLAUDE.md's Step 0 correction) to 15 — the residual 15 splits
+    between the pre-existing item #11 concealment ambiguity (8 hands, unrelated to Step 3) and
+    the newly-found item #27 Tile Hog multi-type gap (7 hands, discovered but deliberately not
+    fixed — out of the original 6-bug scope). Two more new, unfixed gaps surfaced along the way
+    and are tracked below: item #27 itself, and the `[21,76]`/`[31,76]` All Even Pungs/All Fives
+    finding from item #26's allowlist cleanup.
+
 ## Open follow-up work
 
-- Step 3 (one remaining bug from item #19): All Green family (`[3,50]`/`[3,75]`) — already has a
-  permanent fixture, see item #19 for the file/line. (Tile Hog chow-counting fixed — item #25;
-  All Simples/Pure Terminal Chows vs No Honors fixed — item #26; Out with Replacement Tile vs
-  Self-Drawn fixed — item #28.)
-- New, found while verifying item #25/#26 (not part of Step 3's original 6-bug scope):
-  `detectTileHog` only reports count 1 even when two separate tile types are each hogged in the
-  same hand (item #27, fixture added, not fixed); All Even Pungs (21) and All Fives (31) also
-  structurally exclude No Honors (76) but have no `[21,76]`/`[31,76]` entries (found via
-  allowlist cleanup, no fixture yet).
+- New, found while fixing Step 3's six bugs (not part of the original scope): `detectTileHog`
+  only reports count 1 even when two separate tile types are each hogged in the same hand (item
+  #27, fixture added, not fixed); All Even Pungs (21) and All Fives (31) also structurally
+  exclude No Honors (76) but have no `[21,76]`/`[31,76]` entries (found via allowlist cleanup,
+  item #26, no fixture yet).
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - Triage the remaining ~55 unclassified mismatches from item #20's run (rerun

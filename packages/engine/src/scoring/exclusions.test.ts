@@ -58,19 +58,15 @@ describe('Prevalent Wind / Seat Wind do not blanket-exclude Pung of Terminals or
   })
 })
 
-// KNOWN BUGS, found by the validation harness (KICKOFF-validation-harness.md
-// Stage 1, docs/rules/decisions.md's newest "Confirmed" entry) by
-// cross-checking against PyMahjongGB 1.3.0's own exclusion table
-// (fan_calculator.cpp's adjust_fan_table). Recorded per CLAUDE.md's "every
-// scoring bug found becomes a permanent test fixture before it is fixed"
-// rule — these assertions describe ACTUAL (wrong) behavior; do not "fix"
-// them to pass differently, fix exclusions.ts in a separate commit and then
-// flip every `toBe(false)` below to `toBe(true)`.
-//
-// Each is the same shape of bug: a fan whose own definition structurally
-// forces another (lower-value) fan's condition to also be true, but the
-// pair was never added to RAW_EXCLUSION_PAIRS, so scoreHand currently
-// double-counts both instead of keeping only the higher-value one
+// The following describe blocks were all originally "KNOWN BUG" fixtures
+// found by the validation harness (KICKOFF-validation-harness.md Stage 1,
+// docs/rules/decisions.md #19) by cross-checking against PyMahjongGB 1.3.0's
+// own exclusion table (fan_calculator.cpp's adjust_fan_table) — Step 3
+// (decisions.md #22-#29) fixed every one of them; each `it` below now
+// asserts the CORRECT (fixed) behavior, not the original bug. Each is the
+// same shape of fix: a fan whose own definition structurally forces another
+// (lower-value) fan's condition to also be true, so the pair was added to
+// RAW_EXCLUSION_PAIRS to stop scoreHand double-counting both
 // (§3.9.1.5's Non-Repeat Principle). Each is cited to the exact PyMahjongGB
 // source line that independently implements the same suppression.
 describe('All Simples / Pure Terminal Chows exclude No Honors', () => {
@@ -100,15 +96,15 @@ describe('Out with Replacement Tile excludes Self-Drawn', () => {
   })
 })
 
-describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-check', () => {
-  it('All Green (3) should exclude Half Flush (50) and One Voided Suit (75) — fan 3 has NO exclusion entries at all currently', () => {
+describe('All Green excludes Half Flush and One Voided Suit', () => {
+  it('All Green (3) should exclude Half Flush (50) and One Voided Suit (75) — fan 3 had NO exclusion entries at all before this', () => {
     // fan_calculator.cpp, "绿一色不计混一色、缺一门" ("All Green doesn't count
     // Half Flush, One Voided Suit"). All Green (only Bamboo 2/3/4/6/8 +
     // Green Dragon) trivially also satisfies both fans' own definitions
     // (one suit + honors; exactly one suit used) — same Non-Repeat shape as
-    // every other pair above, just never transcribed for fan 3 at all.
-    expect(areExclusive(3, 50)).toBe(false) // SHOULD be true
-    expect(areExclusive(3, 75)).toBe(false) // SHOULD be true
+    // every other pair in this table, just never transcribed for fan 3.
+    expect(areExclusive(3, 50)).toBe(true)
+    expect(areExclusive(3, 75)).toBe(true)
   })
 })
 
