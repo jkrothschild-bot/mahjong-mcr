@@ -85,9 +85,14 @@ function detectTileHog(ctx: HandContext): FanMatch[] {
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
   for (const meld of ctx.melds) {
-    const id = meldTileTypeId(meld)
-    counts.set(id, (counts.get(id) ?? 0) + meld.tiles.length)
-    if (meld.kind === 'kong') kongTypes.add(id)
+    // Credit each physical tile's own type individually — a chow's 3 tiles
+    // are 3 DIFFERENT types (meldTileTypeId's "typeId = tiles[0]" convention
+    // is only valid for pung/kong, where all tiles share one type).
+    for (const tile of meld.tiles) {
+      const id = typeIdOfInstance(tile)
+      counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
+    if (meld.kind === 'kong') kongTypes.add(meldTileTypeId(meld))
   }
   for (const [id, count] of counts) {
     if (count === 4 && !kongTypes.has(id)) return [{ fanId: 64, count: 1 }]

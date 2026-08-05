@@ -644,6 +644,25 @@ corrected to match. See each item's status.
     citation, now honestly reported as needing real triage); coverage unchanged at 80/81. Full
     engine suite green (433 passed, 1 skipped — 3 new fixtures added).
 
+25. **Step 3, fix 3/6: Tile Hog (64) now correctly counts a chow's 3 distinct tile types
+    individually, instead of misattributing all 3 to the chow's low tile.** `detectTileHog`
+    (`fans-2.ts`) used to add `meld.tiles.length` to `counts[meldTileTypeId(meld)]` for every
+    meld — correct for a pung/kong (all physical tiles really share one type) but wrong for a
+    chow, where `meldTileTypeId` returns only the low tile's type (`meld.ts`'s "typeId =
+    tiles[0]" convention, deliberately used elsewhere for representing a chow AS one set) — so a
+    hand with an exposed pung of a tile PLUS an exposed chow starting at that same tile (a
+    genuine 4th physical copy, real Tile Hog) silently read as 6 copies of the pung's type and
+    never hit the `=== 4` check. Fixed by crediting each meld tile's own type individually via
+    `typeIdOfInstance`, only using `meldTileTypeId` for the (correct, pung/kong-only) kong-type
+    check. Not a rulebook ambiguity — a straightforward implementation bug; evidence was
+    PyMahjongGB's cross-check (the single largest `our_bug` bucket, ~78-87 hands depending on
+    which other fixes had already landed). Fixture: `fans-2.test.ts`'s Tile Hog describe, its
+    "BUG: misses..." `it` renamed and flipped `toEqual([])` → `toEqual([{ fanId: 64, count: 1
+    }])`. **Harness re-run (isolated: before/after this fix alone, both against the item #23
+    baseline, before item #24's wind correction):** `our_bug` 286 → 191 (−95); unclassified 55 →
+    54 (−1); `ambiguity`/`their_bug` unchanged; coverage unchanged at 80/81. Full engine suite
+    green (430 passed, 1 skipped — no new tests, existing fixture flipped in place).
+
 ## Open follow-up work
 
 - Step 3 (three remaining exclusion/detector bugs from item #19): All Simples/Pure Terminal

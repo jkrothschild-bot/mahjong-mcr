@@ -211,41 +211,36 @@ describe('Tile Hog (fan 64)', () => {
     expect(FANS_2_DETECTORS[64]!(ctx)).toEqual([])
   })
 
-  // KNOWN BUG, found by the validation harness (KICKOFF-validation-harness.md
-  // Stage 1) — recorded per CLAUDE.md's "every scoring bug found becomes a
-  // permanent test fixture before it is fixed" rule. This asserts ACTUAL
-  // (wrong) behavior; do not "fix" it to pass differently — fix
-  // detectTileHog in a separate commit, then flip toEqual([]) below to
-  // toEqual([{ fanId: 64, count: 1 }]).
-  //
-  // detectTileHog counts a meld's contribution as
+  // Regression test for a fixed bug, found by the validation harness
+  // (KICKOFF-validation-harness.md Stage 1, docs/rules/decisions.md #24).
+  // detectTileHog used to count a meld's contribution as
   // `counts[meldTileTypeId(meld)] += meld.tiles.length` — correct for a
   // pung/kong (all `tiles.length` physical tiles really are the same type),
   // but meldTileTypeId(meld) for a CHOW returns only tiles[0]'s type (the
   // lowest tile — see meld.ts's own meldTileTypeId and set-helpers.ts's
   // allSets, which use this "typeId = tiles[0]" convention deliberately for
-  // representing a chow AS a set). Reusing that same convention here
-  // silently attributes all 3 of the chow's DIFFERENT tiles (e.g. C1, C2,
+  // representing a chow AS a set). Reusing that same convention there
+  // silently attributed all 3 of the chow's DIFFERENT tiles (e.g. C1, C2,
   // C3) to a single count bump on C1's type alone — so a hand with an
   // exposed pung of C1 (3 copies) PLUS an exposed chow starting at C1 (a
-  // 4th, genuinely different physical C1) should read as 4 total C1
-  // copies used without a kong (real Tile Hog) but instead reads as
-  // count['C1'] = 3 (pung) + 3 (chow, wrongly attributed) = 6 — never
-  // hitting the `=== 4` check at all, so this real case is silently missed.
-  // Found via PyMahjongGB cross-check (Stage 1's 1200-hand run hit this
-  // ~78 times — the single largest unexplained bucket after the two missing
-  // exclusion-pair families).
-  it('BUG: misses Tile Hog when the 4th copy comes from an exposed chow, not the concealed hand', () => {
+  // 4th, genuinely different physical C1) read as 4 total C1 copies used
+  // without a kong (real Tile Hog) but instead read as count['C1'] = 3
+  // (pung) + 3 (chow, wrongly attributed) = 6 — never hitting the `=== 4`
+  // check at all, so this real case was silently missed. Found via
+  // PyMahjongGB cross-check (Stage 1's 1200-hand run hit this ~78 times —
+  // the single largest unexplained bucket after the two missing
+  // exclusion-pair families). Fixed by crediting each meld tile's own type
+  // individually instead of trusting meldTileTypeId's chow shortcut.
+  it('matches Tile Hog when the 4th copy comes from an exposed chow, not the concealed hand', () => {
     const c1 = idsFor('C1', 4) // 4 distinct physical copies of C1
     const pungTiles = c1.slice(0, 3)
     const chowLowTile = c1[3]!
     const chowMeld: Meld = { id: '0-0', kind: 'chow', exposure: 'exposed', tiles: [chowLowTile, ...idsFor('C2', 1), ...idsFor('C3', 1)], ownerSeat: 0 }
     const melds = [pungMeld('0-1', pungTiles), chowMeld]
     const ctx = ctxWith({ melds })
-    // This SHOULD be [{ fanId: 64, count: 1 }] — all 4 copies of C1 are
-    // used (3 in the pung, 1 as the chow's low tile) and none of them are
-    // in a kong. It's [] only because of the bug documented above.
-    expect(FANS_2_DETECTORS[64]!(ctx)).toEqual([])
+    // All 4 copies of C1 are used (3 in the pung, 1 as the chow's low tile)
+    // and none of them are in a kong.
+    expect(FANS_2_DETECTORS[64]!(ctx)).toEqual([{ fanId: 64, count: 1 }])
   })
 })
 
