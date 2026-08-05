@@ -586,13 +586,30 @@ corrected to match. See each item's status.
     alone); `their_bug` unchanged at 6; **unclassified unchanged at 55** (no new mismatches
     introduced); coverage unchanged at 80/81. Full engine suite green (430 passed, 1 skipped).
 
+23. **Step 3, fix 2/6: Fully Concealed Hand (56) now excluded by five fans that already
+    structurally require full concealment — `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
+    added to `exclusions.ts`.** Nine Gates (4), Seven Shifted Pairs (6), Thirteen Orphans (7),
+    Four Concealed Pungs (12), and Seven Pairs (19) can each never contain an exposed meld by
+    their own definition, so a self-drawn win on any of them was double-scoring the concealment
+    itself as both the named fan's value and Fully Concealed Hand's 6pts on top — same
+    Non-Repeat Principle (§3.9.1.5) shape as item #22 and the existing `[56,80]` derived entry.
+    Not a literal quote in any of the six fans' own rulebook text. Evidence: PyMahjongGB's
+    `adjust_fan_table` explicitly downgrades Fully Concealed Hand to plain Self-Drawn for Nine
+    Gates and Four Concealed Pungs ("把不求人修正为自摸"), and its special-shape scoring path
+    never calls the self-drawn-concealment setter at all for the other three, so 56 can
+    structurally never fire for those either. Fixture: `exclusions.test.ts`'s "Fully Concealed
+    Hand should be excluded..." describe (renamed from "KNOWN BUG — ..." now that it's fixed),
+    all five `it` blocks flipped to `toBe(true)`. **Harness re-run:** `our_bug` 376 → 286 (−90);
+    `ambiguity` unchanged at 156; `their_bug` unchanged at 6; **unclassified unchanged at 55**;
+    coverage unchanged at 80/81. Full engine suite green (430 passed, 1 skipped).
+
 ## Open follow-up work
 
-- Step 3 (five remaining exclusion/detector bugs from item #19/#22): Fully Concealed Hand
-  family, Tile Hog chow-counting, All Simples/Pure Terminal Chows vs No Honors, Out with
-  Replacement Tile vs Self-Drawn (validate with a dedicated isolated case per item #20's note —
-  this sample has never isolated it cleanly), All Green family. Each already has a permanent
-  fixture — see item #19 for the file/line and item #20 for the `[46,80]` isolation caveat.
+- Step 3 (four remaining exclusion/detector bugs from item #19): Tile Hog chow-counting, All
+  Simples/Pure Terminal Chows vs No Honors, Out with Replacement Tile vs Self-Drawn (validate
+  with a dedicated isolated case per item #20's note — this sample has never isolated it
+  cleanly), All Green family. Each already has a permanent fixture — see item #19 for the
+  file/line and item #20 for the `[46,80]` isolation caveat.
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - Triage the remaining ~55 unclassified mismatches from item #20's run (rerun

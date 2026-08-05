@@ -99,6 +99,27 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // the same win. Same pattern as fan 44's existing (rulebook-stated)
   // exclusion of 80.
   [56, 80],
+  // 4/6/7/12/19 -> 56: derived. Fully Concealed Hand (56) means "won by
+  // self-draw with no melded sets" — these five fans each already
+  // structurally guarantee that same all-concealed shape by their own
+  // definition (Nine Gates/Seven Shifted Pairs/Thirteen Orphans/Four
+  // Concealed Pungs/Seven Pairs can never contain an exposed meld), so any
+  // one of them completed by self-draw would otherwise double-score the
+  // concealment itself as both the named fan's own value AND 56's 6pts on
+  // top. Not stated in any of the six fans' own rulebook text (derived, same
+  // shape as [56,80] just above). Evidence this was missing: PyMahjongGB's
+  // `adjust_fan_table` explicitly downgrades Fully Concealed Hand to plain
+  // Self-Drawn for Nine Gates (4) and Four Concealed Pungs (12) ("把不求人
+  // 修正为自摸"), and its `calculate_special_form_fan` path (Seven Pairs
+  // family/Thirteen Orphans/Honors-and-Knitted) never calls
+  // `adjust_by_self_drawn` at all — the only place Fully Concealed Hand is
+  // ever set — so 56 can structurally never fire for those shapes either.
+  // docs/rules/decisions.md #23.
+  [4, 56],
+  [6, 56],
+  [7, 56],
+  [12, 56],
+  [19, 56],
   // 60/61 -> 73: derived, same "named exact-count wind/honor fan implies the
   // generic per-unit Pung of Terminals or Honors fan" pattern already
   // present for fans 1/4/8/9/11/18/38 (all of which already exclude 73 in

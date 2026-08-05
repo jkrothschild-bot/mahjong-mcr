@@ -114,20 +114,20 @@ describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-che
 // is ever set — so it can never fire for those shapes in the first place.
 // Confirmed empirically against every one of these labels in Stage 1's
 // 1200-hand run.
-describe('KNOWN BUG — Fully Concealed Hand should be excluded by fans that already require full concealment', () => {
+describe('Fully Concealed Hand should be excluded by fans that already require full concealment', () => {
   it('Nine Gates (4) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(4, 56)).toBe(false) // SHOULD be true
+    expect(areExclusive(4, 56)).toBe(true)
   })
   it('Four Concealed Pungs (12) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(12, 56)).toBe(false) // SHOULD be true
+    expect(areExclusive(12, 56)).toBe(true)
   })
   it('Seven Shifted Pairs (6) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(6, 56)).toBe(false) // SHOULD be true
+    expect(areExclusive(6, 56)).toBe(true)
   })
   it('Seven Pairs (19) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(19, 56)).toBe(false) // SHOULD be true
+    expect(areExclusive(19, 56)).toBe(true)
   })
   it('Thirteen Orphans (7) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(7, 56)).toBe(false) // SHOULD be true
+    expect(areExclusive(7, 56)).toBe(true)
   })
 })
