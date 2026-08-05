@@ -120,16 +120,26 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   [7, 56],
   [12, 56],
   [19, 56],
-  // 60/61 -> 73: derived, same "named exact-count wind/honor fan implies the
-  // generic per-unit Pung of Terminals or Honors fan" pattern already
-  // present for fans 1/4/8/9/11/18/38 (all of which already exclude 73 in
-  // the original/derived table above). Prevalent Wind (60) and Seat Wind
-  // (61) are each a single wind pung that trivially also satisfies 73's
-  // per-pung count for that same physical pung — without this, a hand could
-  // score Prevalent/Seat Wind (2pts) AND Pung of Terminals or Honors (1pt)
-  // again for the identical pung. docs/rules/decisions.md #22.
-  [60, 73],
-  [61, 73],
+  // NOTE: [60,73]/[61,73] (Prevalent/Seat Wind vs Pung of Terminals or
+  // Honors) deliberately do NOT belong in this table, unlike every other
+  // "named exact-count fan implies the generic per-unit fan" pair above
+  // (1/4/8/9/11/18/38 -> 73). Fan 73 is COUNTABLE (its FanMatch carries one
+  // aggregated count across every qualifying pung in the hand), and
+  // resolveFanConflicts drops a whole-fan MATCH, not a per-set contribution
+  // — so a pairwise entry here would silently zero out credit for any OTHER
+  // independent terminal/honor pung in the same hand whenever a wind pung
+  // happens to also be present, not just the one overlapping pung. Fan 73's
+  // own text ("A Dragon pung scores 2 points instead") already resolves its
+  // one stated overlap at the physical-set level, not the whole-fan level —
+  // confirmed by a worked example (App.1 p.38, fan 57 example 1) scoring
+  // Dragon Pung AND Pung of Terminals or Honors side-by-side in one hand.
+  // The correct fix lives in detectPungOfTerminalsOrHonors itself (fans-1.ts):
+  // it excludes the specific pung(s) matching ctx.prevailingWind/seatWind
+  // from its OWN count, the same way it already excludes dragon pungs by
+  // construction, leaving any other qualifying pung still counted.
+  // docs/rules/decisions.md #24 (supersedes #22's exclusion-table approach;
+  // #22's underlying finding — these two overlap on the same physical pung
+  // — was correct, only the implementation mechanism was wrong).
   // 1. Big Four Winds
   [1, 38], // Big Three Winds
   [1, 49], // All Pungs

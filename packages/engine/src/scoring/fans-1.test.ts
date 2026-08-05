@@ -170,6 +170,54 @@ describe('Pung of Terminals or Honors (fan 73)', () => {
     const ctx = ctxWith({ decomposition })
     expect(FANS_1_DETECTORS[73]!(ctx)).toEqual([])
   })
+
+  // docs/rules/decisions.md #24: excludes the specific pung matching
+  // ctx.prevailingWind/seatWind from its own count (same physical-set-level
+  // resolution as the dragon exclusion above), but must NOT drop credit for
+  // an unrelated terminal/wind pung elsewhere in the same hand — a whole-fan
+  // exclusion pair in exclusions.ts would have done exactly that (see the
+  // note above RAW_EXCLUSION_PAIRS's [60,73]/[61,73] non-entry).
+  it('excludes the pung matching prevailingWind from its count, but still counts an unrelated terminal pung', () => {
+    const decomposition: Decomposition = {
+      pair: 'C5',
+      sets: [
+        { type: 'pung', tiles: ['WE', 'WE', 'WE'] }, // matches prevailingWind — excluded
+        { type: 'pung', tiles: ['C1', 'C1', 'C1'] }, // independent terminal pung — still counts
+        { type: 'chow', tiles: ['D2', 'D3', 'D4'] },
+        { type: 'pung', tiles: ['DR', 'DR', 'DR'] }, // dragon — already excluded
+      ],
+    }
+    const ctx = ctxWith({ decomposition, prevailingWind: 'east' })
+    expect(FANS_1_DETECTORS[73]!(ctx)).toEqual([{ fanId: 73, count: 1 }])
+  })
+
+  it('excludes the pung matching seatWind from its count the same way', () => {
+    const decomposition: Decomposition = {
+      pair: 'C5',
+      sets: [
+        { type: 'pung', tiles: ['WS', 'WS', 'WS'] }, // matches seatWind — excluded
+        { type: 'pung', tiles: ['C1', 'C1', 'C1'] }, // independent terminal pung — still counts
+        { type: 'chow', tiles: ['D2', 'D3', 'D4'] },
+        { type: 'pung', tiles: ['DR', 'DR', 'DR'] },
+      ],
+    }
+    const ctx = ctxWith({ decomposition, seatWind: 'south' })
+    expect(FANS_1_DETECTORS[73]!(ctx)).toEqual([{ fanId: 73, count: 1 }])
+  })
+
+  it('excludes a pung matching BOTH prevailingWind and seatWind (double wind) from the count exactly once, still not double-subtracting', () => {
+    const decomposition: Decomposition = {
+      pair: 'C5',
+      sets: [
+        { type: 'pung', tiles: ['WE', 'WE', 'WE'] }, // matches both — excluded once
+        { type: 'pung', tiles: ['C1', 'C1', 'C1'] },
+        { type: 'pung', tiles: ['C9', 'C9', 'C9'] },
+        { type: 'chow', tiles: ['D2', 'D3', 'D4'] },
+      ],
+    }
+    const ctx = ctxWith({ decomposition, prevailingWind: 'east', seatWind: 'east' })
+    expect(FANS_1_DETECTORS[73]!(ctx)).toEqual([{ fanId: 73, count: 2 }])
+  })
 })
 
 describe('Melded Kong (fan 74)', () => {

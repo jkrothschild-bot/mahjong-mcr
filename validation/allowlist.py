@@ -112,11 +112,6 @@ LAST_DISCARD_OVERLAP_NAMES = {"Out with Replacement Tile"}
 # them "known, tracked" instead of "unknown."
 OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'Prevalent/Seat Wind should exclude Pung of Terminals or Honors' "
-        "(missing [60,73]/[61,73])",
-        frozenset({"Prevalent Wind", "Seat Wind", "Pung of Terminals or Honors"}),
-    ),
-    (
         "packages/engine/src/scoring/exclusions.test.ts — 'Fully Concealed Hand should be excluded by fans requiring full "
         "concealment' (missing [4,56]/[6,56]/[7,56]/[12,56]/[19,56])",
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),

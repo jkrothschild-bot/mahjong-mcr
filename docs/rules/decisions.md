@@ -603,13 +603,54 @@ corrected to match. See each item's status.
     `ambiguity` unchanged at 156; `their_bug` unchanged at 6; **unclassified unchanged at 55**;
     coverage unchanged at 80/81. Full engine suite green (430 passed, 1 skipped).
 
+24. **Correction to item #22: Prevalent/Seat Wind vs Pung of Terminals or Honors needed a
+    set-level fix in the detector, not a whole-fan `exclusions.ts` entry — the `[60,73]`/
+    `[61,73]` pairs are now REMOVED.** Found while re-running the harness after item #22 landed:
+    of the mismatches still citing that family, most had a diff of `{'Pung of Terminals or
+    Honors'}` alone, with NO wind fan present — a symptom the family's loose name-overlap check
+    (`remaining & family`) shouldn't have been claiming credit for. Direct inspection (seed
+    601187264) showed why: our engine scored `{Three Concealed Pungs, All Pungs, Dragon Pung,
+    Prevalent Wind, Seat Wind, One Voided Suit, Self-Drawn}` — missing `Pung of Terminals or
+    Honors` entirely — while PyMahjongGB scored the same set PLUS `Pung of Terminals or Honors:
+    1`, alongside Prevalent Wind and Seat Wind, not instead of them. Fan 73 is a **countable**
+    per-unit fan (one `FanMatch` with an aggregated count across every qualifying pung in the
+    hand); `resolveFanConflicts` drops a whole `FanMatch`, not a per-set contribution — so the
+    `[60,73]`/`[61,73]` pairwise entries were zeroing out fan 73's ENTIRE count (including
+    credit for the hand's fourth, unrelated terminal pung) whenever a wind pung was merely
+    *present*, not just excluding the one physical pung that actually overlaps.
+    **rules-lawyer consulted** (full transcript context: fan 73's own text, "A Dragon pung
+    scores 2 points instead," is the only on-point precedent for how this fan resolves overlap,
+    and it does so per physical set — confirmed by App.1 p.38's fan 57 example 1, which scores
+    Dragon Pung AND Pung of Terminals or Honors side-by-side in the same hand for two different
+    physical pungs). No rulebook passage states the Prevalent/Seat Wind exclusion's granularity
+    directly (same "derived, not a literal quote" status as before), but fan 73's own dragon
+    clause is the closest analogous case and it is unambiguously set-level. **Fix:**
+    `detectPungOfTerminalsOrHonors` (`fans-1.ts`) now excludes any set whose `typeId` matches
+    `ctx.prevailingWind`/`seatWind` from its own count — by construction, the same way it already
+    excludes dragon pungs — instead of relying on a table-level exclusion. `exclusions.ts`'s
+    `[60,73]`/`[61,73]` entries removed with a comment explaining why they don't belong there.
+    `exclusions.test.ts`'s two fixtures rewritten to assert `areExclusive(60,73)`/`(61,73)` are
+    `false` (a documented non-pair, not a bug), with new fixtures added to `fans-1.test.ts`
+    covering: an unrelated terminal pung still counts alongside an excluded wind pung; the
+    seat-wind case; and a "double wind" pung (matches both prevailing AND seat wind at once)
+    excluded exactly once, not double-subtracted. Also removed the now-obsolete
+    `[60,73]`/`[61,73]` entry from `validation/allowlist.py`'s `OUR_BUG_FAMILIES` — it was still
+    catching 1 residual mismatch under a stale citation after this fix landed; that mismatch now
+    correctly falls through to unclassified instead of being hidden behind a closed bug's name.
+    **Harness re-run:** `our_bug` 191 → 121 (a further **−70** beyond item #22's own reported
+    delta, confirming the whole-fan-drop mechanism was itself causing new mismatches, not just
+    failing to fix old ones); `ambiguity` 156 → 195 (+39); `their_bug` unchanged at 6;
+    unclassified 54 → 55 (+1, the one hand that was falsely claimed by the now-removed stale
+    citation, now honestly reported as needing real triage); coverage unchanged at 80/81. Full
+    engine suite green (433 passed, 1 skipped — 3 new fixtures added).
+
 ## Open follow-up work
 
-- Step 3 (four remaining exclusion/detector bugs from item #19): Tile Hog chow-counting, All
-  Simples/Pure Terminal Chows vs No Honors, Out with Replacement Tile vs Self-Drawn (validate
-  with a dedicated isolated case per item #20's note — this sample has never isolated it
-  cleanly), All Green family. Each already has a permanent fixture — see item #19 for the
-  file/line and item #20 for the `[46,80]` isolation caveat.
+- Step 3 (three remaining exclusion/detector bugs from item #19): All Simples/Pure Terminal
+  Chows vs No Honors, Out with Replacement Tile vs Self-Drawn (validate with a dedicated
+  isolated case per item #20's note — this sample has never isolated it cleanly), All Green
+  family. Each already has a permanent fixture — see item #19 for the file/line and item #20
+  for the `[46,80]` isolation caveat. (Tile Hog chow-counting fixed — item #25.)
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - Triage the remaining ~55 unclassified mismatches from item #20's run (rerun

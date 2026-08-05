@@ -1,7 +1,7 @@
 import { isWinningHand } from '../win-detection.js'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from '../tiles.js'
 import type { FanMatch, HandContext } from './types.js'
-import { allSets, isDragonTypeId, isHonorTypeId, isTerminalTypeId, isWindTypeId, parseSuited, type SuitChar } from './set-helpers.js'
+import { allSets, isDragonTypeId, isHonorTypeId, isTerminalTypeId, isWindTypeId, parseSuited, windTypeId, type SuitChar } from './set-helpers.js'
 
 // 69. Pure Double Chow — 1 pt, PER QUALIFYING RANK. §3.8.1 p.16 / App.1 p.41:
 // "Two identical chows in the same suit." Exact count === 2 per (suit,rank)
@@ -98,11 +98,31 @@ function detectTwoTerminalChows(ctx: HandContext): FanMatch[] {
 // (Big/Little Four Winds, Big Three Winds, All Terminals, All Honors, Nine
 // Gates) already excludes fan 73 via the original rulebook-transcribed
 // table.
+//
+// Also excludes, by construction (not via exclusions.ts), any pung/kong
+// matching ctx.prevailingWind/seatWind — the same physical-set-level
+// resolution fan 73's own dragon clause already uses. This is deliberately
+// NOT a RAW_EXCLUSION_PAIRS entry: fan 73 is countable (one aggregated
+// count per hand), and resolveFanConflicts drops a whole FanMatch, not a
+// per-set contribution — a pairwise [60,73]/[61,73] entry would zero out
+// credit for any OTHER, unrelated terminal/honor pung in the same hand
+// whenever a wind pung happened to also be present. See
+// docs/rules/decisions.md #24 for the full reasoning and the PyMahjongGB
+// evidence (a hand scoring Prevalent Wind + Seat Wind + Dragon Pung + Pung
+// of Terminals or Honors:1 side-by-side, that 1 count coming from a 4th,
+// independent terminal pung — never from the wind pung itself).
 function detectPungOfTerminalsOrHonors(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  const prevalentWindTypeId = ctx.prevailingWind ? windTypeId(ctx.prevailingWind) : null
+  const seatWindTypeId = ctx.seatWind ? windTypeId(ctx.seatWind) : null
   const count = sets.filter(
-    (s) => s.kind !== 'chow' && (isTerminalTypeId(s.typeId) || isWindTypeId(s.typeId)) && !isDragonTypeId(s.typeId),
+    (s) =>
+      s.kind !== 'chow' &&
+      (isTerminalTypeId(s.typeId) || isWindTypeId(s.typeId)) &&
+      !isDragonTypeId(s.typeId) &&
+      s.typeId !== prevalentWindTypeId &&
+      s.typeId !== seatWindTypeId,
   ).length
   return count > 0 ? [{ fanId: 73, count }] : []
 }

@@ -38,6 +38,26 @@ describe('EXCLUDES / areExclusive', () => {
   })
 })
 
+// Prevalent Wind (60) / Seat Wind (61) vs Pung of Terminals or Honors (73)
+// deliberately do NOT get a RAW_EXCLUSION_PAIRS entry — see
+// docs/rules/decisions.md #24. Fan 73 is a countable per-unit fan, and a
+// pairwise exclusion table entry would make resolveFanConflicts drop its
+// WHOLE aggregated count (including credit for any other, independent
+// terminal/honor pung in the same hand) instead of just the one physical
+// pung that overlaps with 60/61. The real fix is in fans-1.test.ts's
+// detectPungOfTerminalsOrHonors tests — it excludes the matching wind pung
+// from its own count, the same way it already excludes dragon pungs by
+// construction.
+describe('Prevalent Wind / Seat Wind do not blanket-exclude Pung of Terminals or Honors', () => {
+  it('Prevalent Wind (60) and Pung of Terminals or Honors (73) are not a whole-fan exclusion pair', () => {
+    expect(areExclusive(60, 73)).toBe(false)
+  })
+
+  it('Seat Wind (61) and Pung of Terminals or Honors (73) are not a whole-fan exclusion pair', () => {
+    expect(areExclusive(61, 73)).toBe(false)
+  })
+})
+
 // KNOWN BUGS, found by the validation harness (KICKOFF-validation-harness.md
 // Stage 1, docs/rules/decisions.md's newest "Confirmed" entry) by
 // cross-checking against PyMahjongGB 1.3.0's own exclusion table
@@ -47,30 +67,13 @@ describe('EXCLUDES / areExclusive', () => {
 // them to pass differently, fix exclusions.ts in a separate commit and then
 // flip every `toBe(false)` below to `toBe(true)`.
 //
-// All five are the same shape of bug: a fan whose own definition
-// structurally forces another (lower-value) fan's condition to also be
-// true, but the pair was never added to RAW_EXCLUSION_PAIRS, so scoreHand
-// currently double-counts both instead of keeping only the higher-value one
+// Each is the same shape of bug: a fan whose own definition structurally
+// forces another (lower-value) fan's condition to also be true, but the
+// pair was never added to RAW_EXCLUSION_PAIRS, so scoreHand currently
+// double-counts both instead of keeping only the higher-value one
 // (§3.9.1.5's Non-Repeat Principle). Each is cited to the exact PyMahjongGB
 // source line that independently implements the same suppression.
 describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-check', () => {
-  it('Prevalent Wind (60) should exclude Pung of Terminals or Honors (73) — same physical wind pung', () => {
-    // fan_calculator.cpp's adjust_fan_table has no direct "圈风刻不计幺九刻"
-    // line, but get_1_pung_fan is only ever invoked on a pung NOT already
-    // claimed by the seat/prevalent-wind check in adjust_by_packs_traits —
-    // structurally, PyMahjongGB never double-awards a wind pung that
-    // matches the table wind. Confirmed empirically: KICKOFF-validation-harness.md
-    // Stage 1's targeted-43-chicken-hand case (prevalentWind=East, a
-    // concealed East pung) scores ONLY 'Prevalent Wind' (2pts) on
-    // PyMahjongGB's side, never also 'Pung of Terminals or Honors' (1pt),
-    // for that same pung.
-    expect(areExclusive(60, 73)).toBe(true)
-  })
-
-  it('Seat Wind (61) should exclude Pung of Terminals or Honors (73) — same physical wind pung', () => {
-    expect(areExclusive(61, 73)).toBe(true)
-  })
-
   it('All Simples (68) should exclude No Honors (76) — All Simples structurally has no honors', () => {
     // fan_calculator.cpp, "断幺不计无字" ("All Simples doesn't count No
     // Honors"). Our table already has this same pattern for 8 other fans
