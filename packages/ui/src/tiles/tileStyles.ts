@@ -71,7 +71,8 @@ export const TILE_FACE_CLASSES = 'border-neutral-500 bg-neutral-100 text-neutral
 // stack's own back styling (WallCounter.tsx) and the face styling, per
 // SPEC.md §5's "clear physical separation, never similar enough to require
 // guessing."
-export const TILE_BACK_CLASSES = 'border-indigo-900 bg-indigo-950 text-indigo-200'
+export const TILE_BACK_CLASSES =
+  'border-[#d6c28e] bg-[#0b4b50] text-teal-100 shadow-[inset_1px_1px_1px_rgba(255,255,255,0.22),inset_-1px_-2px_2px_rgba(0,18,20,0.5),2px_3px_4px_rgba(0,0,0,0.4)]'
 
 export const TILE_HIGHLIGHT_CLASSES = 'ring-2 ring-amber-400'
 

@@ -53,5 +53,5 @@ export function tileImageSrc(typeId: TileTypeId): string | undefined {
 }
 
 export function botBackImageSrc(): string {
-  return ASSET_BY_KEY['bot-back']!
+  return ASSET_BY_KEY['bot-back-realistic']!
 }

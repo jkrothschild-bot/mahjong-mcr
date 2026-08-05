@@ -4,7 +4,7 @@ export type Tile3DTone = 'face' | 'back' | 'wood'
 
 const EDGE_GRADIENT: Record<Tile3DTone, string> = {
   face: 'linear-gradient(to bottom, #e5ddc8, #8a7654)',
-  back: 'linear-gradient(to bottom, #3730a3, #1e1b4b)',
+  back: 'linear-gradient(to bottom, #1b676b, #07363a 58%, #032529)',
   wood: 'linear-gradient(to bottom, #c9a876, #7a5c33)',
 }
 
