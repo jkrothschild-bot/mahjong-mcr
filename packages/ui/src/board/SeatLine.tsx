@@ -493,6 +493,12 @@ export function SeatLine({
         // as the human row does it.
         const meldTransform =
           shift.dx || shift.dy ? { transform: `translate(${shift.dx}px, ${shift.dy}px)` } : undefined
+        // Side-seat tiles are already quarter-turned to face the table. A
+        // claimed discard still needs to lie across its meld, but adding a
+        // second +90° made the left seat's artwork end up at 180° (upside
+        // down), while the right seat happened to land at 0°. Normalize the
+        // claimed tile to 0° for either side so its face reads upright.
+        const displayRotation = tile.claimed && rotated ? 0 : tileRotation + (tile.claimed ? 90 : 0)
         return (
           <Positioned
             key={tile.id}
@@ -502,7 +508,7 @@ export function SeatLine({
             naturalWidth={tileWidth}
             naturalHeight={tileHeight}
             scale={layout.scale}
-            rotation={tileRotation + (tile.claimed ? 90 : 0)}
+            rotation={displayRotation}
           >
             {tile.kind === 'back' ? (
               <div

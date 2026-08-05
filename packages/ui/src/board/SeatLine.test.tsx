@@ -151,6 +151,28 @@ describe('SeatLine revealed melds', () => {
     expect(sideways.height).toBe(ordinary.width)
   })
 
+  it.each([90, -90] as const)('keeps the claimed discard artwork upright in a side bot meld (rack rotation %i)', (rotation) => {
+    const tiles = idsFor('D5', 3)
+    const claimed: Meld = {
+      id: 'side-meld',
+      kind: 'pung',
+      exposure: 'exposed',
+      tiles,
+      ownerSeat: rotation === 90 ? 1 : 3,
+      claimedFrom: { seat: 0, discardTile: tiles[2]! },
+    }
+    render(
+      <SeatLine
+        seat={claimed.ownerSeat}
+        hand={{ ...emptyHand(), melds: [claimed] }}
+        region={SIDE_REGION}
+        grid={{ columns: 2, rows: 9, rotation }}
+      />,
+    )
+
+    expect(screen.getByTestId('meld-tile-side-meld-2').parentElement!.style.transform).toBe('none')
+  })
+
   it('runs a revealed right-side winning hand down the outer column by whole sets, then the inner column and pair', () => {
     const order = [
       ...idsFor('B2', 1), ...idsFor('B3', 1), ...idsFor('B4', 1),
