@@ -566,11 +566,33 @@ corrected to match. See each item's status.
     stands as-is. Filed `their_bug` in `validation/allowlist.py` with this citation, replacing
     the earlier provisional filing from item #19.
 
+22. **Step 3, fix 1/6: Prevalent Wind (60) / Seat Wind (61) now exclude Pung of Terminals or
+    Honors (73) — `[60,73]`/`[61,73]` added to `exclusions.ts`.** Same "named exact-count
+    wind/honor fan implies the generic per-unit Pung of Terminals or Honors fan" pattern already
+    present in the original rulebook-transcribed table for fans 1/4/8/9/11/18 and the derived
+    entry for fan 38 (§3.9.1.5's Non-Repeat Principle: "when a fan is inevitably implied or
+    included by another fan, both fan may not be scored") — a Prevalent Wind or Seat Wind pung
+    is, by definition, also a wind pung, which trivially satisfies 73's per-pung count for that
+    same physical pung. Not a literal quote in either fan's own rulebook text (derived, like
+    [38,73]). Evidence this was actually missing: PyMahjongGB's `fan_calculator.cpp` never
+    double-awards a wind pung already claimed by the seat/prevalent-wind check in
+    `adjust_by_packs_traits` (see the fixture's own comment in `exclusions.test.ts` for the exact
+    empirical case). Fixture: `exclusions.test.ts`'s two `it` blocks in the "KNOWN BUG — missing
+    exclusion pairs" describe, both flipped `toBe(false) // SHOULD be true` → `toBe(true)`.
+    **Harness re-run (1200 hands, seed 20260805, regenerated so `ours` reflects the fix):**
+    `our_bug` total 449 → 376 (−73, all ex-`[60,73]`/`[61,73]` hands either now match PyMahjongGB
+    exactly or fall through to the item #11 concealment ambiguity alone); `ambiguity` 137 → 156
+    (+19, hands that used to combine this bug with item #11's ambiguity now show the ambiguity
+    alone); `their_bug` unchanged at 6; **unclassified unchanged at 55** (no new mismatches
+    introduced); coverage unchanged at 80/81. Full engine suite green (430 passed, 1 skipped).
+
 ## Open follow-up work
 
-- Fix the six missing-exclusion-pair bugs and the Tile Hog chow-counting bug found by item
-  #19's validation harness (each already has a permanent fixture — see that item for the exact
-  file/line and the `[id,id]` pairs to add).
+- Step 3 (five remaining exclusion/detector bugs from item #19/#22): Fully Concealed Hand
+  family, Tile Hog chow-counting, All Simples/Pure Terminal Chows vs No Honors, Out with
+  Replacement Tile vs Self-Drawn (validate with a dedicated isolated case per item #20's note —
+  this sample has never isolated it cleanly), All Green family. Each already has a permanent
+  fixture — see item #19 for the file/line and item #20 for the `[46,80]` isolation caveat.
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - Triage the remaining ~55 unclassified mismatches from item #20's run (rerun

@@ -99,6 +99,16 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // the same win. Same pattern as fan 44's existing (rulebook-stated)
   // exclusion of 80.
   [56, 80],
+  // 60/61 -> 73: derived, same "named exact-count wind/honor fan implies the
+  // generic per-unit Pung of Terminals or Honors fan" pattern already
+  // present for fans 1/4/8/9/11/18/38 (all of which already exclude 73 in
+  // the original/derived table above). Prevalent Wind (60) and Seat Wind
+  // (61) are each a single wind pung that trivially also satisfies 73's
+  // per-pung count for that same physical pung — without this, a hand could
+  // score Prevalent/Seat Wind (2pts) AND Pung of Terminals or Honors (1pt)
+  // again for the identical pung. docs/rules/decisions.md #22.
+  [60, 73],
+  [61, 73],
   // 1. Big Four Winds
   [1, 38], // Big Three Winds
   [1, 49], // All Pungs

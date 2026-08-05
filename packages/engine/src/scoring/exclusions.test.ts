@@ -64,11 +64,11 @@ describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-che
     // concealed East pung) scores ONLY 'Prevalent Wind' (2pts) on
     // PyMahjongGB's side, never also 'Pung of Terminals or Honors' (1pt),
     // for that same pung.
-    expect(areExclusive(60, 73)).toBe(false) // SHOULD be true
+    expect(areExclusive(60, 73)).toBe(true)
   })
 
   it('Seat Wind (61) should exclude Pung of Terminals or Honors (73) — same physical wind pung', () => {
-    expect(areExclusive(61, 73)).toBe(false) // SHOULD be true
+    expect(areExclusive(61, 73)).toBe(true)
   })
 
   it('All Simples (68) should exclude No Honors (76) — All Simples structurally has no honors', () => {
