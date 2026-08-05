@@ -68,6 +68,41 @@ CONCEALMENT_FAMILY = {
 POINT_VALUE_DIVERGENT_NAMES = {"Two Concealed Kongs"}
 
 # ---------------------------------------------------------------------------
+# Root cause J (their_bug) — docs/rules/decisions.md #20. PyMahjongGB's
+# calculate_honors_and_knitted_tiles additionally sets KNITTED_STRAIGHT
+# whenever LESSER_HONORS_AND_KNITTED_TILES fires AND the hand's suited-tile
+# count is exactly 9 (fan_calculator.cpp: "if (numbered_cnt == 9) {
+# fan_table[KNITTED_STRAIGHT] = 1; }") — i.e. PyMahjongGB stacks Knitted
+# Straight onto ANY Lesser Honors hand with a 5/9 honor/suit split, even
+# though that hand has NO pair and NO extra pung/chow (structurally the
+# no-pair 14-singles shape, fans 20/34's shape). Rules-lawyer verification
+# (docs/rules/decisions.md #20) directly quotes §3.8.1/App.1 p.34's fan 35
+# text ("a special Straight... 3 different Knitted sequences" standing in
+# for 3 of the STANDARD 4 sets) and a worked example captioned "Combined
+# with Tile Hog" — impossible under a no-duplicate, no-pair shape — as clear
+# evidence Knitted Straight requires the pair+extra-set structure our engine
+# implements. PyMahjongGB's bonus stacking for the coincidental 9-suited-
+# tile case is not supported by the rulebook text.
+KNITTED_STRAIGHT_BONUS_STACK_NAMES = {"Lesser Honors and Knitted Tiles", "Knitted Straight"}
+
+# ---------------------------------------------------------------------------
+# Root cause K (ambiguity) — docs/rules/decisions.md #13, already-provisional,
+# now observed diverging in practice (found via targeted-34's own win-
+# circumstance randomization). Fan 46 "Out with Replacement Tile"'s first
+# clause is textually identical to fan 45 "Last Tile Claim"'s entire
+# definition (both: winning off the literal last discard of the game); our
+# engine's detectOutWithReplacementTile (fans-8.ts) fires 46 whenever that
+# happens, treating the overlap as a genuine rulebook redundancy that stacks
+# (45+46 = 16 pts for winning on the game's last discard). PyMahjongGB's
+# adjust_by_win_flag instead gates fan 46 ONLY on WIN_FLAG_ABOUT_KONG (a
+# completely separate flag from WIN_FLAG_WALL_LAST, which alone drives fan
+# 45/44) — i.e. it never stacks 46 onto a plain last-discard win at all.
+# decisions.md #13 already flagged this exact scenario as "revisit if this
+# combination ever looks wrong in practice" — this is that revisit; still
+# provisional pending a rulebook-only resolution, not changed here.
+LAST_DISCARD_OVERLAP_NAMES = {"Out with Replacement Tile"}
+
+# ---------------------------------------------------------------------------
 # Root causes B/D/E/F/H (our_bug) — confirmed engine bugs, each with a
 # permanent fixture already committed. Fix is separate/later work per
 # CLAUDE.md's triage protocol; these entries exist so the report can label
@@ -104,10 +139,33 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
 ]
 
 
+CATEGORY_PRIORITY = {"our_bug": 0, "ambiguity": 1, "their_bug": 2}
+
+# Every known pattern, as (category, citation, family-of-names). A hand can
+# trip more than one pattern at once (e.g. targeted-34 hits both the Knitted
+# Straight bonus-stack quirk AND the Last-Discard-overlap ambiguity
+# simultaneously) — classify_mismatch below peels matched names off the diff
+# iteratively rather than requiring a single family to explain everything.
+ALL_PATTERNS: list[tuple[str, str, frozenset[str]]] = [
+    ("ambiguity", "docs/rules/decisions.md #11 — discard/robKong-completed pung concealment", frozenset(CONCEALMENT_FAMILY)),
+    (
+        "their_bug",
+        "docs/rules/decisions.md #20 — PyMahjongGB stacks Knitted Straight onto any 9-suited-tile Lesser Honors hand; not supported by §3.8.1/App.1 p.34's text",
+        frozenset(KNITTED_STRAIGHT_BONUS_STACK_NAMES),
+    ),
+    (
+        "ambiguity",
+        "docs/rules/decisions.md #13 — Last Tile Claim / Out with Replacement Tile textual overlap, provisional; PyMahjongGB gates fan 46 on isAboutKong only, never on a plain last-discard win",
+        frozenset(LAST_DISCARD_OVERLAP_NAMES),
+    ),
+    *(("our_bug", citation, family) for citation, family in OUR_BUG_FAMILIES),
+]
+
+
 def classify_mismatch(our_fans: Counter, pmgb_fans: Counter) -> Classification | None:
-    only_ours = our_fans - pmgb_fans
-    only_pmgb = pmgb_fans - our_fans
-    all_diff_names = set(only_ours.keys()) | set(only_pmgb.keys())
+    only_ours = set((our_fans - pmgb_fans).keys())
+    only_pmgb = set((pmgb_fans - our_fans).keys())
+    all_diff_names = only_ours | only_pmgb
 
     if not all_diff_names:
         # Fan multisets match exactly; a points-only mismatch here can only
@@ -116,11 +174,22 @@ def classify_mismatch(our_fans: Counter, pmgb_fans: Counter) -> Classification |
             return Classification("their_bug", "fan-map.json _pointValueDivergence — Two Concealed Kongs: ours 8pts (§3.8.1) vs PyMahjongGB 6pts")
         return None
 
-    if all_diff_names <= CONCEALMENT_FAMILY:
-        return Classification("ambiguity", "docs/rules/decisions.md #11 — discard/robKong-completed pung concealment")
+    remaining = set(all_diff_names)
+    matched: list[tuple[str, str]] = []  # (category, citation)
+    changed = True
+    while changed and remaining:
+        changed = False
+        for category, citation, family in ALL_PATTERNS:
+            covered = remaining & family
+            if covered:
+                remaining -= covered
+                matched.append((category, citation))
+                changed = True
 
-    for citation, family in OUR_BUG_FAMILIES:
-        if all_diff_names <= family:
-            return Classification("our_bug", citation)
+    if remaining or not matched:
+        return None
 
-    return None
+    matched.sort(key=lambda m: CATEGORY_PRIORITY[m[0]])
+    best_category = matched[0][0]
+    citations = ", ".join(dict.fromkeys(c for _cat, c in matched))  # de-duplicated, order-preserved
+    return Classification(best_category, citations)

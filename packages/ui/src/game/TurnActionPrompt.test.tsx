@@ -53,6 +53,26 @@ function fourConcealedPungsHand(): Hand {
   }
 }
 
+// Knitted Straight (fan 35, 12 pts, App.1 p.34-35): 9 knitted tiles (1-4-7
+// Dots, 2-5-8 Characters, 3-6-9 Bamboo) + a pung of East + a pair of
+// Characters-1. Before docs/rules/decisions.md #20's fix, isWinningHand
+// returned false for this exact shape — the player could never even declare
+// it, the same class of bug fourConcealedPungsHand's own comment describes
+// (a legal win the UI simply had no way to reach), except this one was in
+// the engine's own win-detection, not the UI layer.
+function knittedStraightHand(): Hand {
+  return {
+    ...emptyHand(),
+    concealedTiles: [
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('C2', 1), ...idsFor('C5', 1), ...idsFor('C8', 1),
+      ...idsFor('B3', 1), ...idsFor('B6', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 3),
+      ...idsFor('C1', 2),
+    ],
+  }
+}
+
 describe('TurnActionPrompt', () => {
   it('offers a self-drawn win on a complete, legal hand', () => {
     const hand = fourConcealedPungsHand()
@@ -85,6 +105,20 @@ describe('TurnActionPrompt', () => {
 
     expect(onDeclare).not.toHaveBeenCalled()
     expect(screen.getByText(/discard as usual to keep playing/i)).toBeInTheDocument()
+  })
+
+  // docs/rules/decisions.md #19/#20: decomposeHand had no notion of a
+  // "knitted" set, so this hand was unwinnable in the live game (not just
+  // unscoreable) — legalDiscardPhaseMoves never offered selfDrawWin because
+  // isWinningHand itself returned false. This proves the fix reaches the
+  // player, not just scoreHand.
+  it('offers a self-drawn win on a Knitted Straight hand', () => {
+    const hand = knittedStraightHand()
+    const state = stateWith(hand, hand.concealedTiles[hand.concealedTiles.length - 1]!)
+
+    render(<TurnActionPrompt state={state} isHumanTurn onDeclare={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Declare win' })).toBeInTheDocument()
   })
 
   it('offers a concealed kong when four of a type are held', () => {

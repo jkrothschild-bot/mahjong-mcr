@@ -83,6 +83,29 @@ describe('ClaimPrompt', () => {
     expect(screen.getByRole('button', { name: 'Pass' })).toBeInTheDocument()
   })
 
+  // docs/rules/decisions.md #19/#20: before the fix, isWinningHand returned
+  // false for a completed Knitted Straight hand no matter how it was
+  // reached, so a discard/rob-kong win off this exact shape was just as
+  // unreachable as the self-drawn case (TurnActionPrompt.test.tsx).
+  it('offers a win when a discard completes a Knitted Straight hand', () => {
+    // 9 knitted tiles (1-4-7 Dots, 2-5-8 Characters, 3-6-9 Bamboo) + a pung
+    // of East, waiting on the 2nd Characters-1 to complete the pair.
+    const hand = handWith([
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('C2', 1), ...idsFor('C5', 1), ...idsFor('C8', 1),
+      ...idsFor('B3', 1), ...idsFor('B6', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 3),
+      ...idsFor('C1', 1),
+    ])
+    const [c1ForDiscard] = idsFor('C1', 2).slice(1)
+    const pendingClaim: PendingClaim = { tile: c1ForDiscard!, fromSeat: 3, kind: 'discard', eligibleSeats: [0], declarations: {} }
+    const state = stateWithPendingClaim(hand, pendingClaim)
+
+    render(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={() => {}} />)
+
+    expect(screen.getByRole('button', { name: 'Win' })).toBeInTheDocument()
+  })
+
   it('calls onDeclare with the clicked move', () => {
     const hand = handWith([...idsFor('B1', 1)])
     const [c5ForDiscard] = idsFor('C5', 1)

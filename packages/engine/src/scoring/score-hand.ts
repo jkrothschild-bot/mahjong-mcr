@@ -1,4 +1,4 @@
-import { decomposeHand, isSevenPairs, isThirteenOrphans } from '../win-detection.js'
+import { decomposeHand, isHonorsAndKnittedTiles, isSevenPairs, isThirteenOrphans, knittedStraightRemainders } from '../win-detection.js'
 import type { Meld } from '../meld.js'
 import type { TileInstanceId, Wind } from '../tiles.js'
 import { areExclusive } from './exclusions.js'
@@ -150,6 +150,12 @@ export function scoreHandDetailed(params: ScoreHandParams): DetailedScoreResult 
   }
   if (isThirteenOrphans(concealedTiles, melds)) {
     candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'thirteenOrphans', ...winCircumstance })
+  }
+  if (isHonorsAndKnittedTiles(concealedTiles, melds)) {
+    candidates.push({ concealedTiles, melds, decomposition: null, specialShape: 'honorsAndKnittedTiles', ...winCircumstance })
+  }
+  for (const { decomposition } of knittedStraightRemainders(concealedTiles, melds)) {
+    candidates.push({ concealedTiles, melds, decomposition, specialShape: 'knittedStraight', ...winCircumstance })
   }
 
   if (candidates.length === 0) return { fanMatches: [], basicPoints: 0, winningShape: null }

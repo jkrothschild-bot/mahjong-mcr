@@ -16,8 +16,13 @@ import type { TileInstanceId, Wind } from '../tiles.js'
 export interface HandContext {
   concealedTiles: TileInstanceId[] // final concealed tiles, winning tile included
   melds: Meld[]
-  decomposition: Decomposition | null // the one candidate parse for this trial; null if using specialShape instead
-  specialShape: 'sevenPairs' | 'thirteenOrphans' | null
+  // The one candidate parse for this trial; null for 'sevenPairs'/
+  // 'thirteenOrphans'/'honorsAndKnittedTiles' (no set structure at all).
+  // Non-null for 'knittedStraight' too, but covers only the non-knitted
+  // remainder (0-1 real sets + the pair) — see win-detection.ts's
+  // knittedStraightRemainders.
+  decomposition: Decomposition | null
+  specialShape: 'sevenPairs' | 'thirteenOrphans' | 'honorsAndKnittedTiles' | 'knittedStraight' | null
 
   // Win-circumstance context, added for the 8-point tier's "special
   // situation" fans (Last Tile Draw, Last Tile Claim, Out with Replacement
@@ -76,11 +81,20 @@ export interface WinningShape {
   // Standard four-sets-plus-pair parse. Covers the CONCEALED tiles only —
   // decomposeHand counts melds toward setsNeeded but never emits them in
   // `sets` — so this maps directly onto the concealed block a seat renders.
+  //
+  // Non-null for 'knittedStraight' too, but only covering the REMAINDER
+  // after the 9 knitted tiles are set aside (0 or 1 real set + the pair) —
+  // see win-detection.ts's knittedStraightRemainders. A consumer must
+  // recognize `specialShape === 'knittedStraight'` and treat the 9 tiles
+  // NOT accounted for by `decomposition` as the 3 knitted sequences, not
+  // silently drop them.
   decomposition: Decomposition | null
-  // Non-null instead of `decomposition` for the two shapes that have no set
-  // structure at all. A consumer has to regroup these from tile counts
-  // (7 pairs; 13 distinct terminals/honors with one doubled).
-  specialShape: 'sevenPairs' | 'thirteenOrphans' | null
+  // Non-null instead of `decomposition` for 'sevenPairs'/'thirteenOrphans'/
+  // 'honorsAndKnittedTiles' — those three have no set structure at all, so a
+  // consumer has to regroup them from tile counts (7 pairs; 13 distinct
+  // terminals/honors with one doubled; 14 distinct singles). 'knittedStraight'
+  // is the one shape where BOTH fields are non-null at once — see above.
+  specialShape: 'sevenPairs' | 'thirteenOrphans' | 'honorsAndKnittedTiles' | 'knittedStraight' | null
 }
 
 export interface DetailedScoreResult extends ScoreResult {

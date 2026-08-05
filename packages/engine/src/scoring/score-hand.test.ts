@@ -254,3 +254,73 @@ describe('scoreHandDetailed', () => {
     expect(scoreHandDetailed({ concealedTiles: idsFor('C1', 3), melds: [] }).winningShape).toBeNull()
   })
 })
+
+// End-to-end proof that the knitted-shape fix (docs/rules/decisions.md
+// #19/#20) reaches scoreHand, not just isWinningHand — these hands were
+// unscoreable at all (basicPoints: 0, no Chicken Hand floor) before
+// win-detection.ts gained isHonorsAndKnittedTiles/knittedStraightRemainders.
+describe('scoreHand — knitted-tile shapes (fans 20/34/35) reach real scoring, not just isWinningHand', () => {
+  it('scores a Greater Honors and Knitted Tiles hand (fan 20, 24 pts)', () => {
+    const concealedTiles = [
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+      ...idsFor('DR', 1), ...idsFor('DG', 1), ...idsFor('DW', 1),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+      ...idsFor('C2', 1), ...idsFor('C5', 1), ...idsFor('C8', 1),
+      ...idsFor('D3', 1),
+    ]
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.fanMatches).toContainEqual({ fanId: 20, count: 1 })
+    expect(result.basicPoints).toBeGreaterThanOrEqual(24)
+
+    const { winningShape } = scoreHandDetailed({ concealedTiles, melds: [] })
+    expect(winningShape?.specialShape).toBe('honorsAndKnittedTiles')
+    expect(winningShape?.decomposition).toBeNull()
+  })
+
+  it('scores a Lesser Honors and Knitted Tiles hand (fan 34, 12 pts)', () => {
+    const concealedTiles = [
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1),
+      ...idsFor('DR', 1), ...idsFor('DG', 1),
+      ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
+      ...idsFor('D2', 1), ...idsFor('D5', 1), ...idsFor('D8', 1),
+      ...idsFor('B3', 1), ...idsFor('B6', 1), ...idsFor('B9', 1),
+    ]
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.fanMatches).toContainEqual({ fanId: 34, count: 1 })
+    expect(result.basicPoints).toBeGreaterThanOrEqual(12)
+  })
+
+  it('scores a Knitted Straight hand (fan 35, 12 pts) — App.1 p.35\'s own worked-example pattern', () => {
+    const concealedTiles = [
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('C2', 1), ...idsFor('C5', 1), ...idsFor('C8', 1),
+      ...idsFor('B3', 1), ...idsFor('B6', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 3),
+      ...idsFor('C1', 2),
+    ]
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.fanMatches).toContainEqual({ fanId: 35, count: 1 })
+    expect(result.basicPoints).toBeGreaterThanOrEqual(12)
+
+    const { winningShape } = scoreHandDetailed({ concealedTiles, melds: [] })
+    expect(winningShape?.specialShape).toBe('knittedStraight')
+    // The remainder decomposition (pung of East + pair of C1) — NOT null,
+    // unlike every other special shape (see types.ts's WinningShape comment).
+    expect(winningShape?.decomposition).toEqual({ pair: 'C1', sets: [{ type: 'pung', tiles: ['WE', 'WE', 'WE'] }] })
+  })
+
+  it('a Knitted Straight hand is no longer stuck at Chicken Hand\'s 8-point floor', () => {
+    // Before the fix, isWinningHand was false for this exact hand, so it
+    // couldn't even be declared a win. Sanity-check the floor didn't just
+    // silently swallow it into a low Chicken Hand score instead.
+    const concealedTiles = [
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('C2', 1), ...idsFor('C5', 1), ...idsFor('C8', 1),
+      ...idsFor('B3', 1), ...idsFor('B6', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 3),
+      ...idsFor('C1', 2),
+    ]
+    const result = scoreHand({ concealedTiles, melds: [] })
+    expect(result.fanMatches).not.toContainEqual({ fanId: 43, count: 1 }) // Chicken Hand
+  })
+})

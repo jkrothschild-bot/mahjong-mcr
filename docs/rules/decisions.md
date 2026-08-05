@@ -84,8 +84,16 @@ corrected to match. See each item's status.
       needs the fan-list extraction to pin down precisely before implementing; tracked as
       follow-up work, not done in this pass (see PLAN.md M2 session notes).
    **Status: CONFIRMED shapes exist (§3.7.2.2, p.13); Thirteen Orphans implemented in this
-   fix; Honors-and-Knitted-Tiles deferred to M2 pending the fan-list extraction for its exact
-   tile split.**
+   fix.**
+   **Deferral CLOSED 2026-08-05 (item #20).** Item 4's tile-composition split was in fact
+   pinned down in the very next session (item #12, below) and the fan-20/34 detectors were
+   written against it — but the *shape-recognition* half of this deferral silently never
+   happened: nobody wired the resulting shape into `decomposeHand`/`isWinningHand`, so the
+   deferral note here kept saying "not yet implemented" for years after the detectors
+   actually were, while `isWinningHand` kept returning `false` for every hand needing them.
+   Found by the validation harness (item #19) and fixed in item #20, which also covers fan 35
+   (Knitted Straight) — a related but structurally distinct shape this item never mentioned
+   at all.
 
 ## Newly confirmed (not originally in this doc)
 
@@ -436,20 +444,127 @@ corrected to match. See each item's status.
       unconditionally unsatisfiable since it was written — see that file's own updated wording
       and `validation/README.md` for how to rerun).
 
+20. **Knitted-tile shapes (fans 20/34/35) are now reachable — item #19's bug fixed, 2026-08-05.**
+    `win-detection.ts` gained `isHonorsAndKnittedTiles` (the shared shape behind fans 20/34: 14
+    distinct single tiles, no pair, no melds — honor count 5/6/7, suit tiles partitioned across
+    the 3 suits with each suit's ranks sharing one knitted sequence and all three sequences
+    used) and `knittedStraightRemainders` (fan 35: the 9-tile knitted pattern stands in for 3 of
+    the standard 4 sets, decomposing whatever's left via the same core search `decomposeHand`
+    already used — extracted into `decomposeWithSetsNeeded` so both share one implementation).
+    Both are wired into `isWinningHand` and `scoreHandDetailed`'s candidate generation. Tile
+    compositions implement item #6's shape-4 recognition and item #12's Greater-Honors split
+    exactly as already ruled there; no new tile-composition ruling was needed for fans 20/34.
+    - **Fan 35's structure verified directly against `mcr_EN.pdf` via `rules-lawyer` before
+      implementing** (not from the pre-existing `fans-12.ts` code comment alone, per CLAUDE.md's
+      "never implement from memory" rule — that comment turned out to be correct, but it hadn't
+      been independently re-checked since it was written). **§3.8.1 p.15 and Appendix 1 p.34,
+      exact quote**: "A special Straight which is formed not with standard chows but with 3
+      different Knitted sequences. For example, 1-4-7 of Dots, 2-5-8 of Characters, and 3-6-9 of
+      Bamboos - but not necessarily in this order." Confirmed as the pair+extra-set shape (NOT
+      fan 20/34's no-pair 14-singles shape) by: (a) the text itself calling it "a special
+      Straight" — the rulebook's term for a set-based shape (fan 28 Pure Straight, fan 39 Mixed
+      Straight), never used for the no-pair shapes; (b) fans 20/34's own text explicitly says
+      "singles" and fan 35's never does; (c) Appendix 1 p.34's three worked examples, one
+      captioned "Combined with Tile Hog" (fan 64) — Tile Hog requires a repeated tile type
+      appearing outside a Kong, structurally impossible under a no-duplicate 14-distinct-singles
+      shape, so the example alone rules out the no-pair reading.
+    - **Real bug found and fixed in the SAME pass, before it ever shipped**: 7 existing fan
+      detectors trusted `allSets(ctx.melds, ctx.decomposition)` to represent the hand's complete
+      4-set picture — true for every candidate type that existed before this fix, but violated
+      by the new Knitted Straight candidate (whose `decomposition` covers only the 0-1 real sets
+      left over after the 9 knitted tiles are set aside; the other 3 "sets" are invisible to
+      `allSets()`). Detectors making a universal claim across `sets` (`.every(...)` or an
+      equivalent loop) without first checking `sets.length === 4` would pass vacuously or
+      incompletely on the short list. Found by a full audit of every `allSets(` call site in
+      `scoring/fans-*.ts`, confirmed live via the validation harness (`targeted-35` scored a
+      spurious "All Terminals and Honors" before the fix). Fixed by adding the same
+      `sets.length !== 4` guard the safe detectors already used, to: `detectAllChows` (63,
+      fans-2.ts), `detectOutsideHand` (55, fans-4.ts), `detectAllPungs` (49, fans-6.ts),
+      `detectAllFives` (31, fans-16.ts), `detectAllEvenPungs` (21, fans-24.ts),
+      `detectAllTerminalsAndHonors` (18, fans-32.ts), `detectAllTerminals` (8, fans-64.ts) and
+      `detectAllHonors` (11, fans-64.ts) — **committed separately from this item** (its own
+      commit, so it can be reverted alone if the guard pattern ever turns out wrong) even
+      though it was found and fixed in the same working session. Every one of these guards is
+      a structural no-op for every pre-existing candidate type (their `sets.length` was already
+      always 4) — confirmed by the full 430-test engine suite staying green with zero
+      behavioral change to any existing fixture. Regression test: `score-hand.test.ts`'s "does
+      not let a Knitted Straight hand falsely trigger whole-hand-universal fans".
+    - **Reaches the player, not just the scorer — verified end-to-end.** `moves.ts`'s
+      `legalDiscardPhaseMoves`/`computeClaimOptionsForSeat` (the sole gate behind both
+      `TurnActionPrompt`'s "Declare win" button and `ClaimPrompt`'s "Win" button) call
+      `isWinningHand` directly with no other wiring needed — both UI prompts are driven purely
+      by `legalMoves`, so the win-detection.ts fix propagates automatically. Added UI-level
+      tests for both paths: `TurnActionPrompt.test.tsx`'s "offers a self-drawn win on a Knitted
+      Straight hand" and `ClaimPrompt.test.tsx`'s "offers a win when a discard completes a
+      Knitted Straight hand".
+    - **Harness re-run after the fix**: coverage rose from 77/81 to **80/81** — the only fan
+      still uncovered is #81 (Flower Tiles), out of scope by design (§19). Added 3 new targeted
+      generators (`targeted-20/34/35`) to `validation/`'s harness itself, which had been
+      deliberately skipping these fans pending exactly this fix. `targeted-20` (Greater Honors)
+      scores an EXACT match against PyMahjongGB (24 pts both sides). `targeted-35` (Knitted
+      Straight) also scores an exact match (15 pts: fan 35 + Concealed Hand + Pung of Terminals
+      or Honors on both sides) — direct confirmation that App.1 p.35's Example 3 caption
+      ("Combined with... Pung of Terminals or Honors") is correctly implemented.
+      `targeted-34` (Lesser Honors) does NOT match — see the next two `ambiguity`/`their_bug`
+      findings below, both new.
+    - **New `their_bug` finding**: PyMahjongGB's `calculate_honors_and_knitted_tiles`
+      additionally sets `KNITTED_STRAIGHT` whenever `LESSER_HONORS_AND_KNITTED_TILES` fires AND
+      the hand's suited-tile count is exactly 9 (`if (numbered_cnt == 9) { fan_table[
+      KNITTED_STRAIGHT] = 1; }`) — i.e. it stacks fan 35 onto ANY 5-honor/9-suit Lesser Honors
+      hand, even though that hand has no pair and no extra set at all (the no-pair 14-singles
+      shape, not fan 35's shape). Not supported by §3.8.1/App.1 p.34's text (see above) — filed
+      `their_bug` in `validation/allowlist.py`, not implemented.
+    - **New evidence for the already-provisional item #13**: the same `targeted-34` case's win
+      circumstance happened to land on a plain last-discard win, and our engine's fan 46 (Out
+      with Replacement Tile) fired alongside fan 45 (Last Tile Claim) per item #13's reading —
+      but PyMahjongGB's `adjust_by_win_flag` gates fan 46 ONLY on `WIN_FLAG_ABOUT_KONG`, a
+      completely separate flag from `WIN_FLAG_WALL_LAST` (which alone drives fan 44/45), and
+      never stacks 46 onto a plain last-discard win. Item #13 already said "revisit if this
+      combination ever looks wrong in practice" — recorded here as that revisit. Still
+      provisional; not changed without a direct rulebook citation resolving the overlap either
+      way. Filed `ambiguity` in `validation/allowlist.py`.
+    - **Harness classifier improved in the same pass**: `validation/allowlist.py`'s
+      `classify_mismatch` now peels off every recognized pattern from a mismatch's fan-name diff
+      iteratively (not just checking one family at a time), so a hand tripping two independent
+      known causes at once — like `targeted-34` above — gets a composed classification instead
+      of falling through to unclassified. **This is re-attribution, not resolution**: the 126
+      hands that moved out of "unclassified" (181 → 55) were already-mismatched hands that the
+      simpler single-family classifier couldn't explain; none of them are newly fixed, and no
+      engine behavior changed in this step — only which citation(s) a mismatch is filed under.
+    - **A real misattribution this exact change caught, worth recording precisely**: item #19's
+      "31x — Out with Replacement Tile should exclude Self-Drawn (missing `[46,80]`)" count was
+      wrong from the moment it was written, not a regression introduced by the classifier
+      change. The old single-family check (`all_diff_names <= {"Out with Replacement Tile",
+      "Self-Drawn"}`) matches a diff of size 1 just as trivially as size 2, so every one of
+      those 31 hands — confirmed by direct query, all 31, zero exceptions — was actually a bare
+      `{"Out with Replacement Tile"}` diff: item #13's overlap (fan 45/46 both firing on a plain
+      last-discard win), not a `[46,80]` Self-Drawn double-count at all. The new peeling
+      classifier checks item #13's narrower pattern first and correctly reclassifies all 31 as
+      `ambiguity`; the `[46,80]` `our_bug` citation now has **zero** confirmed occurrences in
+      this 1200-hand sample (verified directly against the current run, not inferred). **This
+      does not mean `[46,80]` is not a real bug** — `fan_calculator.cpp`'s "杠上开花不计自摸" is
+      still a direct, unambiguous statement that PyMahjongGB excludes fan 80 whenever fan 46
+      fires, and `exclusions.test.ts`'s fixture for it stands on that source-level evidence
+      regardless of sample luck — it means this specific 1200-hand/seed-20260805 sample has
+      never yet produced a hand that isolates `[46,80]` cleanly from item #13's overlap (would
+      need a hand where BOTH fan 46 fires AND our engine's Self-Drawn detector separately fires
+      alongside it, on a kong-replacement self-draw specifically — `targeted-46-out-with-
+      replacement`'s own case doesn't isolate it either, see that generator). Before fixing
+      `[46,80]` in Step 3, re-verify this specific citation empirically rather than trusting the
+      family definition alone — the family as currently written is technically correct (a real
+      bug) but has not been seen in isolation, only in a form that reads as something else.
+
 ## Open follow-up work
 
 - Fix the six missing-exclusion-pair bugs and the Tile Hog chow-counting bug found by item
   #19's validation harness (each already has a permanent fixture — see that item for the exact
   file/line and the `[id,id]` pairs to add).
-- Implement the "knitted" set concept in `win-detection.ts` so `decomposeHand`/`isWinningHand`
-  can recognize Greater/Lesser Honors and Knitted Tiles (fans 20/34) and Knitted Straight (fan
-  35) — see item #19; this was already tracked below for 20/34 specifically, but item #19 found
-  the root cause is shared with fan 35 and is more severe than "detector not written yet" (the
-  detectors already exist and are correct; the shape is structurally unreachable).
+- ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - Get a `rules-lawyer` ruling on fan 48 "Two Concealed Kongs"'s point value (8 vs PyMahjongGB's
   6) directly against §3.8.1's table — see item #19.
-- Triage the remaining ~180 unclassified mismatches from item #19's run (rerun
-  `validation/compare.py --json-report` for the current list).
+- Triage the remaining ~55 unclassified mismatches from item #20's run (rerun
+  `validation/compare.py --json-report` for the current list — down from ~180 after item #20's
+  fix plus the classifier's new pattern-composition logic).
 - Appendix 4 (seat/table rotation detail) is missing from the available PDF — if a more
   complete copy ever turns up, re-verify item #4 (dealer rotation) against it specifically.
 - Fan encyclopedia (M5, `scoring/encyclopedia.ts`) example hands: v1 ships id/name/points/rule

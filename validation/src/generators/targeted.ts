@@ -13,13 +13,13 @@
 // work: those unit tests build a bare HandContext by hand and never touch
 // decomposeHand/isWinningHand/PyMahjongGB at all.
 //
-// Deliberately SKIPPED: fans 20 (Greater Honors and Knitted Tiles), 34
-// (Lesser Honors and Knitted Tiles), 35 (Knitted Straight) — see the "KNOWN
-// BUG" describe block in win-detection.test.ts. decomposeHand has no
-// "knitted" set concept, so isWinningHand returns false for every hand
-// these fans require; no case for them can pass the "must throw if not a
-// real win" generator invariant (1a). Coverage report must list all three
-// as uncovered with this exact reason, not silently.
+// Fans 20/34/35 (Greater/Lesser Honors and Knitted Tiles, Knitted Straight)
+// were skipped here until docs/rules/decisions.md #19/#20 (2026-08-05):
+// decomposeHand had no "knitted" set concept, so isWinningHand returned
+// false for every hand these fans require and no case for them could pass
+// the "must throw if not a real win" generator invariant (1a). Now fixed —
+// see targeted-20/34/35 below, and win-detection.test.ts for the engine-side
+// fixtures these compositions are shared with.
 import {
   isWinningHand,
   mulberry32,
@@ -343,6 +343,47 @@ export function runTargetedGenerators(masterSeed: number): GeneratedCase[] {
   // 58. Last Tile — forced isLastCopyOfItsKind with a plain discard win (not
   // robKong, which would exclude fan 58 via [47,58] — see exclusions.ts).
   add(fromSpec(masterSeed, 'targeted-58-last-tile', { pair: 'D8', sets: [chow('C2', 'C3', 'C4'), pung('D6'), chow('B3', 'B4', 'B5'), pung('C9')] }, { winMethod: 'discard', isLastCopyOfItsKind: true }))
+
+  // 20. Greater Honors and Knitted Tiles — 24 pts (docs/rules/decisions.md
+  // #12/#20). 7 honors + 7 suit singles split 3+3+1 across the 3 different
+  // knitted sequences — same composition as win-detection.test.ts's own
+  // "Greater-style" fixture. 14 distinct singles, no pair, 0 melds.
+  add(
+    (() => {
+      const allocator = new TileAllocator()
+      const singles: TileTypeId[] = ['WE', 'WS', 'WW', 'WN', 'DR', 'DG', 'DW', 'B1', 'B4', 'B7', 'C2', 'C5', 'C8', 'D3']
+      const concealedTiles = singles.map((t) => allocator.take(t, 1)[0]!)
+      return finalize(masterSeed, 'targeted-20-greater-honors-and-knitted-tiles', concealedTiles, [])
+    })(),
+  )
+  // 34. Lesser Honors and Knitted Tiles — 12 pts. 5 honors + 9 suit singles
+  // (3 per suit, one full knitted sequence each) — same composition as
+  // win-detection.test.ts's "Lesser-style" fixture.
+  add(
+    (() => {
+      const allocator = new TileAllocator()
+      const singles: TileTypeId[] = [
+        'WE', 'WS', 'WW', 'DR', 'DG',
+        'C1', 'C4', 'C7', 'D2', 'D5', 'D8', 'B3', 'B6', 'B9',
+      ]
+      const concealedTiles = singles.map((t) => allocator.take(t, 1)[0]!)
+      return finalize(masterSeed, 'targeted-34-lesser-honors-and-knitted-tiles', concealedTiles, [])
+    })(),
+  )
+  // 35. Knitted Straight — 12 pts (docs/rules/decisions.md #20, verified
+  // directly against App.1 p.34-35: the 9-tile knitted pattern stands in
+  // for 3 of the 4 required sets). 1-4-7 Dots + 2-5-8 Characters + 3-6-9
+  // Bamboo + a concealed pung of East + a pair of C1 — App.1 p.35's own
+  // worked-example pattern, same composition as win-detection.test.ts.
+  add(
+    (() => {
+      const allocator = new TileAllocator()
+      const knitted: TileTypeId[] = ['D1', 'D4', 'D7', 'C2', 'C5', 'C8', 'B3', 'B6', 'B9']
+      const knittedTiles = knitted.map((t) => allocator.take(t, 1)[0]!)
+      const concealedTiles = [...knittedTiles, ...allocator.take('WE', 3), ...allocator.take('C1', 2)]
+      return finalize(masterSeed, 'targeted-35-knitted-straight', concealedTiles, [])
+    })(),
+  )
 
   return cases
 }

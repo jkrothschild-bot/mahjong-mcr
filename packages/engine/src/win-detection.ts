@@ -99,16 +99,13 @@ function findSets(counts: Record<TileTypeId, number>, setsNeeded: number): SetSh
   return results
 }
 
-// Standard winning shape: melds.length existing melds (each — including a
-// kong, despite its 4 physical tiles — counts as exactly one "set") plus a
-// decomposition of the concealed tiles into (4 - melds.length) more sets and
-// one pair. Deliberately does NOT special-case a concealed 4-of-a-kind: the
-// generic search below only ever consumes 3 tiles for a pung, so an
-// undeclared concealed kong can only contribute if the 4th tile happens to
-// also complete an adjacent chow — correctly refusing to "backdoor" an
-// undeclared kong into a win otherwise.
-export function decomposeHand(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): Decomposition[] {
-  const setsNeeded = 4 - melds.length
+// The core of decomposeHand, parameterized directly on how many sets are
+// needed rather than deriving it from a real `melds` array — pulled out so
+// knittedStraightRemainders (below) can ask for a specific set count (0 or
+// 1) against a tile pool that isn't itself a real concealed hand (the
+// remainder after removing the 9 knitted tiles), without needing to
+// fabricate placeholder Meld objects just to manipulate the arithmetic.
+function decomposeWithSetsNeeded(concealedTiles: readonly TileInstanceId[], setsNeeded: number): Decomposition[] {
   if (setsNeeded < 0) return []
 
   const counts = groupConcealedByType(concealedTiles)
@@ -124,6 +121,18 @@ export function decomposeHand(concealedTiles: readonly TileInstanceId[], melds: 
   }
 
   return decompositions
+}
+
+// Standard winning shape: melds.length existing melds (each — including a
+// kong, despite its 4 physical tiles — counts as exactly one "set") plus a
+// decomposition of the concealed tiles into (4 - melds.length) more sets and
+// one pair. Deliberately does NOT special-case a concealed 4-of-a-kind: the
+// generic search below only ever consumes 3 tiles for a pung, so an
+// undeclared concealed kong can only contribute if the 4th tile happens to
+// also complete an adjacent chow — correctly refusing to "backdoor" an
+// undeclared kong into a win otherwise.
+export function decomposeHand(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): Decomposition[] {
+  return decomposeWithSetsNeeded(concealedTiles, 4 - melds.length)
 }
 
 // Provisional per docs/rules/decisions.md item 5: no melds of any kind
@@ -170,15 +179,130 @@ export function isThirteenOrphans(concealedTiles: readonly TileInstanceId[], mel
   return pairsFound === 1
 }
 
-// Structural shapes recognized so far: standard (four sets + pair), seven
-// pairs, and Thirteen Orphans. §3.7.2.2 also recognizes a fourth shape —
-// Lesser/Greater Honors and Knitted Tiles (14 single tiles, no pair at all)
-// — deferred to M2 pending the fan-list extraction for its exact
-// Lesser/Greater tile-composition split; see docs/rules/decisions.md #6.
+// --- Knitted-tile shapes (§3.7.2.2 shape (4); docs/rules/decisions.md #6/#12/#20) ---
+
+// The 3 "knitted sequences" fans 20/34/35 are all built from — {1,4,7},
+// {2,5,8}, {3,6,9}, identified by rank mod 3.
+const KNITTED_SEQUENCES: readonly number[][] = [
+  [1, 4, 7],
+  [2, 5, 8],
+  [3, 6, 9],
+]
+const SUIT_CHARS: readonly ('C' | 'D' | 'B')[] = ['C', 'D', 'B']
+// All 6 orderings of the 3 suits, one knitted sequence assigned per suit —
+// the rulebook doesn't pin which suit gets which sequence, just that all 3
+// are used, one each (docs/rules/decisions.md #12).
+const SUIT_PERMUTATIONS: readonly ('C' | 'D' | 'B')[][] = [
+  ['C', 'D', 'B'], ['C', 'B', 'D'], ['D', 'C', 'B'], ['D', 'B', 'C'], ['B', 'C', 'D'], ['B', 'D', 'C'],
+]
+
+// Every TileTypeId in this engine is either suited (`${'C'|'D'|'B'}${1-9}`)
+// or one of the 7 honors (`WE`/`WS`/`WW`/`WN`/`DR`/`DG`/`DW`) — flowers and
+// seasons never appear in concealedTiles (see tiles.ts), so "not suited" is
+// a safe, sufficient honor check within this module.
+function isHonorType(id: TileTypeId): boolean {
+  return !/^[CDB][1-9]$/.test(id)
+}
+
+// Fans 20 (Greater, exactly 7 honors) and 34 (Lesser, 5-6 honors) share one
+// structural shape — §3.7.2.2 shape (4), docs/rules/decisions.md #6/#12: 14
+// distinct single tiles, NO pair and no melds at all (a genuine exception to
+// "every winning hand has a pair"); the suit tiles (7, 8, or 9 of them,
+// since only 5-7 honors are structurally possible — see fans-12.ts's own
+// comment) partition across the 3 suits with each suit's ranks sharing
+// exactly one knitted sequence and all three sequences used. Point-tier
+// discrimination (Greater vs Lesser) happens entirely in the fan detectors
+// (fans-24.ts/fans-12.ts) via honor count; this is the shape-recognition
+// half those detectors could never reach before — scoreHandDetailed never
+// generated a matching candidate, so they were dead code (decisions.md #19).
+export function isHonorsAndKnittedTiles(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): boolean {
+  if (melds.length !== 0) return false
+  if (concealedTiles.length !== 14) return false
+  const typeIds = concealedTiles.map(typeIdOfInstance)
+  if (new Set(typeIds).size !== 14) return false
+
+  const honorCount = typeIds.filter(isHonorType).length
+  if (honorCount < 5 || honorCount > 7) return false
+
+  const bySuit: Record<'C' | 'D' | 'B', number[]> = { C: [], D: [], B: [] }
+  for (const id of typeIds) {
+    const match = /^([CDB])([1-9])$/.exec(id)
+    if (match) bySuit[match[1] as 'C' | 'D' | 'B'].push(Number(match[2]))
+  }
+  const seqIndices = SUIT_CHARS.map((suit) => {
+    const ranks = bySuit[suit]
+    if (ranks.length === 0) return null // every suit used must contribute at least one tile
+    const sequences = new Set(ranks.map((r) => r % 3))
+    return sequences.size === 1 ? sequences.values().next().value! : null // all of one suit's ranks must share one sequence
+  })
+  if (seqIndices.some((idx) => idx === null)) return false
+  return new Set(seqIndices).size === 3 // the three suits present must use three DIFFERENT sequences
+}
+
+export interface KnittedStraightRemainder {
+  // The decomposition of whatever's left after removing the 9 knitted
+  // tiles — 1 pair + 1 more set (0 melds declared) or just the pair (1 meld
+  // already declared; 4 - melds.length - 3 = 0).
+  decomposition: Decomposition
+}
+
+// Fan 35, Knitted Straight (§3.8.1 p.15 / App.1 p.34, verified against the
+// actual rulebook text — see docs/rules/decisions.md #20): "a special
+// Straight formed not with standard chows but with 3 different Knitted
+// sequences" — i.e. the 9-tile knitted pattern stands in for 3 of the
+// standard 4 sets, NOT the no-pair 14-singles shape fans 20/34 use (the
+// rulebook's own wording and worked examples — one captioned "Combined with
+// Tile Hog", impossible under a no-duplicates shape — confirm this). Tries
+// every suit-to-sequence assignment; for each where the 9 tiles are
+// physically present, decomposes the remainder (via the same core search
+// decomposeHand uses) and returns every valid remainder decomposition found.
+// scoreHandDetailed tries each as its own independent candidate — same
+// "Freedom to Choose the Highest Points" pattern as the standard shape's own
+// multiple decompositions.
+export function knittedStraightRemainders(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): KnittedStraightRemainder[] {
+  const additionalSetsNeeded = 4 - melds.length - 3
+  if (additionalSetsNeeded < 0 || additionalSetsNeeded > 1) return []
+
+  const results: KnittedStraightRemainder[] = []
+  for (const suitOrder of SUIT_PERMUTATIONS) {
+    const neededTypeIds: TileTypeId[] = []
+    for (let i = 0; i < 3; i++) {
+      for (const rank of KNITTED_SEQUENCES[i]!) {
+        neededTypeIds.push(`${suitOrder[i]}${rank}`)
+      }
+    }
+
+    const remaining = concealedTiles.slice()
+    let allFound = true
+    for (const typeId of neededTypeIds) {
+      const idx = remaining.findIndex((t) => typeIdOfInstance(t) === typeId)
+      if (idx === -1) {
+        allFound = false
+        break
+      }
+      remaining.splice(idx, 1)
+    }
+    if (!allFound) continue
+
+    for (const decomposition of decomposeWithSetsNeeded(remaining, additionalSetsNeeded)) {
+      results.push({ decomposition })
+    }
+  }
+  return results
+}
+
+// Structural shapes recognized: standard (four sets + pair), Seven Pairs,
+// Thirteen Orphans, Greater/Lesser Honors and Knitted Tiles, and Knitted
+// Straight — all four §3.7.2.2 shapes, plus the knitted-tile variants within
+// shape (4)/fan 35 (docs/rules/decisions.md #6/#12/#20 — closed 2026-08-05;
+// see #19/#20 for the "decomposeHand had no notion of a knitted set" bug
+// this closes).
 export function isWinningHand(concealedTiles: readonly TileInstanceId[], melds: readonly Meld[]): boolean {
   return (
     decomposeHand(concealedTiles, melds).length > 0 ||
     isSevenPairs(concealedTiles, melds) ||
-    isThirteenOrphans(concealedTiles, melds)
+    isThirteenOrphans(concealedTiles, melds) ||
+    isHonorsAndKnittedTiles(concealedTiles, melds) ||
+    knittedStraightRemainders(concealedTiles, melds).length > 0
   )
 }
