@@ -36,10 +36,15 @@ both before any work.
   docstring for what `their_bug`/`ambiguity`/`our_bug`/UNCLASSIFIED mean). The
   harness exists and has been run for real (docs/rules/decisions.md #19,
   2026-08-05: 1200 hands, 77/81 fans covered) — this rule is satisfiable now,
-  but not fully clean: that run found 6 pre-existing engine bugs (each with a
-  permanent failing-by-design fixture already committed, per the rule below —
-  see decisions.md #19 for the full list) plus ~180 hands still genuinely
-  unclassified. Don't cite "PyMahjongGB
+  but not fully clean: that run found **7 pre-existing engine bugs**, not 6 —
+  six missing-exclusion/detector bugs in `exclusions.ts`/`fans-2.ts` PLUS one
+  more severe than either: `decomposeHand` has no notion of a "knitted" set,
+  so `isWinningHand` returns `false` for every hand fans 20/34/35 (Greater/
+  Lesser Honors and Knitted Tiles, Knitted Straight) require — a player
+  cannot even declare these hands won, and they're 3 of the harness's 4
+  uncovered fans. Each bug (all 7) has a permanent failing-by-design fixture
+  already committed, per the rule below — see decisions.md #19 for the full
+  list. Also ~180 hands still genuinely unclassified. Don't cite "PyMahjongGB
   cross-check passes" for the WHOLE engine without qualification — it means
   clean *for the fans your change touches*, checked against the current
   baseline in decisions.md #19, not zero mismatches system-wide (some are
