@@ -170,7 +170,8 @@ export const MELD_BASELINE_OFFSET_PX: Record<TileScale, number> = {
 // as its own Positioned sibling BEFORE the meld's tiles in DOM order (these
 // are absolutely-positioned siblings with no z-index) — adds zero width
 // demand of its own.
-export const MELD_SHELF_CLASSES = 'rounded-md border border-neutral-700/60 bg-neutral-950/70 shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]'
+export const MELD_SHELF_CLASSES =
+  'rounded-md border border-[#351708] bg-[repeating-linear-gradient(7deg,rgba(255,218,155,0.05)_0_1px,transparent_1px_5px),linear-gradient(180deg,#8b4d25,#54250f_68%,#351508)] shadow-[inset_0_3px_2px_rgba(255,211,145,0.3),inset_0_-5px_6px_rgba(24,8,2,0.66),0_4px_7px_rgba(0,0,0,0.42)]'
 
 // Small-icon compact size — still used by the hint tabs (BestMoveTab,
 // TileSafetyTab, WaitsPanel), which render a handful of tiles inline in
@@ -178,14 +179,14 @@ export const MELD_SHELF_CLASSES = 'rounded-md border border-neutral-700/60 bg-ne
 // lines) moved to its own Phase 7 sizing below — this one predates that
 // split and is unrelated to it now.
 const TILE_FACE_COMPACT_SIZE: Record<TileScale, string> = {
-  normal: 'h-[54px] w-[44px]',
-  large: 'h-[54px] w-[44px]',
+  normal: 'h-[59.4px] w-[48.4px]',
+  large: 'h-[59.4px] w-[48.4px]',
 }
 
 // Numeric px twin of TILE_FACE_COMPACT_SIZE — see TILE_BOX_PX's comment.
 export const TILE_FACE_COMPACT_PX: Record<TileScale, { width: number; height: number }> = {
-  normal: { width: 44, height: 54 },
-  large: { width: 44, height: 54 },
+  normal: { width: 48.4, height: 59.4 },
+  large: { width: 48.4, height: 59.4 },
 }
 
 export function tileFaceCompactClassName(
@@ -222,8 +223,8 @@ export function tileFaceCompactClassName(
 // pass its result as an inline style, same pattern HandTiles.tsx already
 // uses for the human hand row's own shrink-to-fit.
 export const DISCARD_FIELD_PX: Record<TileScale, { width: number; height: number }> = {
-  normal: { width: 67, height: 82 },
-  large: { width: 67, height: 82 },
+  normal: { width: 65, height: 75.2 },
+  large: { width: 65, height: 75.2 },
 }
 // Below this, a discard/seat-line tile is no longer worth calling
 // "compact" — a floor of last resort for extreme narrow designWidths, not
@@ -232,8 +233,8 @@ export const DISCARD_FIELD_PX: Record<TileScale, { width: number; height: number
 export const DISCARD_FIELD_WIDTH_FLOOR = 28
 
 const DISCARD_FIELD_SIZE: Record<TileScale, string> = {
-  normal: 'h-[82px] w-[67px]',
-  large: 'h-[82px] w-[67px]',
+  normal: 'h-[75.2px] w-[65px]',
+  large: 'h-[75.2px] w-[65px]',
 }
 
 export function discardFieldTileClassName(
@@ -257,19 +258,19 @@ export function discardFieldTileClassName(
 // on one code path rather than two). See DISCARD_FIELD_PX's own comment.
 //
 // Bumped >=10% over the original 44x54 (49/44 = +11.4%, 60/54 = +11.1%) so
-// bot hands/melds/flowers read more clearly — stageLayout.ts's SIDE_WIDTH,
-// NORTH_LINE_H, and FIELD_H were widened/grown alongside this so the west/
-// east 3x9 grid and north's row still hit fit-scale 1.0 at the documented
-// worst-case occupancy, not silently re-clamped back down to the old size.
+// bot hands/melds read more clearly — stageLayout.ts's compact bot regions
+// hold the real 18-tile playing maximum in a west/east 2x9 grid or one
+// north row. Flowers use their own compact tray and therefore do not force
+// these full-size tiles back down to the old size.
 export const SEAT_LINE_PX: Record<TileScale, { width: number; height: number }> = {
-  normal: { width: 49, height: 60 },
-  large: { width: 49, height: 60 },
+  normal: { width: 65, height: 80 },
+  large: { width: 65, height: 80 },
 }
 export const SEAT_LINE_WIDTH_FLOOR = 28
 
 const SEAT_LINE_SIZE: Record<TileScale, string> = {
-  normal: 'h-[60px] w-[49px]',
-  large: 'h-[60px] w-[49px]',
+  normal: 'h-[80px] w-[65px]',
+  large: 'h-[80px] w-[65px]',
 }
 
 export function seatLineFaceClassName(

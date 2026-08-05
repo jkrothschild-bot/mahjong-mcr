@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { startHand, type GameState } from '@mahjong-mcr/engine'
 import { getBoardRegions, MIN_DESIGN_WIDTH } from '../stage/stageLayout.js'
+import { applyDevOccupancy } from '../dev/devOccupancy.js'
 import { DiscardField } from './DiscardField.js'
 
 function freshState(): GameState {
@@ -29,12 +30,28 @@ describe('DiscardField drop target', () => {
     expect(wrapper.style.height).toBe(`${expectedHeight}px`)
     // Sanity: strictly wider than a single zone — proves this isn't still
     // just the old "you"-only target under a renamed testid.
-    expect(expectedWidth).toBeGreaterThan(regions.you.width * 3)
+    expect(expectedWidth).toBeGreaterThan(regions.you.width)
   })
 
   it('renders exactly one drop target for the whole field, not one per zone', () => {
     render(<DiscardField state={freshState()} />)
     expect(screen.getAllByTestId('discard-zone-drop-target')).toHaveLength(1)
+  })
+})
+
+describe('seat-oriented discard attribution', () => {
+  it('renders no wind labels and leaves a visible gap between north and human rivers', () => {
+    render(<DiscardField state={applyDevOccupancy(freshState(), 'preview', 0)} />)
+    expect(screen.queryByTestId(/discard-zone-label-/)).not.toBeInTheDocument()
+
+    const bounds = (zone: HTMLElement) => [...zone.querySelectorAll('[data-testid^="discard-tile-"]')].map((tile) => {
+      const box = tile.parentElement as HTMLElement
+      const top = Number.parseFloat(box.style.top) + Number.parseFloat(box.style.marginTop)
+      return { top, bottom: top + Number.parseFloat(box.style.height) }
+    })
+    const north = bounds(screen.getByTestId('discard-zone-north'))
+    const human = bounds(screen.getByTestId('discard-zone-you'))
+    expect(Math.min(...human.map((box) => box.top)) - Math.max(...north.map((box) => box.bottom))).toBeGreaterThan(0)
   })
 })
 

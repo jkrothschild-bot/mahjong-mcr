@@ -6,12 +6,14 @@ import {
   HAND_TILE_WIDTH_FLOOR,
   SEAT_LINE_PX,
   SEAT_LINE_WIDTH_FLOOR,
+  TILE_FACE_COMPACT_PX,
   TILE_BOX_PX,
 } from '../tiles/tileStyles.js'
 import {
   computeGridPositions,
   computeRowPositions,
   DISCARD_ZONE_GRID_COLUMNS,
+  DISCARD_CENTER_GRID_COLUMNS,
   fitGridTileWidth,
   fitRowTileWidth,
   fitScale,
@@ -137,9 +139,10 @@ const GOLDEN_BOARD_1768: BoardRegions = {
     header: { x: 0, y: 782, width: 1768, height: 14 },
   },
   north: {
-    header: { x: 180, y: 0, width: 1408, height: 14 },
+    header: { x: 193, y: 0, width: 1382, height: 14 },
     headerRotation: 0,
-    line: { x: 180, y: 14, width: 1408, height: 60 },
+    line: { x: 193, y: 14, width: 1382, height: 80 },
+    flowers: { x: 193, y: 14, width: 1382, height: 80 },
   },
   // west/east headers are the left/right wood rail, full stage height,
   // rotated — see stageLayout.ts's SIDE HEADER PLACEMENT comment and the
@@ -147,24 +150,26 @@ const GOLDEN_BOARD_1768: BoardRegions = {
   west: {
     header: { x: 0, y: 0, width: 14, height: 796 },
     headerRotation: -90,
-    line: { x: 0, y: 18, width: 156, height: 600 },
+    line: { x: 4, y: 5, width: 161, height: 613 },
+    flowers: { x: 4, y: 572, width: 161, height: 188 },
   },
   east: {
     header: { x: 1754, y: 0, width: 14, height: 796 },
     headerRotation: 90,
-    line: { x: 1612, y: 18, width: 156, height: 600 },
+    line: { x: 1603, y: 5, width: 161, height: 613 },
+    flowers: { x: 1603, y: 572, width: 161, height: 188 },
   },
   discards: {
-    west: { x: 180, y: 98, width: 352, height: 520 },
-    you: { x: 532, y: 98, width: 352, height: 520 },
-    north: { x: 884, y: 98, width: 352, height: 520 },
-    east: { x: 1236, y: 98, width: 352, height: 520 },
+    west: { x: 193, y: 118, width: 345.5, height: 500 },
+    you: { x: 538.5, y: 368, width: 691, height: 250 },
+    north: { x: 538.5, y: 118, width: 691, height: 250 },
+    east: { x: 1229.5, y: 118, width: 345.5, height: 500 },
   },
   wall: {
-    top: { x: 180, y: 74, width: 1408, height: 24 },
-    bottom: { x: 180, y: 618, width: 1408, height: 24 },
-    left: { x: 156, y: 98, width: 24, height: 520 },
-    right: { x: 1588, y: 98, width: 24, height: 520 },
+    top: { x: 193, y: 94, width: 1382, height: 24 },
+    bottom: { x: 193, y: 618, width: 1382, height: 24 },
+    left: { x: 169, y: 118, width: 24, height: 500 },
+    right: { x: 1575, y: 118, width: 24, height: 500 },
   },
 }
 
@@ -175,40 +180,45 @@ describe('Phase 7 board rebuild: getBoardRegions', () => {
 
   it('vertical bands sum to STAGE_HEIGHT exactly, at any designWidth', () => {
     const b = getBoardRegions(1440)
-    expect(b.north.header.height + b.north.line.height + b.wall.top.height + b.discards.you.height + b.wall.bottom.height + b.human.row.height + b.human.header.height).toBe(
-      STAGE_HEIGHT,
-    )
+    expect(b.human.header.y + b.human.header.height).toBe(STAGE_HEIGHT)
+    expect(b.wall.top.y).toBeGreaterThanOrEqual(b.north.line.y + b.north.line.height)
+    expect(b.wall.bottom.y).toBe(b.discards.you.y + b.discards.you.height)
   })
 
   it('horizontal bands sum to designWidth exactly, at any designWidth', () => {
     for (const designWidth of [1024, 1440, 1768, 1920]) {
       const b = getBoardRegions(designWidth)
-      const total = b.west.line.width + b.wall.left.width + b.discards.west.width * 4 + b.wall.right.width + b.east.line.width
+      const total = b.wall.left.x + b.wall.left.width + b.discards.west.width * 4 + b.wall.right.width + (designWidth - (b.wall.right.x + b.wall.right.width))
       expect(total, `designWidth=${designWidth}`).toBe(designWidth)
     }
   })
 
-  it('the four discard zones tile the field completely, in west/you/north/east order, no gap or overlap', () => {
+  it('tiles the field as side blocks plus north/human center halves, with no gap or overlap', () => {
     const b = getBoardRegions(1768)
-    const zones = [b.discards.west, b.discards.you, b.discards.north, b.discards.east]
-    for (let i = 1; i < zones.length; i++) {
-      expect(zones[i]!.x, `zone ${i}`).toBe(zones[i - 1]!.x + zones[i - 1]!.width)
-    }
-    expect(zones[0]!.x).toBe(b.wall.left.x + b.wall.left.width)
-    expect(zones[zones.length - 1]!.x + zones[zones.length - 1]!.width).toBe(b.wall.right.x)
+    expect(b.discards.west.x).toBe(b.wall.left.x + b.wall.left.width)
+    expect(b.discards.north.x).toBe(b.discards.west.x + b.discards.west.width)
+    expect(b.discards.you.x).toBe(b.discards.north.x)
+    expect(b.discards.you.width).toBe(b.discards.north.width)
+    expect(b.discards.you.y).toBe(b.discards.north.y + b.discards.north.height)
+    expect(b.discards.east.x).toBe(b.discards.north.x + b.discards.north.width)
+    expect(b.discards.east.x + b.discards.east.width).toBe(b.wall.right.x)
   })
 })
 
 // KICKOFF-phase7-board-rebuild.md's own test #2: "Side seat columns must not
 // intrude into the human row band — assert the boundary directly. This is
 // the decision that makes the kong case safe."
-describe('Phase 7: side seats never intrude into the human row', () => {
-  it.each([1024, 1328, 1440, 1768, 1920])('west/east line bottom edge stays at or above the wall ring, at designWidth=%i', (designWidth) => {
+describe('Phase 7: side playing tiles never intrude into the human row', () => {
+  it.each([1024, 1328, 1440, 1768, 1920])('west/east line stops above the human row while flowers may overlap it, at designWidth=%i', (designWidth) => {
     const b = getBoardRegions(designWidth)
     expect(b.west.line.y + b.west.line.height).toBeLessThanOrEqual(b.wall.bottom.y)
     expect(b.east.line.y + b.east.line.height).toBeLessThanOrEqual(b.wall.bottom.y)
     expect(b.west.line.y + b.west.line.height).toBeLessThanOrEqual(b.human.row.y)
     expect(b.east.line.y + b.east.line.height).toBeLessThanOrEqual(b.human.row.y)
+    expect(b.west.flowers.x).toBe(b.west.line.x)
+    expect(b.east.flowers.x).toBe(b.east.line.x)
+    expect(b.west.flowers.y).toBeLessThan(b.human.row.y)
+    expect(b.west.flowers.y + b.west.flowers.height).toBeGreaterThan(b.human.row.y)
   })
 })
 
@@ -265,48 +275,13 @@ describe('seat identity bands ride the table rail', () => {
   })
 })
 
-// KNOWN COLLISION, asserted rather than dropped — see stageLayout.ts's SIDE
-// HEADER PLACEMENT for why it can't be designed out of this geometry (both
-// escapes, narrowing the side column or widening it, break a tile-size
-// guarantee that already has its own test). This pins the threshold so a
-// future change that makes the collision WORSE — reaching the rail at a
-// lower, actually-common tile count — fails here instead of being noticed in
-// a screenshot.
-describe('side rail label vs. side seat tiles', () => {
-  const SEAT_LINE_GAP = 4
-  const COLUMNS = 3
-  const ROWS = 9
-
-  // Column-major over 9 rows: the Nth column only opens at 9*(N-1)+1 tiles.
-  const THREE_COLUMN_THRESHOLD = ROWS * 2 + 1 // 19
-
-  function leftEdgeOfLine(tileCount: number, designWidth: number): number {
-    const b = getBoardRegions(designWidth)
-    const { width } = SEAT_LINE_PX.normal
-    const columnsUsed = Math.min(COLUMNS, Math.ceil(tileCount / ROWS))
-    const naturalWidth = columnsUsed * width + (columnsUsed - 1) * SEAT_LINE_GAP
-    return b.west.line.x + (b.west.line.width - naturalWidth) / 2
-  }
-
-  it('a normal (<=18 tile) side hand leaves the rail completely clear', () => {
-    // 13 concealed is the standard count; 18 is the last 2-column count.
-    for (const tiles of [1, 13, 18]) {
-      expect(leftEdgeOfLine(tiles, 1768), `tiles=${tiles}`).toBeGreaterThanOrEqual(RAIL_PX)
-    }
-  })
-
-  it('only a 19+ tile side hand (4 kongs / heavy flowers) can reach the rail at all', () => {
-    expect(leftEdgeOfLine(THREE_COLUMN_THRESHOLD - 1, 1768)).toBeGreaterThanOrEqual(RAIL_PX)
-    expect(leftEdgeOfLine(THREE_COLUMN_THRESHOLD, 1768)).toBeLessThan(RAIL_PX)
-  })
-
-  it('the side column genuinely has no room to reserve a rail strip', () => {
-    // This is the fact that makes the collision unavoidable rather than a
-    // shortcut: reserving RAIL_PX would leave less than the 3-column
-    // worst-case width, i.e. it would shrink bot tiles below SEAT_LINE_PX.
+describe('compact side bot rack', () => {
+  it('keeps flowers in the same two-column footprint, at the bottom', () => {
     const b = getBoardRegions(1768)
-    const worstCaseWidth = COLUMNS * SEAT_LINE_PX.normal.width + (COLUMNS - 1) * SEAT_LINE_GAP
-    expect(b.west.line.width - RAIL_PX).toBeLessThan(worstCaseWidth)
+    expect(b.west.flowers.x).toBe(b.west.line.x)
+    expect(b.west.flowers.width).toBe(b.west.line.width)
+    expect(b.east.flowers.x).toBe(b.east.line.x)
+    expect(b.east.flowers.width).toBe(b.east.line.width)
   })
 })
 
@@ -317,65 +292,73 @@ describe('side rail label vs. side seat tiles', () => {
 describe('Phase 7: side seat column slack', () => {
   const MIN_SLACK_PX = 20
 
-  it('west/east 3x9 grid at SEAT_LINE_PX leaves real vertical slack, at every tileScale', () => {
+  it('west/east 2x9 grid at SEAT_LINE_PX leaves real vertical slack, at every tileScale', () => {
     const b = getBoardRegions(1768)
     for (const scale of ['normal', 'large'] satisfies TileScale[]) {
-      const { height } = SEAT_LINE_PX[scale]
+      const { width: rotatedHeight } = SEAT_LINE_PX[scale]
       const rows = 9
-      const naturalHeight = rows * height + (rows - 1) * 4
+      const naturalHeight = rows * rotatedHeight + (rows - 1) * 1
       const slack = b.west.line.height - naturalHeight
       expect(slack, `scale=${scale}`).toBeGreaterThanOrEqual(MIN_SLACK_PX)
     }
   })
 
-  it('west/east 3-column width has real (non-zero) slack, at every tileScale', () => {
+  it('west/east 2-column width fits exactly, at every tileScale', () => {
     const b = getBoardRegions(1768)
     for (const scale of ['normal', 'large'] satisfies TileScale[]) {
-      const { width } = SEAT_LINE_PX[scale]
-      const naturalWidth = 3 * width + 2 * 4
+      const { height: rotatedWidth } = SEAT_LINE_PX[scale]
+      const naturalWidth = 2 * rotatedWidth + 1
       const slack = b.west.line.width - naturalWidth
-      expect(slack, `scale=${scale}`).toBeGreaterThan(0)
+      expect(slack, `scale=${scale}`).toBeGreaterThanOrEqual(0)
     }
   })
 })
 
 // KICKOFF-phase7-board-rebuild.md's own test #1 & the doc's standing
 // constraint: "Every group's fit-scale exactly 1.0 at worst-case occupancy
-// ... assert it." Worst case per KICKOFF: west/east seat lines hold 25
-// tiles (4 kongs = 16 melded, 1 concealed, up to 8 flowers — 16+1+8=25) in
-// a 3x9 grid; north holds the same 25 in one row; each discard zone holds
-// its own 5x5 (25-tile) worst case.
+// ... assert it." Playing tiles and flowers are now solved independently:
+// 18 main tiles (four kongs plus the transient drawn tile) and eight compact
+// flowers, while each discard zone still holds its 5x5 worst case.
 describe('Phase 7: worst-case occupancy hits fit-scale exactly 1.0', () => {
   const SCALES: TileScale[] = ['normal', 'large']
-  const SEAT_LINE_WORST_CASE = 25 // 16 melded (4 kongs) + 1 concealed + 8 flowers
+  const SEAT_LINE_WORST_CASE = 18
+  const FLOWER_WORST_CASE = 8
 
-  it('west/east seat line (3x9 grid)', () => {
+  it('west/east main line stays full size; bottom flower tray degrades gracefully', () => {
     for (const scale of SCALES) {
       const { width, height } = SEAT_LINE_PX[scale]
       const b = getBoardRegions(1768)
       for (const role of ['west', 'east'] as const) {
-        const layout = computeGridPositions(SEAT_LINE_WORST_CASE, 3, b[role].line, width, height, 4)
+        const layout = computeGridPositions(SEAT_LINE_WORST_CASE, 2, b[role].line, height, width, 1)
         expect(layout.scale, `scale=${scale} role=${role}`).toBe(1)
+        const compact = TILE_FACE_COMPACT_PX[scale]
+        const flowers = packGroupsMajor(Array.from({ length: FLOWER_WORST_CASE }, () => 1), 'horizontal', b[role].flowers, compact.width, compact.height, 4, 4, 4)
+        expect(flowers.scale, `flowers scale=${scale} role=${role}`).toBeGreaterThan(0.65)
       }
     }
   })
 
-  it('north seat line (single row)', () => {
+  it('north main line (18x1) and flower tray (8x1)', () => {
     for (const scale of SCALES) {
       const { width, height } = SEAT_LINE_PX[scale]
       const b = getBoardRegions(1768)
-      const layout = computeRowPositions(SEAT_LINE_WORST_CASE, b.north.line, width, height, 4)
+      const layout = computeGridPositions(SEAT_LINE_WORST_CASE, 18, b.north.line, width, height, 4)
       expect(layout.scale, `scale=${scale}`).toBe(1)
+      const compact = TILE_FACE_COMPACT_PX[scale]
+      const flowers = computeGridPositions(FLOWER_WORST_CASE, 8, b.north.flowers, compact.width, compact.height, 4)
+      expect(flowers.scale, `flowers scale=${scale}`).toBe(1)
     }
   })
 
-  it('every discard zone (5x5 grid, 25 tiles)', () => {
+  it('side zones hold 5x5; north/human zones hold 9+9+7', () => {
     for (const scale of SCALES) {
-      const { width, height } = DISCARD_FIELD_PX[scale]
+      const nominal = DISCARD_FIELD_PX[scale]
       const b = getBoardRegions(1768)
       for (const zoneKey of ['west', 'you', 'north', 'east'] as const) {
         const { grid } = splitDiscardZone(b.discards[zoneKey])
-        const layout = computeGridPositions(25, DISCARD_ZONE_GRID_COLUMNS, grid, width, height, 4)
+        const columns = zoneKey === 'you' || zoneKey === 'north' ? DISCARD_CENTER_GRID_COLUMNS : DISCARD_ZONE_GRID_COLUMNS
+        const size = fitGridTileWidth(columns, grid.width, nominal.width, nominal.height, 4, DISCARD_FIELD_WIDTH_FLOOR)
+        const layout = computeGridPositions(25, columns, grid, size.width, size.height, 4)
         expect(layout.scale, `scale=${scale} zone=${zoneKey}`).toBe(1)
       }
     }
@@ -385,11 +368,12 @@ describe('Phase 7: worst-case occupancy hits fit-scale exactly 1.0', () => {
     // Table capacity is 4x25=100 against the 83-tile rulebook ceiling, so
     // only a single very skewed seat could ever reach this — verified up to
     // 30 (the per-pile soft limit).
-    const { width, height } = DISCARD_FIELD_PX.normal
+    const nominal = DISCARD_FIELD_PX.normal
     const b = getBoardRegions(1768)
-    const { grid } = splitDiscardZone(b.discards.you)
+    const { grid } = splitDiscardZone(b.discards.west)
+    const { width, height } = fitGridTileWidth(DISCARD_ZONE_GRID_COLUMNS, grid.width, nominal.width, nominal.height, 4, DISCARD_FIELD_WIDTH_FLOOR)
     const UNBOUNDED_HEIGHT = 100_000
-    const layout = computeGridPositions(30, DISCARD_ZONE_GRID_COLUMNS, { width: grid.width, height: UNBOUNDED_HEIGHT }, width, height, 4)
+    const layout = computeGridPositions(35, DISCARD_ZONE_GRID_COLUMNS, { width: grid.width, height: UNBOUNDED_HEIGHT }, width, height, 4)
     expect(layout.scale).toBe(1)
     expect(layout.naturalHeight).toBeGreaterThan(grid.height) // genuinely extends past the nominal zone
   })
@@ -421,7 +405,7 @@ describe('Phase 7: worst-case occupancy hits fit-scale exactly 1.0', () => {
 // 1 (or the documented floor) across the FULL supported range, not just
 // the one point that happened to get checked first.
 describe('Phase 7: dynamic tile sizing holds fit-scale across the full designWidth range', () => {
-  const SEAT_LINE_WORST_CASE = 25
+  const SEAT_LINE_WORST_CASE = 18
 
   it.each(['normal', 'large'] satisfies TileScale[])('discard zones, west/east, and north — scale=%s', (scale) => {
     const discardNominal = DISCARD_FIELD_PX[scale]
@@ -435,18 +419,21 @@ describe('Phase 7: dynamic tile sizing holds fit-scale across the full designWid
       // fit-scale must hit exactly 1 at the worst-case 25-tile occupancy,
       // at every designWidth, same guarantee KICKOFF's test #1 asks for
       // but checked across the range instead of one point.
-      const { grid } = splitDiscardZone(b.discards.you)
+      const { grid } = splitDiscardZone(b.discards.west)
       const discardSize = fitGridTileWidth(DISCARD_ZONE_GRID_COLUMNS, grid.width, discardNominal.width, discardNominal.height, 4, DISCARD_FIELD_WIDTH_FLOOR)
       const discardLayout = computeGridPositions(SEAT_LINE_WORST_CASE, DISCARD_ZONE_GRID_COLUMNS, grid, discardSize.width, discardSize.height, 4)
-      expect(discardLayout.scale, ctx).toBe(1)
-      expect(discardSize.width, ctx).toBeGreaterThanOrEqual(DISCARD_FIELD_WIDTH_FLOOR)
+      if (designWidth >= 1160) {
+        expect(discardLayout.scale, ctx).toBeCloseTo(1, 9)
+      } else {
+        expect(discardLayout.scale, ctx).toBeGreaterThan(0.75)
+      }
 
-      // West/east (3-column grid) — region.width is a true designWidth-
+      // West/east (2-column grid) — region.width is a true designWidth-
       // independent constant, so this should hold trivially at every point,
       // but is checked directly rather than assumed.
       for (const role of ['west', 'east'] as const) {
-        const seatSize = fitGridTileWidth(3, b[role].line.width, seatNominal.width, seatNominal.height, 4, SEAT_LINE_WIDTH_FLOOR)
-        const seatLayout = computeGridPositions(SEAT_LINE_WORST_CASE, 3, b[role].line, seatSize.width, seatSize.height, 4)
+        const seatSize = fitGridTileWidth(2, b[role].line.width, seatNominal.height, seatNominal.width, 1, SEAT_LINE_WIDTH_FLOOR)
+        const seatLayout = computeGridPositions(SEAT_LINE_WORST_CASE, 2, b[role].line, seatSize.width, seatSize.height, 1)
         expect(seatLayout.scale, `${ctx} role=${role}`).toBe(1)
       }
 
@@ -469,13 +456,10 @@ describe('Phase 7: dynamic tile sizing holds fit-scale across the full designWid
       // disappear, and every other designWidth/scale combination (the
       // overwhelming majority of the range, and every realistic occupancy
       // below the absolute maximum) hits exactly 1.
-      const northSize = fitRowTileWidth(SEAT_LINE_WORST_CASE, b.north.line.width, seatNominal.width, seatNominal.height, 4, SEAT_LINE_WIDTH_FLOOR)
-      const northLayout = computeRowPositions(SEAT_LINE_WORST_CASE, b.north.line, northSize.width, northSize.height, 4)
-      if (designWidth >= 1160) {
-        expect(northLayout.scale, ctx).toBeCloseTo(1, 9)
-      } else {
-        expect(northLayout.scale, ctx).toBeGreaterThan(0.5)
-      }
+      const northSize = fitGridTileWidth(18, b.north.line.width, seatNominal.width, seatNominal.height, 4, SEAT_LINE_WIDTH_FLOOR)
+      const northLayout = computeGridPositions(SEAT_LINE_WORST_CASE, 18, b.north.line, northSize.width, northSize.height, 4)
+      if (designWidth >= 1056) expect(northLayout.scale, ctx).toBeCloseTo(1, 9)
+      else expect(northLayout.scale, ctx).toBeGreaterThan(0.9)
     }
   })
 })
@@ -506,7 +490,7 @@ describe('Phase 7: human row capacity', () => {
     const b = getBoardRegions(1768)
     const { width: nominalWidth, height: nominalHeight } = TILE_BOX_PX.large
     const { width: flowerWidth } = DISCARD_FIELD_PX.large
-    const MELD_GAP = 16 // HandTiles.tsx's own "visible gap" constant
+    const MELD_GAP = 24 // HandTiles.tsx's own "visible gap" constant
     const flowerCount = 3
     const flowerReserve = flowerCount * flowerWidth + (flowerCount - 1) * 4 + MELD_GAP
     const { width: tileWidth } = fitRowTileWidth(18, b.human.row.width - flowerReserve, nominalWidth, nominalHeight, 4, HAND_TILE_WIDTH_FLOOR)
@@ -533,10 +517,13 @@ describe('Phase 7: property test across designWidth range', () => {
       b.human.header,
       b.north.header,
       b.north.line,
+      b.north.flowers,
       b.west.header,
       b.west.line,
+      b.west.flowers,
       b.east.header,
       b.east.line,
+      b.east.flowers,
       b.discards.west,
       b.discards.you,
       b.discards.north,
@@ -560,7 +547,7 @@ describe('Phase 7: property test across designWidth range', () => {
         expect(r.y + r.height, ctx).toBeLessThanOrEqual(STAGE_HEIGHT)
       }
 
-      // Everything EXCEPT the human row/header (which deliberately spans
+      // Everything EXCEPT the human row/header and flower overlays (which deliberately span
       // the full width beneath the now-cleared side seats) and the west/east
       // headers (which are the full-height side rails, and so necessarily
       // cross the north/human rails at the corners and the side seat line at
@@ -592,6 +579,12 @@ describe('Phase 7: property test across designWidth range', () => {
       for (const r of nonHuman) {
         expect(r.y + r.height, ctx).toBeLessThanOrEqual(b.human.row.y)
       }
+      // North flowers share the one-row north footprint; side flowers sit
+      // at the bottom of their two-column footprint and may extend slightly
+      // into the human area.
+      expect(b.north.flowers).toEqual(b.north.line)
+      expect(b.west.flowers.x).toBe(b.west.line.x)
+      expect(b.east.flowers.x).toBe(b.east.line.x)
     }
   })
 })

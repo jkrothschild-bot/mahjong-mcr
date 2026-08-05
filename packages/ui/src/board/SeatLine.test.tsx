@@ -7,18 +7,19 @@ import { SeatLine } from './SeatLine.js'
 
 const TEST_REGION: Rect = { x: 0, y: 0, width: 400, height: 200 }
 
-// The REAL west/east seat line geometry (stageLayout.ts's SIDE_WIDTH 156 and
+// The REAL west/east seat line geometry (stageLayout.ts's SIDE_WIDTH 176 and
 // SIDE_LINE_H 600). The generous TEST_REGION above is fine for tests that
 // only care about which tiles render, but anything asserting column packing
 // or worst-case fit has to use the actual budget — that budget is the whole
 // question.
-const SIDE_REGION: Rect = { x: 0, y: 18, width: 156, height: 600 }
+const SIDE_REGION: Rect = { x: 4, y: 5, width: 161, height: 613 }
+const SIDE_FLOWER_REGION: Rect = { x: 4, y: 572, width: 161, height: 188 }
 
 // Positioned writes the placed box inline on its own wrapper, so the
 // wrapper's style IS the layout.
-function boxOf(container: HTMLElement, testId: string): { left: string; width: number; height: number } {
+function boxOf(container: HTMLElement, testId: string): { left: string; top: string; width: number; height: number } {
   const el = container.querySelector(`[data-testid="${testId}"]`)!.parentElement as HTMLElement
-  return { left: el.style.left, width: parseFloat(el.style.width), height: parseFloat(el.style.height) }
+  return { left: el.style.left, top: el.style.top, width: parseFloat(el.style.width), height: parseFloat(el.style.height) }
 }
 
 function idsFor(typeId: TileTypeId, count: number): TileInstanceId[] {
@@ -94,6 +95,23 @@ describe('SeatLine concealed kongs', () => {
 // just one uniform TILE_GAP. These give a revealed meld the human row's own
 // treatment: a recessed shelf behind it and a nudge perpendicular to the line.
 describe('SeatLine revealed melds', () => {
+  it('renders a dimensional wooden holder with a back lip, groove, and front ledge', () => {
+    const hand = { ...emptyHand(), concealedTiles: idsFor('C1', 3) }
+    render(<SeatLine seat={1} hand={hand} region={TEST_REGION} grid={{ columns: 3, rows: 9 }} />)
+    expect(screen.getByTestId('seat-1-wooden-rack')).toBeInTheDocument()
+    expect(screen.getByTestId('seat-1-rack-back-lip')).toBeInTheDocument()
+    expect(screen.getByTestId('seat-1-rack-groove')).toBeInTheDocument()
+    expect(screen.getByTestId('seat-1-rack-front-lip')).toBeInTheDocument()
+  })
+
+  it('splits a side holder into two differently grained columns with a light recessed seam', () => {
+    const hand = { ...emptyHand(), concealedTiles: idsFor('C1', 4) }
+    render(<SeatLine seat={1} hand={hand} region={SIDE_REGION} grid={{ columns: 2, rows: 9, rotation: 90 }} />)
+    expect(screen.getByTestId('seat-1-rack-column-one')).toBeInTheDocument()
+    expect(screen.getByTestId('seat-1-rack-column-two')).toBeInTheDocument()
+    expect(screen.getByTestId('seat-1-rack-column-indent')).toHaveClass('left-1/2')
+  })
+
   function pung(id: string, typeId: TileTypeId): Meld {
     return { id, kind: 'pung', exposure: 'exposed', tiles: idsFor(typeId, 3), ownerSeat: 1 }
   }
@@ -110,6 +128,94 @@ describe('SeatLine revealed melds', () => {
 
     expect(screen.getByTestId('seat-1-meld-shelf-m-0')).toBeInTheDocument()
     expect(screen.getByTestId('seat-1-meld-shelf-m-1')).toBeInTheDocument()
+  })
+
+  it('turns the claimed discard sideways in a bot exposed meld', () => {
+    const tiles = idsFor('D5', 3)
+    const claimed: Meld = {
+      id: 'm-0',
+      kind: 'pung',
+      exposure: 'exposed',
+      tiles,
+      ownerSeat: 2,
+      claimedFrom: { seat: 1, discardTile: tiles[2]! },
+    }
+    const { container } = render(
+      <SeatLine seat={2} hand={{ ...emptyHand(), melds: [claimed] }} region={TEST_REGION} grid={{ columns: 18, rows: 1, axis: 'horizontal' }} />,
+    )
+
+    const ordinary = boxOf(container, 'meld-tile-m-0-0')
+    const sideways = boxOf(container, 'meld-tile-m-0-2')
+    expect(screen.getByTestId('meld-tile-m-0-2')).toHaveAttribute('data-claimed-tile', 'true')
+    expect(sideways.width).toBe(ordinary.height)
+    expect(sideways.height).toBe(ordinary.width)
+  })
+
+  it('runs a revealed right-side winning hand down the outer column by whole sets, then the inner column and pair', () => {
+    const order = [
+      ...idsFor('B2', 1), ...idsFor('B3', 1), ...idsFor('B4', 1),
+      ...idsFor('D3', 1), ...idsFor('D4', 1), ...idsFor('D5', 1),
+      ...idsFor('C4', 1), ...idsFor('C5', 1), ...idsFor('C6', 1),
+      ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1),
+      ...idsFor('C2', 2),
+    ]
+    const hand = { ...emptyHand(), concealedTiles: [...order] }
+    const { container } = render(
+      <SeatLine
+        seat={3}
+        hand={hand}
+        region={SIDE_REGION}
+        grid={{ columns: 2, rows: 9, rotation: -90 }}
+        revealConcealed
+        concealedOrder={order}
+      />,
+    )
+
+    const boxes = order.map((id) => boxOf(container, `seat-3-revealed-${id}`))
+    const outerColumn = new Set(boxes.slice(0, 6).map((box) => box.left))
+    const innerColumn = new Set(boxes.slice(6).map((box) => box.left))
+    expect(outerColumn.size).toBe(1)
+    expect(innerColumn.size).toBe(1)
+    expect(Number.parseFloat([...outerColumn][0]!)).toBeGreaterThan(Number.parseFloat([...innerColumn][0]!))
+    expect(boxes.slice(0, 6).map((box) => Number.parseFloat(box.top))).toEqual(
+      boxes.slice(0, 6).map((box) => Number.parseFloat(box.top)).sort((a, b) => a - b),
+    )
+    expect(boxes.slice(6).map((box) => Number.parseFloat(box.top))).toEqual(
+      boxes.slice(6).map((box) => Number.parseFloat(box.top)).sort((a, b) => a - b),
+    )
+  })
+
+  it('mirrors the grouped reveal on the left side, filling the outer column before the inner column and pair', () => {
+    const order = [
+      ...idsFor('B2', 1), ...idsFor('B3', 1), ...idsFor('B4', 1),
+      ...idsFor('D3', 1), ...idsFor('D4', 1), ...idsFor('D5', 1),
+      ...idsFor('C4', 1), ...idsFor('C5', 1), ...idsFor('C6', 1),
+      ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1),
+      ...idsFor('C2', 2),
+    ]
+    const { container } = render(
+      <SeatLine
+        seat={1}
+        hand={{ ...emptyHand(), concealedTiles: [...order] }}
+        region={SIDE_REGION}
+        grid={{ columns: 2, rows: 9, rotation: 90 }}
+        revealConcealed
+        concealedOrder={order}
+      />,
+    )
+
+    const boxes = order.map((id) => boxOf(container, `seat-1-revealed-${id}`))
+    const outerColumn = new Set(boxes.slice(0, 6).map((box) => box.left))
+    const innerColumn = new Set(boxes.slice(6).map((box) => box.left))
+    expect(outerColumn.size).toBe(1)
+    expect(innerColumn.size).toBe(1)
+    expect(Number.parseFloat([...outerColumn][0]!)).toBeLessThan(Number.parseFloat([...innerColumn][0]!))
+    expect(boxes.slice(0, 6).map((box) => Number.parseFloat(box.top))).toEqual(
+      boxes.slice(0, 6).map((box) => Number.parseFloat(box.top)).sort((a, b) => a - b),
+    )
+    expect(boxes.slice(6).map((box) => Number.parseFloat(box.top))).toEqual(
+      boxes.slice(6).map((box) => Number.parseFloat(box.top)).sort((a, b) => a - b),
+    )
   })
 
   it('never puts a shelf behind concealed tiles or flowers', () => {
@@ -134,7 +240,7 @@ describe('SeatLine revealed melds', () => {
       melds: [pung('m-0', 'D5')],
     }
     const { container } = render(
-      <SeatLine seat={1} hand={hand} region={SIDE_REGION} grid={{ columns: 3, rows: 9 }} revealConcealed />,
+      <SeatLine seat={1} hand={hand} region={SIDE_REGION} flowerRegion={SIDE_FLOWER_REGION} flowerAxis="vertical" grid={{ columns: 2, rows: 9, rotation: 90 }} revealConcealed />,
     )
 
     const columns = new Set([0, 1, 2].map((i) => boxOf(container, `meld-tile-m-0-${i}`).left))
@@ -143,11 +249,9 @@ describe('SeatLine revealed melds', () => {
     expect(screen.getAllByTestId(/seat-1-meld-shelf-m-0/)).toHaveLength(1)
   })
 
-  it('keeps every meld whole at worst-case occupancy, without shrinking a single tile', () => {
-    // The documented worst case: 4 kongs (16 melded) + 1 concealed + 8
-    // flowers = 25 tiles. Atomicity costs padding slots, and the side column
-    // only has 27 (3 x 9) — so this is the case that proves the packing
-    // choice actually fits before it shrinks anything.
+  it('keeps every meld whole at worst-case occupancy, with 18 main tiles and 8 compact flowers unshrunk', () => {
+    // Transient maximum: 4 kongs (16 melded) + 2 concealed/drawn = 18 main
+    // tiles, plus all 8 flowers in their independent compact tray.
     const kongs: Meld[] = (['D1', 'D2', 'D3', 'D4'] as TileTypeId[]).map((typeId, i) => ({
       id: `k-${i}`,
       kind: 'kong' as const,
@@ -158,12 +262,12 @@ describe('SeatLine revealed melds', () => {
     }))
     const hand = {
       ...emptyHand(),
-      concealedTiles: idsFor('C1', 1),
+      concealedTiles: idsFor('C1', 2),
       melds: kongs,
       flowers: [136, 137, 138, 139, 140, 141, 142, 143],
     }
     const { container } = render(
-      <SeatLine seat={1} hand={hand} region={SIDE_REGION} grid={{ columns: 3, rows: 9 }} revealConcealed />,
+      <SeatLine seat={1} hand={hand} region={SIDE_REGION} flowerRegion={SIDE_FLOWER_REGION} flowerAxis="vertical" grid={{ columns: 2, rows: 9, rotation: 90 }} revealConcealed />,
     )
 
     for (const kong of kongs) {
@@ -173,8 +277,16 @@ describe('SeatLine revealed melds', () => {
     // No tile shrank: every rendered tile is still at the nominal seat-line
     // size, i.e. packGroupsMajor's fit-scale stayed at 1.
     const tile = boxOf(container, 'meld-tile-k-0-0')
-    expect(tile.width).toBe(SEAT_LINE_PX.normal.width)
-    expect(tile.height).toBe(SEAT_LINE_PX.normal.height)
+    expect(tile.width).toBe(SEAT_LINE_PX.normal.height)
+    expect(tile.height).toBe(SEAT_LINE_PX.normal.width)
+    const flower = boxOf(container, 'flower-tile-136')
+    expect(flower.width).toBe(59.4)
+    expect(flower.height).toBe(48.4)
+    const flowerWrapper = container.querySelector('[data-testid="flower-tile-136"]')!.closest('.absolute') as HTMLElement
+    // A 90-degree Positioned swaps this portrait tile's outer footprint.
+    expect(Number.parseFloat(flowerWrapper.style.width)).toBeGreaterThan(Number.parseFloat(flowerWrapper.style.height))
+    expect(Number.parseFloat(flowerWrapper.style.width)).toBeCloseTo(59.4)
+    expect(Number.parseFloat(flowerWrapper.style.height)).toBeCloseTo(48.4)
   })
 
   it('lets concealed tiles flow across a column break — only melds are atomic', () => {
@@ -182,13 +294,13 @@ describe('SeatLine revealed melds', () => {
     // as one atomic group would make it an oversized group that fit-scale
     // shrinks. They're size-1 groups precisely so they wrap freely.
     const hand = { ...emptyHand(), concealedTiles: [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('C4', 1)] }
-    const { container } = render(<SeatLine seat={1} hand={hand} region={SIDE_REGION} grid={{ columns: 3, rows: 9 }} />)
+    const { container } = render(<SeatLine seat={1} hand={hand} region={SIDE_REGION} flowerRegion={SIDE_FLOWER_REGION} flowerAxis="vertical" grid={{ columns: 2, rows: 9, rotation: 90 }} />)
 
     const backs = screen.getAllByTestId(/seat-1-back-/)
     expect(backs).toHaveLength(13)
     const columns = new Set(backs.map((el) => (el.parentElement as HTMLElement).style.left))
     expect(columns.size).toBeGreaterThan(1)
-    expect(boxOf(container, backs[0]!.getAttribute('data-testid')!).width).toBe(SEAT_LINE_PX.normal.width)
+    expect(boxOf(container, backs[0]!.getAttribute('data-testid')!).width).toBe(SEAT_LINE_PX.normal.height)
   })
 
   it('nudges revealed meld tiles perpendicular to the line, and leaves concealed tiles alone', () => {
@@ -259,5 +371,26 @@ describe('SeatLine revealed melds', () => {
       />,
     )
     expect(screen.getByTestId('meld-tile-m-0-0').style.transform).toBe('')
+  })
+})
+
+describe('north flower placement', () => {
+  it('keeps flowers on the same row, immediately to the right of the playing tiles', () => {
+    const concealedTiles = [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('C4', 1)]
+    const hand = { ...emptyHand(), concealedTiles, flowers: [136, 137] }
+    const region = { x: 193, y: 14, width: 1382, height: 80 }
+    const { container } = render(
+      <SeatLine seat={2} hand={hand} region={region} flowerRegion={region} flowerAxis="horizontal" grid={{ columns: 18, rows: 1, axis: 'horizontal' }} />,
+    )
+    const lastTile = boxOf(container, `seat-2-back-${concealedTiles.at(-1)}`)
+    const firstFlower = boxOf(container, 'flower-tile-136')
+    const firstTile = boxOf(container, `seat-2-back-${concealedTiles[0]}`)
+    const lastFlower = boxOf(container, 'flower-tile-137')
+    expect(firstFlower.top).toBe(lastTile.top)
+    expect(Number.parseFloat(firstFlower.left)).toBeGreaterThan(Number.parseFloat(lastTile.left))
+    const rackLeft = Number.parseFloat(firstTile.left) - firstTile.width / 2
+    const rackRight = Number.parseFloat(lastFlower.left) + lastFlower.width / 2
+    const rackCenter = (rackLeft + rackRight) / 2
+    expect(rackCenter).toBeCloseTo(region.x + region.width / 2)
   })
 })

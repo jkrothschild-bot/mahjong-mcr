@@ -85,6 +85,19 @@ describe('Seat', () => {
     expect(screen.getByRole('button', { name: 'Sort hand' })).toBeInTheDocument()
   })
 
+  it('anchors the sort control immediately to the left of the first human tile', () => {
+    const concealedTiles = [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('C4', 1)]
+    const p = player({ seat: 0, hand: { ...emptyHand(), concealedTiles } })
+    render(
+      <Seat seat={0} role="human" player={p} isDealer={false} isCurrentTurn={false} isHuman matchScore={0} handOrder={p.hand.concealedTiles} onSort={vi.fn()} />,
+    )
+    const controlBox = screen.getByRole('button', { name: 'Sort hand' }).parentElement as HTMLElement
+    const firstTileBox = screen.getByTestId(`hand-tile-${p.hand.concealedTiles[0]}`).parentElement as HTMLElement
+    const controlRight = Number.parseFloat(controlBox.style.left) + Number.parseFloat(controlBox.style.marginLeft) + Number.parseFloat(controlBox.style.width)
+    const firstTileLeft = Number.parseFloat(firstTileBox.style.left) + Number.parseFloat(firstTileBox.style.marginLeft)
+    expect(firstTileLeft - controlRight).toBeCloseTo(8)
+  })
+
   it('omits the sort control when onSort is not provided', () => {
     const p = player({ seat: 0, hand: { ...emptyHand(), concealedTiles: idsFor('C1', 1) } })
     render(
@@ -138,7 +151,9 @@ describe('Seat', () => {
 
     it('appears beside the Sort button when the player has not discarded yet', () => {
       renderHuman(true)
-      expect(screen.getByTestId('discard-hint')).toBeInTheDocument()
+      const hint = screen.getByTestId('discard-hint')
+      expect(hint).toBeInTheDocument()
+      expect(hint.closest('.absolute')).toHaveClass('z-30', 'pointer-events-none')
     })
 
     it('is gone once the player has discarded', () => {

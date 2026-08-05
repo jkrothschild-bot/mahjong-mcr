@@ -439,16 +439,23 @@ export interface SeatLineRegion {
   // convention: the left label reads bottom-to-top, the right one
   // top-to-bottom, so neither ends up upside down.
   headerRotation: 0 | 90 | -90
-  // Hand (backs for a bot) + melds + flowers together, one continuous
-  // line — a fixed 3-column grid for west/east, a single row for north.
+  // Hand backs + melds together — a fixed 2-column grid for west/east, a
+  // single row for north.
+  // Flowers are kept out of this playing-tile footprint: chow/pung/kong
+  // tiles replace concealed tiles rather than adding to an unchanged
+  // 13-tile hand, so this region only needs the real 18-tile transient
+  // maximum (13 + four kong extras + one drawn tile).
   line: Rect
+  // Up to eight flowers/seasons on their own compact tray. Separating this
+  // peripheral collection from the main line is what avoids reserving 26
+  // full-size bot-tile slots around the table.
+  flowers: Rect
 }
 
 export interface DiscardZoneRegions {
-  // Ordered west -> you -> north -> east (KICKOFF's own deliberate choice:
-  // "west and east zones sit on their own side; the middle two are the
-  // seats without a side"), NOT necessarily left-to-right screen order for
-  // every seat's own throws — labels are the attribution mechanism.
+  // West/east retain tall side blocks. The broad center is split into a
+  // north half and human half, making each river's ownership follow the
+  // physical seat position instead of relying primarily on labels.
   west: Rect
   you: Rect
   north: Rect
@@ -472,10 +479,10 @@ export interface BoardRegions {
 }
 
 // Vertical bands (top to bottom), fixed regardless of designWidth — sum to
-// STAGE_HEIGHT exactly: 14 + 60 + 24 + 520 + 24 + 140 + 14 = 796.
-// NORTH_LINE_H and FIELD_H were both grown (from 54/498) to make room for
-// SEAT_LINE_PX's own >=10% bump (tileStyles.ts) without re-clamping bot
-// tiles back down to their old rendered size — see that constant's comment.
+// STAGE_HEIGHT exactly: 14 + 80 + 24 + 500 + 24 + 140 + 14 = 796.
+// North reserves exactly one 80px playing-tile row. Its uncommon flowers
+// are an overlay below the wall, so an empty flower tray never steals a
+// permanent row from the discard field.
 // The wood table rail — TableSurface.tsx insets its green felt by exactly
 // this much on all four sides, so the outermost RAIL_PX of the stage is
 // visible rail on every edge. Every seat's identity band rides that rail
@@ -487,12 +494,10 @@ export interface BoardRegions {
 export const RAIL_PX = 14
 
 const HEADER_H = RAIL_PX
-const NORTH_LINE_H = 60
+const NORTH_LINE_H = 80
 const WALL_H = 24
-const FIELD_H = 520
+const FIELD_H = 500
 const HUMAN_ROW_H = 140
-const RING_GAP = 4
-
 const NORTH_HEADER_Y = 0
 const NORTH_LINE_Y = NORTH_HEADER_Y + HEADER_H
 const WALL_TOP_Y = NORTH_LINE_Y + NORTH_LINE_H
@@ -508,19 +513,28 @@ const HUMAN_HEADER_Y = HUMAN_ROW_Y + HUMAN_ROW_H
 // this is what lets the human row claim the full board width beneath them
 // without a corner conflict).
 //
-// Widened from 144 (just enough over SEAT_LINE_PX's new 3-column worst-case
-// width, 3*49+2*4=155, to keep real slack) — capped just below 158, the
-// point past which the center field's own worst-case discard-zone width
-// (designWidth=1768, 5*67+4*4=351) would no longer fit its own quarter of
-// the shrunk field (stageLayout.test.ts's own worst-case-occupancy test).
-const SIDE_WIDTH = 156
+// Two rotated columns hold the 18-tile main-hand maximum at 161px
+// (2*80+1). Flowers share this same footprint at the bottom, so they add no
+// third column. The recovered side width belongs to the discard field.
+const SIDE_WIDTH = 169
+const SIDE_OUTER_INSET = 4
+const SIDE_MAIN_WIDTH = 161
+// The side tray extends down into the otherwise unused outer edge of the
+// human band. At 188px it can pack all eight rotated flower/season tiles at
+// full size, so the maximum-flower left bot is not smaller than a five-
+// flower right bot.
+const SIDE_FLOWER_HEIGHT = 188
+const SIDE_FLOWER_HUMAN_OVERLAP = 70
 // Was the side seats' own header band (a 156x14 rect in the top corner,
 // which is why E/W used to read as floating in the corners rather than
 // belonging to their seat). The header moved onto the rail (see SIDE HEADER
 // PLACEMENT); what's left here is just the top inset that kept the side line
 // clear of it, retained so the side line's own geometry — asserted directly
 // by the golden/capacity tests — doesn't move.
-const SIDE_LINE_TOP_INSET = HEADER_H + RING_GAP
+// The enlarged rotated tiles need the full side rail height. Starting 5px
+// below the top edge retains a visual inset while preserving 20px of
+// worst-case vertical slack across nine packed rows.
+const SIDE_LINE_TOP_INSET = 5
 const SIDE_LINE_Y = SIDE_LINE_TOP_INSET
 const SIDE_LINE_H = WALL_BOTTOM_Y - SIDE_LINE_Y
 
@@ -534,24 +548,14 @@ const SIDE_LINE_H = WALL_BOTTOM_Y - SIDE_LINE_Y
 // an explicit rect: the outermost RAIL_PX of each side, full stage height,
 // rotated so the label runs along the edge.
 //
-// KNOWN COLLISION, not silently dropped (tracked by the
-// 'side rail label vs. side seat tiles' test below). The side seat line
-// starts at x=0 — it always overlapped the left rail — and is width-bound:
-// SIDE_WIDTH=156 against a worst-case 3-column line of 3*49+2*4=155, i.e.
-// ~1px of slack. So the fix is NOT available in this geometry:
-//   - carving a 14px label strip out of the column drops the line to 142px,
-//     which shrinks bot tiles from 49px to ~44px and undoes SEAT_LINE_PX's
-//     own deliberate >=10% legibility bump;
-//   - widening SIDE_WIDTH by 14 to 170 pushes the field's own worst-case
-//     discard zone from 352px to 345px, below the 351px it needs.
-// The side line is column-major over 9 rows, so it only reaches 3 columns
-// (and therefore the rail) at 19+ tiles — 4 kongs, or heavy flowers. Below
-// that it centers at 2 columns and leaves 27px of clear rail. Seat.tsx
-// renders the band AFTER the line so the label stays legible on top when a
-// 19+ tile hand does reach it.
+// The compact rack deliberately starts close to the rail: preserving the
+// full 80px rotated tile width matters more than carving a text-only strip
+// out of it. Seat.tsx renders the identity band after the rack, so its dark
+// chip remains legible over the wood/tile edge.
 
-const ZONE_LABEL_H = 20
+const ZONE_LABEL_H = 0
 export const DISCARD_ZONE_GRID_COLUMNS = 5
+export const DISCARD_CENTER_GRID_COLUMNS = 9
 
 function centerFieldGeometry(designWidth: number) {
   const x = SIDE_WIDTH + WALL_H
@@ -571,9 +575,10 @@ export function getBoardRegions(designWidth: number): BoardRegions {
   if (cached) return cached
 
   const { x: fieldX, width: fieldWidth } = centerFieldGeometry(designWidth)
-  const zoneWidth = fieldWidth / 4
-
-  const zoneRect = (index: number): Rect => ({ x: fieldX + index * zoneWidth, y: FIELD_Y, width: zoneWidth, height: FIELD_H })
+  const sideZoneWidth = fieldWidth / 4
+  const centerX = fieldX + sideZoneWidth
+  const centerWidth = fieldWidth / 2
+  const centerHeight = FIELD_H / 2
 
   const result: BoardRegions = {
     human: {
@@ -584,22 +589,37 @@ export function getBoardRegions(designWidth: number): BoardRegions {
       header: { x: fieldX, y: NORTH_HEADER_Y, width: fieldWidth, height: HEADER_H },
       headerRotation: 0,
       line: { x: fieldX, y: NORTH_LINE_Y, width: fieldWidth, height: NORTH_LINE_H },
+      // SeatLine places north flowers beside the actual playing-tile block
+      // within this shared one-row footprint.
+      flowers: { x: fieldX, y: NORTH_LINE_Y, width: fieldWidth, height: NORTH_LINE_H },
     },
     west: {
       header: { x: 0, y: 0, width: RAIL_PX, height: STAGE_HEIGHT },
       headerRotation: -90,
-      line: { x: 0, y: SIDE_LINE_Y, width: SIDE_WIDTH, height: SIDE_LINE_H },
+      line: { x: SIDE_OUTER_INSET, y: SIDE_LINE_Y, width: SIDE_MAIN_WIDTH, height: SIDE_LINE_H },
+      flowers: {
+        x: SIDE_OUTER_INSET,
+        y: HUMAN_ROW_Y - SIDE_FLOWER_HUMAN_OVERLAP,
+        width: SIDE_MAIN_WIDTH,
+        height: SIDE_FLOWER_HEIGHT,
+      },
     },
     east: {
       header: { x: designWidth - RAIL_PX, y: 0, width: RAIL_PX, height: STAGE_HEIGHT },
       headerRotation: 90,
-      line: { x: designWidth - SIDE_WIDTH, y: SIDE_LINE_Y, width: SIDE_WIDTH, height: SIDE_LINE_H },
+      line: { x: designWidth - SIDE_OUTER_INSET - SIDE_MAIN_WIDTH, y: SIDE_LINE_Y, width: SIDE_MAIN_WIDTH, height: SIDE_LINE_H },
+      flowers: {
+        x: designWidth - SIDE_OUTER_INSET - SIDE_MAIN_WIDTH,
+        y: HUMAN_ROW_Y - SIDE_FLOWER_HUMAN_OVERLAP,
+        width: SIDE_MAIN_WIDTH,
+        height: SIDE_FLOWER_HEIGHT,
+      },
     },
     discards: {
-      west: zoneRect(0),
-      you: zoneRect(1),
-      north: zoneRect(2),
-      east: zoneRect(3),
+      west: { x: fieldX, y: FIELD_Y, width: sideZoneWidth, height: FIELD_H },
+      north: { x: centerX, y: FIELD_Y, width: centerWidth, height: centerHeight },
+      you: { x: centerX, y: FIELD_Y + centerHeight, width: centerWidth, height: centerHeight },
+      east: { x: fieldX + sideZoneWidth * 3, y: FIELD_Y, width: sideZoneWidth, height: FIELD_H },
     },
     wall: {
       top: { x: fieldX, y: WALL_TOP_Y, width: fieldWidth, height: WALL_H },
@@ -612,8 +632,8 @@ export function getBoardRegions(designWidth: number): BoardRegions {
   return result
 }
 
-// Splits a discard zone's full rect (KICKOFF: "20px label band, then a
-// grid") into the two sub-rects DiscardField.tsx actually renders into.
+// Discard ownership is now conveyed by seat-oriented geometry, so the old
+// wind-label band is zero-height and the grid receives the full zone.
 export function splitDiscardZone(zone: Rect): { label: Rect; grid: Rect } {
   return {
     label: { x: zone.x, y: zone.y, width: zone.width, height: ZONE_LABEL_H },

@@ -6,6 +6,22 @@ import { sortByMode } from './hand/handOrder.js'
 import { initLoopState } from './game/useGameLoop.js'
 
 describe('App', () => {
+  it('temporarily toggles a full-board occupancy preview', () => {
+    render(<App />)
+    const preview = screen.getByRole('button', { name: 'Preview full board' })
+    fireEvent.click(preview)
+    expect(screen.getByRole('button', { name: 'Exit full board' })).toHaveAttribute('aria-pressed', 'true')
+    for (const [seat, flowerCount] of [
+      [0, 5],
+      [1, 8],
+      [2, 5],
+      [3, 5],
+    ] as const) {
+      expect(screen.getByTestId(`seat-${seat}`).querySelectorAll('[data-testid^="flower-tile-"]')).toHaveLength(flowerCount)
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Exit full board' }))
+    expect(screen.getByRole('button', { name: 'Preview full board' })).toHaveAttribute('aria-pressed', 'false')
+  })
   it('renders the header and all four seats', () => {
     render(<App />)
 
@@ -119,10 +135,12 @@ describe('App', () => {
   it('confirming Restart abandons the current match — a discard made before restarting is gone afterward', () => {
     render(<App />)
 
+    expect(screen.getByTestId('discard-hint')).toBeInTheDocument()
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
     fireEvent.doubleClick(firstTile!)
     expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
+    expect(screen.queryByTestId('discard-hint')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Restart' }))
     const dialog = screen.getByRole('dialog', { name: 'Confirm restart' })
@@ -133,6 +151,7 @@ describe('App', () => {
     // the human's hand is a fresh 14-tile deal again.
     expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(0)
     expect(screen.getByRole('list', { name: 'Your hand' }).querySelectorAll('[data-testid^="hand-tile-"]')).toHaveLength(14)
+    expect(screen.getByTestId('discard-hint')).toBeInTheDocument()
   })
 
   // Both confirm-before-discard and step mode were removed. Their tests are

@@ -39,6 +39,7 @@ function App() {
   const [exportOpen, setExportOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
+  const [boardPreviewOpen, setBoardPreviewOpen] = useState(false)
   const { stats, recordHandResult } = useSessionStats()
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
@@ -88,7 +89,11 @@ function App() {
   // the rest of the app (turn order, wall, hint system) keeps working normally
   // underneath the visualization.
   const [devOccupancyMode] = useState(() => (import.meta.env.DEV ? parseDevOccupancyMode(window.location.search) : null))
-  const displayState = devOccupancyMode ? applyDevOccupancy(state, devOccupancyMode, HUMAN_SEAT) : state
+  const displayState = boardPreviewOpen
+    ? applyDevOccupancy(state, 'preview', HUMAN_SEAT)
+    : devOccupancyMode
+      ? applyDevOccupancy(state, devOccupancyMode, HUMAN_SEAT)
+      : state
 
   const openReplay = () => setReplaySnapshot(matchMoveLogs)
 
@@ -105,16 +110,15 @@ function App() {
     recordHandResult(state, HUMAN_SEAT)
   }, [state, recordHandResult])
 
-  // One-way latch for the discard hint (DiscardHint.tsx): true until the
-  // human's first discard, false forever after, for the whole session.
+  // Match-scoped latch for the discard hint (DiscardHint.tsx): true until
+  // the human's first discard, then restored when Restart begins a fresh
+  // match.
   //
   // Deliberately NOT derived from state.players[HUMAN_SEAT].discards.length —
   // that resets with every deal, so the hint would reappear at the start of
   // all 16 hands. Deliberately not persisted either: it costs one obvious
   // line to relearn and persisting it would mean a storage decision (and a
   // "why won't this come back?" support case) for a one-sentence cue.
-  // Survives a Restart on purpose — restarting the match doesn't unteach the
-  // player how to discard.
   const [hasHumanDiscarded, setHasHumanDiscarded] = useState(false)
   const onSubmitDiscard = useCallback(
     (tile: number) => {
@@ -143,6 +147,18 @@ function App() {
           <span className="text-xs text-neutral-400">Learn while you play</span>
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={boardPreviewOpen}
+            onClick={() => setBoardPreviewOpen((open) => !open)}
+            className={`min-h-11 rounded-md border px-3 text-sm ${
+              boardPreviewOpen
+                ? 'border-amber-400 bg-amber-950 text-amber-200'
+                : 'border-amber-600 text-amber-300 hover:bg-amber-950'
+            }`}
+          >
+            {boardPreviewOpen ? 'Exit full board' : 'Preview full board'}
+          </button>
           <button
             type="button"
             onClick={() => setTileCountGridOpen(true)}
@@ -221,13 +237,20 @@ function App() {
           <main>, not the true remaining space. */}
       <main className="flex-1 min-h-0 flex flex-col items-center justify-start gap-1 p-1">
         <Board
+          // Preview replaces nearly every rendered tile with a synthetic
+          // state that deliberately reuses physical tile ids. Remount at
+          // the mode boundary so Board's hand-order cache and Motion's
+          // shared-layout registry cannot carry the live board into the
+          // preview; previously the missing flowers appeared only after
+          // Sort forced a second update.
+          key={boardPreviewOpen ? 'full-board-preview' : 'live-board'}
           state={displayState}
           matchState={matchState}
           matchScores={matchScores}
-          isHumanTurn={isHumanTurn}
+          isHumanTurn={boardPreviewOpen ? false : isHumanTurn}
           selectedTileId={selectedTileId}
           onTileClick={selectTile}
-          onRequestDiscardTile={isHumanTurn ? requestDiscardTile : undefined}
+          onRequestDiscardTile={!boardPreviewOpen && isHumanTurn ? requestDiscardTile : undefined}
           selectedTypeId={selectedTypeId}
           onInspectTile={inspectTile}
           showDiscardHint={!hasHumanDiscarded}
@@ -292,6 +315,7 @@ function App() {
         open={restartConfirmOpen}
         onConfirm={() => {
           resetMatch()
+          setHasHumanDiscarded(false)
           setRestartConfirmOpen(false)
         }}
         onCancel={() => setRestartConfirmOpen(false)}

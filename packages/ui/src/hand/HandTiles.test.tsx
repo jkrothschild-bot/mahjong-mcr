@@ -35,6 +35,10 @@ describe('HandTiles', () => {
     const list = screen.getByRole('list', { name: 'Your hand' })
     const items = list.querySelectorAll('[role="listitem"]')
     expect(items).toHaveLength(2)
+    expect(screen.getByTestId('human-wooden-rack')).toBeInTheDocument()
+    expect(screen.getByTestId('human-rack-back-lip')).toBeInTheDocument()
+    expect(screen.getByTestId('human-rack-groove')).toBeInTheDocument()
+    expect(screen.getByTestId('human-rack-front-lip')).toBeInTheDocument()
     expect(items[0]).toHaveTextContent('C1')
     expect(items[1]).toHaveTextContent('WE')
   })
@@ -176,17 +180,52 @@ describe('HandTiles', () => {
   })
 
   // KICKOFF-phase9-human-melds.md item 2.
-  it('renders a recessed shelf behind each meld, before that meld\'s own tiles in DOM order', () => {
+  it('renders one recessed shelf per meld, before its tiles in DOM order', () => {
     const pung: Meld = { id: 'p-0', kind: 'pung', exposure: 'exposed', tiles: idsFor('C2', 3), ownerSeat: 0 }
-    render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[pung]} flowers={[]} />)
+    const chow: Meld = { id: 'c-0', kind: 'chow', exposure: 'exposed', tiles: [idsFor('C3', 1)[0]!, idsFor('C4', 1)[0]!, idsFor('C5', 1)[0]!], ownerSeat: 0 }
+    render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[pung, chow]} flowers={[]} />)
 
     const shelf = screen.getByTestId('meld-shelf-p-0')
+    expect(screen.getByTestId('meld-shelf-c-0')).toBeInTheDocument()
     const tile0 = screen.getByTestId('meld-tile-p-0-0')
     // DOCUMENT_POSITION_FOLLOWING on tile0 (from shelf's perspective) means
     // shelf comes first in the DOM — behind the tile, since neither carries
     // a z-index.
     // eslint-disable-next-line no-bitwise
     expect(shelf.compareDocumentPosition(tile0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('turns the claimed tile sideways in an exposed meld', () => {
+    const tiles = idsFor('C2', 3)
+    const pung: Meld = {
+      id: 'p-0',
+      kind: 'pung',
+      exposure: 'exposed',
+      tiles,
+      ownerSeat: 0,
+      claimedFrom: { seat: 3, discardTile: tiles[2]! },
+    }
+    render(<HandTiles order={[]} activeId={null} overId={null} region={TEST_REGION} melds={[pung]} flowers={[]} />)
+
+    expect(screen.getByTestId('meld-tile-p-0-2')).toHaveAttribute('data-claimed-tile', 'true')
+    expect(screen.getByTestId('meld-tile-p-0-2').style.transform).toContain('rotate(90deg)')
+    expect(screen.getByTestId('meld-tile-p-0-0').style.transform).not.toContain('rotate')
+  })
+
+  it('places human flowers immediately after the playing tiles instead of at the far-right stage edge', () => {
+    const order = [...idsFor('C1', 4), ...idsFor('C2', 4)]
+    const flowers = [136, 137, 138, 139, 140]
+    render(<HandTiles order={order} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={flowers} />)
+
+    const lastTile = screen.getByTestId(`hand-tile-${order.at(-1)}`).parentElement as HTMLElement
+    const firstFlower = screen.getByTestId('flower-tile-136').parentElement as HTMLElement
+    const tileRight = Number.parseFloat(lastTile.style.left) + Number.parseFloat(lastTile.style.marginLeft) + Number.parseFloat(lastTile.style.width)
+    const flowerLeft = Number.parseFloat(firstFlower.style.left) + Number.parseFloat(firstFlower.style.marginLeft)
+    expect(flowerLeft - tileRight).toBe(16)
+
+    const tileBottom = Number.parseFloat(lastTile.style.top) + Number.parseFloat(lastTile.style.marginTop) + Number.parseFloat(lastTile.style.height)
+    const flowerBottom = Number.parseFloat(firstFlower.style.top) + Number.parseFloat(firstFlower.style.marginTop) + Number.parseFloat(firstFlower.style.height)
+    expect(flowerBottom).toBeCloseTo(tileBottom)
   })
 
   // KICKOFF-phase9-human-melds.md's verification item 2: "the row's tile
@@ -203,7 +242,7 @@ describe('HandTiles', () => {
     render(<HandTiles order={order} activeId={null} overId={null} region={TEST_REGION} melds={[kong]} flowers={[]} />)
 
     const TILE_GAP = 4
-    const MELD_GAP = 16
+    const MELD_GAP = 24
     const meldReserve = MELD_GAP - TILE_GAP
     const { width: nominalWidth, height: nominalHeight } = TILE_BOX_PX.normal
     const expected = fitRowTileWidth(

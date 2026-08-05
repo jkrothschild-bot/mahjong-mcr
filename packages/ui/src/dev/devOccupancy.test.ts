@@ -7,12 +7,27 @@ function freshState() {
 }
 
 describe('parseDevOccupancyMode', () => {
-  it('recognizes worst/oneChow/threeMelds and rejects anything else', () => {
+  it('recognizes preview/worst/oneChow/threeMelds and rejects anything else', () => {
     expect(parseDevOccupancyMode('?occupancy=worst')).toBe('worst')
+    expect(parseDevOccupancyMode('?occupancy=preview')).toBe('preview')
     expect(parseDevOccupancyMode('?occupancy=oneChow')).toBe('oneChow')
     expect(parseDevOccupancyMode('?occupancy=threeMelds')).toBe('threeMelds')
     expect(parseDevOccupancyMode('?occupancy=bogus')).toBeNull()
     expect(parseDevOccupancyMode('')).toBeNull()
+  })
+})
+
+describe("applyDevOccupancy('preview')", () => {
+  it('fills every river, shows five human flowers, maximises the left bot at eight, and makes north a three-kong hand', () => {
+    const state = applyDevOccupancy(freshState(), 'preview', 0)
+    for (const player of state.players) {
+      expect(player.discards).toHaveLength(25)
+      expect(player.hand.flowers).toHaveLength(player.seat === 1 ? 8 : 5)
+      expect(player.hand.melds).toHaveLength(player.seat === 2 ? 3 : 2)
+    }
+    expect(state.players[0].hand.flowers).toHaveLength(5)
+    expect(state.players[1].hand.flowers).toHaveLength(8)
+    expect(state.players[2].hand.melds.every((meld) => meld.kind === 'kong')).toBe(true)
   })
 })
 
@@ -23,6 +38,11 @@ describe('parseDevOccupancyMode', () => {
 // broken in a screenshot and undermined verifying item 4's concealed-kong
 // (2 back / 2 face) rendering. Locking this in so it can't silently regress.
 describe("applyDevOccupancy('worst') synthetic kongs", () => {
+  it('fills every discard zone to its exact 5x5 visual capacity', () => {
+    const state = applyDevOccupancy(freshState(), 'worst', 0)
+    expect(state.players.map((player) => player.discards.length)).toEqual([25, 25, 25, 25])
+  })
+
   it('every synthetic kong is 4 tiles of the same type, for every seat', () => {
     const state = applyDevOccupancy(freshState(), 'worst', 0)
     for (const player of state.players) {

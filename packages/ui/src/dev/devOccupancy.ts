@@ -22,14 +22,17 @@ import { typeIdOfInstance, TILE_TYPE_BY_ID, type GameState, type Meld, type Play
 // human seat's hand, real coherent melds rather than 'worst''s arbitrary
 // tile ids (visual coherence doesn't matter for a pure occupancy stress
 // test, but it does for "does one chow's shelf/offset actually read right").
-export type DevOccupancyMode = 'worst' | 'oneChow' | 'threeMelds'
+export type DevOccupancyMode = 'worst' | 'preview' | 'oneChow' | 'threeMelds'
 
 // Phase 4's own 83-total fixture ("83 shared across seats... skewed toward
 // seat 0"), carried over from the removed DiscardOverlay's tests so the
 // worst-case numbers stay pinned somewhere — also exercises DiscardField's per-zone
 // "additive, never rescaling" overflow (a 30-tile pile exceeds a zone's own
 // 25-tile/5x5 nominal capacity).
-const DISCARD_COUNTS: Record<number, number> = { 0: 30, 1: 30, 2: 15, 3: 8 }
+// Visual capacity fixture: every river fills its nominal 5x5 zone exactly.
+// This intentionally exceeds the legal table-wide total; it is a layout
+// stress state, just like simultaneously giving every seat all 8 flowers.
+const DISCARD_COUNTS: Record<number, number> = { 0: 25, 1: 25, 2: 25, 3: 25 }
 const KONG_COUNT = 4 // worst case: all 4 melds are kongs, not pungs/chows — most inter-group gaps
 const CONCEALED_REMAINDER = 1 // 13 + K kongs = 17; 4 kongs leaves exactly 1 tile still concealed
 // The human row's own worst case is 18, not 17 — KICKOFF-phase7-board-
@@ -46,7 +49,7 @@ const FLOWER_COUNT = 8
 
 export function parseDevOccupancyMode(search: string): DevOccupancyMode | null {
   const value = new URLSearchParams(search).get('occupancy')
-  return value === 'worst' || value === 'oneChow' || value === 'threeMelds' ? value : null
+  return value === 'worst' || value === 'preview' || value === 'oneChow' || value === 'threeMelds' ? value : null
 }
 
 // Every real TileInstanceId is 0-143 (144 physical tiles) — but this
@@ -130,6 +133,9 @@ function syntheticKong(ownerSeat: PlayerState['seat'], index: number): Meld {
     kongSource: concealed ? 'concealed' : 'exposedFromDiscard',
     tiles,
     ownerSeat,
+    ...(!concealed
+      ? { claimedFrom: { seat: ((ownerSeat + 3) % 4) as PlayerState['seat'], discardTile: tiles[tiles.length - 1]! } }
+      : {}),
   }
 }
 
@@ -149,6 +155,59 @@ export function applyDevOccupancy(state: GameState, mode: DevOccupancyMode, huma
     const players = state.players.map((player) =>
       player.seat === humanSeat ? { ...player, hand: { ...player.hand, ...built } } : player,
     )
+    return { ...state, players: players as GameState['players'] }
+  }
+
+  // Temporary late-game board preview: full discard rivers, but plausible
+  // rather than pathological hands. The human explicitly carries five
+  // flowers and the bot on their left (South, seat 1) carries the maximum
+  // eight, so both of those otherwise easy-to-miss trays are visible.
+  // North carries three kongs as the other deliberately heavy hand.
+  // Unlike `worst`, this is suitable for an owner-facing toggle because it
+  // resembles the board they are likely to encounter during real play.
+  if (mode === 'preview') {
+    const cursor = { next: 0 }
+    const previewTypes: readonly [TileTypeId, TileTypeId, TileTypeId][] = [
+      ['C2', 'C3', 'C4'],
+      ['D4', 'D5', 'D6'],
+      ['B6', 'B7', 'B8'],
+      ['C6', 'C7', 'C8'],
+    ]
+    const players = state.players.map((player) => {
+      const chowTypes = previewTypes[player.seat]!
+      const chowTiles = chowTypes.flatMap((typeId) => realTileIds(typeId, 1))
+      const chow: Meld = {
+        id: `preview-chow-${player.seat}`,
+        kind: 'chow',
+        exposure: 'exposed',
+        tiles: chowTiles,
+        ownerSeat: player.seat,
+        claimedFrom: { seat: ((player.seat + 3) % 4) as PlayerState['seat'], discardTile: chowTiles[1]! },
+      }
+      const pungType = (['DR', 'DG', 'DW', 'WE'] as const)[player.seat]!
+      const pungTiles = realTileIds(pungType, 3)
+      const pung: Meld = {
+        id: `preview-pung-${player.seat}`,
+        kind: 'pung',
+        exposure: 'exposed',
+        tiles: pungTiles,
+        ownerSeat: player.seat,
+        claimedFrom: { seat: ((player.seat + 1) % 4) as PlayerState['seat'], discardTile: pungTiles[2]! },
+      }
+      const northKongs = player.seat === 2 ? Array.from({ length: 3 }, (_, i) => syntheticKong(player.seat, i)) : null
+      const concealedCount = player.seat === 2 ? 1 : player.seat === humanSeat ? 8 : 7
+      const flowerCount = player.seat === 1 ? FLOWER_COUNT : 5
+      return {
+        ...player,
+        discards: Array.from({ length: 25 }, () => nextId(cursor)),
+        hand: {
+          ...player.hand,
+          concealedTiles: Array.from({ length: concealedCount }, () => nextId(cursor)),
+          melds: northKongs ?? [chow, pung],
+          flowers: Array.from({ length: flowerCount }, (_, i) => 136 + ((player.seat * 5 + i) % FLOWER_COUNT)),
+        },
+      }
+    })
     return { ...state, players: players as GameState['players'] }
   }
 

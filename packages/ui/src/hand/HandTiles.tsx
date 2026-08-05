@@ -11,7 +11,6 @@ import { computeRowPositions, fitRowTileWidth, packGroupsMajor, placeGroup, type
 import { TileBackContent } from '../tiles/TileBackContent.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import {
-  DISCARD_FIELD_PX,
   HAND_TILE_WIDTH_FLOOR,
   MELD_BASELINE_OFFSET_PX,
   MELD_SHELF_CLASSES,
@@ -21,6 +20,7 @@ import {
   meldTileFaceClassName,
   tileFaceClassName,
   TILE_BOX_PX,
+  TILE_FACE_COMPACT_PX,
 } from '../tiles/tileStyles.js'
 import { DISCARD_ZONE_ID, END_ZONE_ID } from './resolveReorderTarget.js'
 
@@ -82,7 +82,8 @@ const TILE_GAP = 4
 // concealed block and the melds that follow it — bigger than the uniform
 // intra-row tile gap, same "rhythm" role INTER_GAP plays elsewhere
 // (Discards' 6-tile groups, and the removed all-discards view's bands).
-const MELD_GAP = 16
+const MELD_GAP = 24
+const FLOWER_GAP = 16
 // Deliberately much narrower than a real tile — see the end-zone placement
 // comment below for why a full tile-width drop slot risks overflowing the
 // stage's clipped bounds once a row uses 100% of its region's width.
@@ -212,8 +213,11 @@ export function HandTiles({
   // hand row on the rare turn a 4th+ flower is drawn. Unlike a discard/meld
   // pile (CLAUDE.md's "never reflow" target), flowers are a low-stakes,
   // peripheral count the player isn't tracking shape against.
-  const { width: flowerWidth } = DISCARD_FIELD_PX[tileScale]
-  const flowerReserve = flowers.length > 0 ? flowers.length * flowerWidth + (flowers.length - 1) * TILE_GAP + MELD_GAP : 0
+  // Flowers live on their own compact wooden tray. At the eight-flower
+  // stress case this preserves the full 18-slot playing-tile row without
+  // forcing it below the hand legibility floor.
+  const { width: flowerWidth } = TILE_FACE_COMPACT_PX[tileScale]
+  const flowerReserve = flowers.length > 0 ? flowers.length * flowerWidth + (flowers.length - 1) * TILE_GAP + FLOWER_GAP : 0
   // Phase 2.2 step 4: shrink to keep the row on one line down to
   // HAND_TILE_WIDTH_FLOOR, rather than wrapping and letting the group
   // fit-scale shrink the whole multi-row block (Phase 2's "worst outcome
@@ -251,8 +255,9 @@ export function HandTiles({
   // use, reused here per KICKOFF's own instruction rather than hand-rolling
   // a second gap-aware row layout.
   const groups = [...(order.length > 0 ? [order.length] : []), ...melds.map((meld) => meld.tiles.length)]
-  const layout = packGroupsMajor(groups, 'horizontal', region, tileWidth, tileHeight, TILE_GAP, MELD_GAP, TILE_GAP)
-  const placed = placeGroup(layout, region, tileWidth, tileHeight)
+  const playingRegion = { ...region, width: region.width - flowerReserve }
+  const layout = packGroupsMajor(groups, 'horizontal', playingRegion, tileWidth, tileHeight, TILE_GAP, MELD_GAP, TILE_GAP)
+  const placed = placeGroup(layout, playingRegion, tileWidth, tileHeight)
   const concealedPlaced = placed.slice(0, order.length)
   const meldPlaced = placed.slice(order.length)
   const activeTypeId = activeId !== null ? typeIdOfInstance(activeId) : null
@@ -278,7 +283,7 @@ export function HandTiles({
   const lastPlacedTile = order.length > 0 ? concealedPlaced[order.length - 1] : undefined
   const endZonePlaced = lastPlacedTile
     ? { x: lastPlacedTile.x + (tileWidth / 2 + TILE_GAP + END_ZONE_WIDTH / 2) * layout.scale, y: lastPlacedTile.y }
-    : placeGroup(computeRowPositions(1, region, tileWidth, tileHeight, TILE_GAP), region, tileWidth, tileHeight)[0]!
+    : placeGroup(computeRowPositions(1, playingRegion, tileWidth, tileHeight, TILE_GAP), playingRegion, tileWidth, tileHeight)[0]!
 
   // Where to draw the drop-preview line: immediately before whatever tile
   // (or the trailing end zone) the pointer/keyboard focus is currently
@@ -296,19 +301,80 @@ export function HandTiles({
         : order.indexOf(overId)
   const insertionPos = insertionIndex === null ? null : insertionIndex === order.length ? endZonePlaced : concealedPlaced[insertionIndex]!
 
-  // Flowers fill from the row's own right edge, at discard size (67px, not
-  // the full hand-tile size) — reserved out of the hand+meld block's own
-  // budget above (flowerReserve), positioned here at their real edge-
-  // anchored spot.
-  const { height: flowerHeight } = DISCARD_FIELD_PX[tileScale]
-  const flowerY = region.y + region.height / 2
+  // Flowers follow immediately after the playing block, at compact size.
+  // They used to anchor to the full row's far-right edge, where the side
+  // bot rack can cover them; the width is already reserved above, so there
+  // is no reason to leave that large empty gap.
+  const { height: flowerHeight } = TILE_FACE_COMPACT_PX[tileScale]
+  // Sit the compact flower tray on the same lower baseline as the full-size
+  // hand tiles. Centring both made the shorter flowers float noticeably
+  // higher on the table.
+  const flowerY = region.y + region.height / 2 + (tileHeight * layout.scale - flowerHeight) / 2
+  const playingRight = placed.length > 0
+    ? Math.max(...placed.map((p) => p.x + (tileWidth * layout.scale) / 2))
+    : playingRegion.x
   const flowerPlaced = flowers.map((_, index) => ({
-    x: region.x + region.width - flowerWidth / 2 - index * (flowerWidth + TILE_GAP),
+    x: playingRight + FLOWER_GAP + flowerWidth / 2 + index * (flowerWidth + TILE_GAP),
     y: flowerY,
   }))
 
+  const rackBoxes = [
+    ...placed.map((p) => ({
+      left: p.x - (tileWidth * layout.scale) / 2,
+      right: p.x + (tileWidth * layout.scale) / 2,
+      top: p.y - (tileHeight * layout.scale) / 2,
+      bottom: p.y + (tileHeight * layout.scale) / 2 + meldBaselineOffset * layout.scale,
+    })),
+    ...flowerPlaced.map((p) => ({
+      left: p.x - flowerWidth / 2,
+      right: p.x + flowerWidth / 2,
+      top: p.y - flowerHeight / 2,
+      bottom: p.y + flowerHeight / 2,
+    })),
+  ]
+  const rackPad = 6
+  const rackBounds = rackBoxes.length > 0
+    ? {
+        left: Math.min(...rackBoxes.map((box) => box.left)) - rackPad,
+        right: Math.max(...rackBoxes.map((box) => box.right)) + rackPad,
+        top: Math.min(...rackBoxes.map((box) => box.top)) - rackPad,
+        bottom: Math.max(...rackBoxes.map((box) => box.bottom)) + rackPad,
+      }
+    : null
+
   return (
     <>
+      {rackBounds && (
+        <Positioned
+          x={(rackBounds.left + rackBounds.right) / 2}
+          y={(rackBounds.top + rackBounds.bottom) / 2}
+          naturalWidth={rackBounds.right - rackBounds.left}
+          naturalHeight={rackBounds.bottom - rackBounds.top}
+        >
+          <div
+            aria-hidden
+            data-testid="human-wooden-rack"
+            className="relative h-full w-full overflow-hidden rounded-xl border border-[#351708] shadow-[inset_0_3px_3px_rgba(255,211,145,0.32),inset_0_-7px_8px_rgba(24,8,2,0.68),0_5px_9px_rgba(0,0,0,0.48)]"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(7deg,rgba(255,218,155,0.055) 0 1px,transparent 1px 5px),linear-gradient(180deg,#8b4d25 0%,#6b3518 30%,#54250f 67%,#351508 100%)',
+            }}
+          >
+            <div
+              data-testid="human-rack-back-lip"
+              className="absolute inset-x-0 top-0 h-[9px] border-b border-[#3c1a0a] bg-[linear-gradient(180deg,#b36f3b,#6e3518_70%,#3b1809)] shadow-[0_3px_4px_rgba(0,0,0,0.38),inset_0_1px_rgba(255,226,177,0.45)]"
+            />
+            <div
+              data-testid="human-rack-groove"
+              className="absolute inset-x-[5px] bottom-[7px] h-[5px] rounded-full border-t border-black/60 bg-[#291006]/80 shadow-[0_2px_1px_rgba(255,190,110,0.14)]"
+            />
+            <div
+              data-testid="human-rack-front-lip"
+              className="absolute inset-x-0 bottom-0 h-[8px] border-t border-[#2a1006] bg-[linear-gradient(180deg,#7d3d1b,#3a1708)] shadow-[inset_0_2px_1px_rgba(255,193,115,0.2),0_-2px_3px_rgba(0,0,0,0.28)]"
+            />
+          </div>
+        </Positioned>
+      )}
       <SortableContext items={[...order]} strategy={rectSortingStrategy}>
         <div role="list" aria-label="Your hand">
           {order.map((id, index) => (
@@ -328,21 +394,16 @@ export function HandTiles({
               onTileClick={onTileClick}
             />
           ))}
-          {/* KICKOFF-phase9-human-melds.md item 2: one recessed shelf per
-              meld, rendered BEFORE (i.e. behind, in DOM order — these are
-              absolutely positioned siblings with no z-index) that meld's own
-              tiles below. Background only: naturalWidth/naturalHeight are
-              derived from tileWidth/tileHeight/TILE_GAP (the row solve's own
-              numbers) plus a small fixed pad, never fed back into the solve
-              itself. */}
+          {/* One recessed inset per meld, rendered before its tiles. Separate
+              shelves keep adjacent declared sets visually distinct. */}
           {meldRanges.map(({ meld, startIndex }) => {
             const first = meldPlaced[startIndex]!
             const last = meldPlaced[startIndex + meld.tiles.length - 1]!
-            const shelfWidth = meld.tiles.length * tileWidth + (meld.tiles.length - 1) * TILE_GAP + 2 * MELD_SHELF_PAD_X
+            const shelfWidth = last.x - first.x + tileWidth + 2 * MELD_SHELF_PAD_X
             const shelfHeight = tileHeight + 2 * MELD_SHELF_PAD_Y
             return (
               <Positioned
-                key={`${meld.id}-shelf`}
+                key={`meld-shelf-${meld.id}`}
                 x={(first.x + last.x) / 2}
                 y={first.y + meldBaselineOffset * layout.scale}
                 naturalWidth={shelfWidth}
@@ -365,12 +426,14 @@ export function HandTiles({
               // other 2 (always face-up) already reveal the type — the tile
               // inspector/highlighting below stay fully wired regardless.
               const isConcealedKongBack = meld.kongSource === 'concealed' && (tileIndex === 0 || tileIndex === 3)
+              const isClaimedTile = meld.exposure === 'exposed' && meld.claimedFrom?.discardTile === id
               const highlighted = selectedTileId === id || highlightedTypeId === typeId
               return (
                 <Positioned key={id} layoutId={String(id)} x={p.x} y={p.y} naturalWidth={tileWidth} naturalHeight={tileHeight} scale={layout.scale}>
                   <div
                     data-tile-id={id}
                     data-testid={`meld-tile-${meld.id}-${tileIndex}`}
+                    data-claimed-tile={isClaimedTile || undefined}
                     role="listitem"
                     onClick={onTileClick ? () => onTileClick(id) : undefined}
                     // Item 1: melds sit on a lower baseline than concealed
@@ -379,7 +442,11 @@ export function HandTiles({
                     // packGroupsMajor/placeGroup's own x/y math (and the
                     // shelf above, which adds the same offset to its own y)
                     // stays untouched.
-                    style={{ transform: `translateY(${meldBaselineOffset}px)` }}
+                    style={{
+                      transform: isClaimedTile
+                        ? `translateY(${meldBaselineOffset}px) rotate(90deg) scale(${tileWidth / tileHeight})`
+                        : `translateY(${meldBaselineOffset}px)`,
+                    }}
                     className={
                       isConcealedKongBack
                         ? meldBackTileClassName({ highlighted, extra: onTileClick ? 'cursor-pointer' : undefined, scale: tileScale })
@@ -418,11 +485,30 @@ export function HandTiles({
               }}
             />
           )}
+          {flowerPlaced.length > 0 && (() => {
+            const left = flowerPlaced[0]!
+            const right = flowerPlaced[flowerPlaced.length - 1]!
+            return (
+              <Positioned
+                x={(left.x + right.x) / 2}
+                y={flowerY}
+                naturalWidth={right.x - left.x + flowerWidth + 8}
+                naturalHeight={flowerHeight + 8}
+              >
+                <div aria-hidden data-testid="flower-shelf-shared" className={`h-full w-full ${MELD_SHELF_CLASSES}`} />
+              </Positioned>
+            )
+          })()}
           {flowers.map((id, index) => {
             const p = flowerPlaced[index]!
             const typeId = typeIdOfInstance(id)
+            // Flowers never move between rendered zones after replacement,
+            // so they do not need shared-layout identity. Preview mode
+            // reuses the eight physical flower ids across four hands;
+            // giving those duplicates one layoutId makes Motion merge them
+            // and leaves some trays invisible until another render.
             return (
-              <Positioned key={id} layoutId={String(id)} x={p.x} y={p.y} naturalWidth={flowerWidth} naturalHeight={flowerHeight}>
+              <Positioned key={id} x={p.x} y={p.y} naturalWidth={flowerWidth} naturalHeight={flowerHeight}>
                 <div
                   data-tile-id={id}
                   data-testid={`flower-tile-${id}`}

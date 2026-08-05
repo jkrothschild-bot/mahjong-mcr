@@ -4,10 +4,11 @@ import { DISCARD_ZONE_ID, END_ZONE_ID } from '../hand/resolveReorderTarget.js'
 import { HandTiles } from '../hand/HandTiles.js'
 import { DiscardHint } from '../hand/DiscardHint.js'
 import { SortToolbar } from '../hand/SortToolbar.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { useStageMetrics } from '../stage/StageMetricsContext.js'
 import { Positioned } from '../stage/Positioned.js'
-import { getBoardRegions, type SeatLineRegion, type SeatRole } from '../stage/stageLayout.js'
-import { SEAT_LINE_MELD_SHIFT_PX } from '../tiles/tileStyles.js'
+import { fitRowTileWidth, getBoardRegions, type SeatLineRegion, type SeatRole } from '../stage/stageLayout.js'
+import { HAND_TILE_WIDTH_FLOOR, SEAT_LINE_MELD_SHIFT_PX, TILE_BOX_PX, TILE_FACE_COMPACT_PX } from '../tiles/tileStyles.js'
 import { SeatLine } from './SeatLine.js'
 
 // The sort control's own reserved slot at the left edge of the human row —
@@ -168,6 +169,7 @@ export function Seat({
   revealWinningTileId,
 }: SeatProps) {
   const { designWidth } = useStageMetrics()
+  const { tileScale } = useSettingsContext()
   const board = getBoardRegions(designWidth)
   const seatLine: SeatLineRegion = role === 'human' ? board.north /* unused for human, see below */ : board[role]
   const headerRegion = role === 'human' ? board.human.header : seatLine.header
@@ -182,6 +184,21 @@ export function Seat({
     width: board.human.row.width - SORT_CONTROL_WIDTH,
     height: board.human.row.height,
   }
+  // HandTiles centers the playing block inside `handRegion`. Anchor the
+  // controls to that block's computed left edge instead of the stage edge,
+  // so the Sort button and discard instructions stay beside the first tile
+  // on wide boards rather than being stranded in the far-left corner.
+  const handTileCount = (handOrder?.length ?? player.hand.concealedTiles.length) + player.hand.melds.reduce((sum, meld) => sum + meld.tiles.length, 0)
+  const flowerWidth = TILE_FACE_COMPACT_PX[tileScale].width
+  const flowerReserve = player.hand.flowers.length > 0 ? player.hand.flowers.length * flowerWidth + (player.hand.flowers.length - 1) * 4 + 16 : 0
+  const meldReserve = player.hand.melds.length > 0 ? 12 : 0
+  const nominal = TILE_BOX_PX[tileScale]
+  const fitted = fitRowTileWidth(handTileCount, handRegion.width - flowerReserve - meldReserve, nominal.width, nominal.height, 4, HAND_TILE_WIDTH_FLOOR)
+  const groupCount = (handOrder?.length ?? player.hand.concealedTiles.length) > 0 ? 1 + player.hand.melds.length : player.hand.melds.length
+  const naturalHandWidth = handTileCount > 0 ? handTileCount * fitted.width + Math.max(0, handTileCount - groupCount) * 4 + Math.max(0, groupCount - 1) * 16 : 0
+  const playingWidth = handRegion.width - flowerReserve
+  const firstTileLeft = handRegion.x + Math.max(0, (playingWidth - naturalHandWidth) / 2)
+  const controlCenterX = Math.max(SORT_CONTROL_WIDTH / 2, firstTileLeft - 8 - SORT_CONTROL_WIDTH / 2)
 
   // One centered group per table edge — wind letter, badges and match score
   // together. This was previously justify-between across a full-width band,
@@ -250,7 +267,7 @@ export function Seat({
           {onSort && (
             <>
               <Positioned
-                x={sortRegion.x + sortRegion.width / 2}
+                x={controlCenterX}
                 y={sortRegion.y + SORT_BUTTON_TOP + SORT_CONTROL_HEIGHT / 2}
                 naturalWidth={SORT_CONTROL_WIDTH}
                 naturalHeight={SORT_CONTROL_HEIGHT}
@@ -259,10 +276,11 @@ export function Seat({
               </Positioned>
               {showDiscardHint && (
                 <Positioned
-                  x={sortRegion.x + sortRegion.width / 2}
+                  x={controlCenterX}
                   y={sortRegion.y + DISCARD_HINT_TOP + DISCARD_HINT_HEIGHT / 2}
                   naturalWidth={SORT_CONTROL_WIDTH}
                   naturalHeight={DISCARD_HINT_HEIGHT}
+                  className="pointer-events-none z-30"
                 >
                   <DiscardHint visible />
                 </Positioned>
@@ -296,7 +314,13 @@ export function Seat({
           seat={seat}
           hand={player.hand}
           region={seatLine.line}
-          grid={role === 'north' ? undefined : { columns: 3, rows: 9 }}
+          flowerRegion={seatLine.flowers}
+          flowerAxis="horizontal"
+          grid={
+            role === 'north'
+              ? { columns: 18, rows: 1, axis: 'horizontal' }
+              : { columns: 2, rows: 9, axis: 'vertical', rotation: role === 'west' ? 90 : -90 }
+          }
           revealConcealed={revealConcealed}
           concealedOrder={revealOrder}
           extraConcealedTiles={revealExtraTiles}

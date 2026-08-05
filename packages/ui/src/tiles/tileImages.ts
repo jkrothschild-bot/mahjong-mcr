@@ -25,7 +25,7 @@ const HONOR_ASSET_KEY: Record<string, string> = {
   DW: 'P',
 }
 
-// Flower/season asset FILE names are "flowerN"/"seasonN", not "F1"/"S1" —
+// Flower/season asset FILE names are "flowerN-art"/"seasonN-art", not "F1"/"S1" —
 // Windows/macOS default filesystems are case-insensitive, so a file named
 // "S1.svg" silently collides with the already-written "s1.svg" (Bamboo 1).
 // That collision actually happened on first generation and clobbered 4 real
@@ -33,7 +33,7 @@ const HONOR_ASSET_KEY: Record<string, string> = {
 function flowerSeasonAssetKey(typeId: TileTypeId): string | undefined {
   const match = /^([FS])([1-4])$/.exec(typeId)
   if (!match) return undefined
-  return `${match[1] === 'F' ? 'flower' : 'season'}${match[2]}`
+  return `${match[1] === 'F' ? 'flower' : 'season'}${match[2]}-art`
 }
 
 function assetKeyFor(typeId: TileTypeId): string | undefined {
@@ -43,9 +43,9 @@ function assetKeyFor(typeId: TileTypeId): string | undefined {
 }
 
 // All 42 real tile types (34 standard + 8 flower/season) have art —
-// flowers/seasons are original hand-coded SVGs (see
-// scripts/generate-tile-art.mjs and THIRD_PARTY_LICENSES.md), not vendored
-// from any external set. Undefined is still possible if an asset is ever
+// flowers/seasons are original project raster artwork (see
+// THIRD_PARTY_LICENSES.md), not vendored from any external set. Undefined is
+// still possible if an asset is ever
 // missing; callers fall back to the plain text label.
 export function tileImageSrc(typeId: TileTypeId): string | undefined {
   const key = assetKeyFor(typeId)

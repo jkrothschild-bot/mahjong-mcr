@@ -1,11 +1,11 @@
 import { useDroppable } from '@dnd-kit/core'
-import { typeIdOfInstance, type GameState, type PlayerState, type Seat as SeatId, type TileInstanceId } from '@mahjong-mcr/engine'
+import { typeIdOfInstance, type GameState, type Seat as SeatId, type TileInstanceId } from '@mahjong-mcr/engine'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
 import { DISCARD_ZONE_ID } from '../hand/resolveReorderTarget.js'
 import { useSettingsContext } from '../settings/SettingsContext.js'
 import { Positioned } from '../stage/Positioned.js'
 import { useStageMetrics } from '../stage/StageMetricsContext.js'
-import { computeGridPositions, fitGridTileWidth, getBoardRegions, placeGroup, splitDiscardZone, DISCARD_ZONE_GRID_COLUMNS } from '../stage/stageLayout.js'
+import { computeGridPositions, fitGridTileWidth, getBoardRegions, placeGroup, splitDiscardZone, DISCARD_CENTER_GRID_COLUMNS, DISCARD_ZONE_GRID_COLUMNS } from '../stage/stageLayout.js'
 import { discardFieldTileClassName, DISCARD_FIELD_PX, DISCARD_FIELD_WIDTH_FLOOR } from '../tiles/tileStyles.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 
@@ -39,10 +39,6 @@ const ZONE_POSITION_LABEL: Record<ZoneKey, string> = { west: 'Left', you: 'You',
 
 function seatForOffset(offset: number): SeatId {
   return ((offset + HUMAN_SEAT) % 4) as SeatId
-}
-
-function windLabel(player: PlayerState): string {
-  return player.seatWind.charAt(0).toUpperCase() + player.seatWind.slice(1)
 }
 
 export interface DiscardFieldProps {
@@ -100,20 +96,6 @@ export function DiscardField({ state, selectedTypeId, onTileClick, omitTileId }:
     width: regions.east.x + regions.east.width - regions.west.x,
     height: regions.west.height,
   }
-  // All 4 zones are exactly fieldWidth/4 wide (splitDiscardZone only cuts
-  // off the label band, not the width) — solved once, from whichever zone,
-  // rather than per-zone. Column count (5), not tile count, drives this —
-  // see fitGridTileWidth's own comment for why that's what keeps a growing
-  // discard pile from ever re-triggering this solve mid-hand.
-  const { width: tileWidth, height: tileHeight } = fitGridTileWidth(
-    DISCARD_ZONE_GRID_COLUMNS,
-    splitDiscardZone(regions.west).grid.width,
-    nominal.width,
-    nominal.height,
-    TILE_GAP,
-    DISCARD_FIELD_WIDTH_FLOOR,
-  )
-
   return (
     <div aria-label="Discard field">
       {/* A drop target needs a real bounding box for dnd-kit's collision
@@ -141,39 +123,38 @@ export function DiscardField({ state, selectedTypeId, onTileClick, omitTileId }:
         const seat = seatForOffset(ZONE_OFFSETS[zoneKey])
         const player = state.players[seat]!
         const discards = omitTileId != null ? player.discards.filter((id) => id !== omitTileId) : player.discards
-        const { label, grid } = splitDiscardZone(regions[zoneKey])
+        const { grid } = splitDiscardZone(regions[zoneKey])
+        const columns = zoneKey === 'you' || zoneKey === 'north' ? DISCARD_CENTER_GRID_COLUMNS : DISCARD_ZONE_GRID_COLUMNS
+        const { width: tileWidth, height: tileHeight } = fitGridTileWidth(
+          columns,
+          grid.width,
+          nominal.width,
+          nominal.height,
+          TILE_GAP,
+          DISCARD_FIELD_WIDTH_FLOOR,
+        )
         const layout = computeGridPositions(
           discards.length,
-          DISCARD_ZONE_GRID_COLUMNS,
+          columns,
           { width: grid.width, height: UNBOUNDED_HEIGHT },
           tileWidth,
           tileHeight,
           TILE_GAP,
         )
-        const placed = placeGroup(layout, grid, tileWidth, tileHeight)
+        // With labels gone, pin north to the top of its half and the human
+        // river to the bottom of its half. The recovered label height thus
+        // becomes real separation between those opposing rivers instead of
+        // being absorbed by centering both blocks again.
+        const occupiedHeight = Math.min(grid.height, layout.naturalHeight * layout.scale)
+        const placementGrid = zoneKey === 'north'
+          ? { ...grid, height: occupiedHeight }
+          : zoneKey === 'you'
+            ? { ...grid, y: grid.y + grid.height - occupiedHeight, height: occupiedHeight }
+            : grid
+        const placed = placeGroup(layout, placementGrid, tileWidth, tileHeight)
 
         return (
           <div key={zoneKey} data-testid={`discard-zone-${zoneKey}`}>
-            <Positioned
-              x={label.x + label.width / 2}
-              y={label.y + label.height / 2}
-              naturalWidth={label.width}
-              naturalHeight={label.height}
-            >
-              <div
-                data-testid={`discard-zone-label-${zoneKey}`}
-                className="w-full truncate text-center text-xs font-semibold text-neutral-300"
-              >
-                {/* Wind alone identifies a pile unambiguously (no two seats
-                    share a wind) — the "Left"/"Across"/"Right" position word
-                    was redundant noise once you already know the wind.
-                    "You" stays, but as a trailing qualifier on your own real
-                    wind ("East (You)") rather than replacing it outright, so
-                    every other zone's "just the wind" reads consistently. */}
-                {windLabel(player)}
-                {zoneKey === 'you' && ' (You)'}
-              </div>
-            </Positioned>
             <div role="list" aria-label={`${ZONE_POSITION_LABEL[zoneKey]} discards`}>
               {discards.map((id, index) => {
                 const typeId = typeIdOfInstance(id)

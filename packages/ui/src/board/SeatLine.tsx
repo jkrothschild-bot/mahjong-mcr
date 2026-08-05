@@ -1,37 +1,120 @@
 import { typeIdOfInstance, type Hand, type TileInstanceId } from '@mahjong-mcr/engine'
 import { useSettingsContext } from '../settings/SettingsContext.js'
 import { Positioned } from '../stage/Positioned.js'
-import { computeRowPositions, fitGridTileWidth, fitRowTileWidth, packGroupsMajor, placeGroup, type Rect } from '../stage/stageLayout.js'
+import { computeGridPositions, fitGridTileWidth, packGroupsMajor, placeGroup, type GroupLayout, type Rect } from '../stage/stageLayout.js'
 import {
   MELD_SHELF_CLASSES,
   SEAT_LINE_MELD_SHELF_PAD_PX,
   SEAT_LINE_PX,
   SEAT_LINE_WIDTH_FLOOR,
+  TILE_FACE_COMPACT_PX,
   WINNING_TILE_RING_CLASSES,
   seatLineBackClassName,
   seatLineFaceClassName,
   seatLineMeldFaceClassName,
+  tileFaceCompactClassName,
 } from '../tiles/tileStyles.js'
 import { TileBackContent } from '../tiles/TileBackContent.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 
 const TILE_GAP = 4
-// North's own worst case (KICKOFF-phase7-board-rebuild.md: "23-25 tiles" —
-// 16 melded + 1 concealed + up to 8 flowers). Solved against THIS constant,
-// never the live `flat.length`, so a seat's line is pre-sized for its
-// worst case up front and never reflows as melds/flowers actually
-// accumulate (CLAUDE.md's "overflow is additive, never rescaling").
-const NORTH_WORST_CASE_COUNT = 25
+const RACK_PAD = 2
+
+// A side rack has two fixed columns of nine tile slots. Sequential
+// group-major packing can waste a whole column in the legal transient
+// maximum [1 concealed, 1 drawn, 4, 4, 4, 4]: the two singles at the start
+// leave neither column with room for two intact kongs. Assigning each
+// concealed/meld group to the currently shorter column instead yields the
+// exact legal split 1+4+4 / 1+4+4, keeps every meld whole, and never needs a
+// third column. North remains ordinary left-to-right group-major packing.
+function packBalancedSideColumns(
+  groupSizes: readonly number[],
+  columns: number,
+  region: Rect,
+  tileWidth: number,
+  tileHeight: number,
+  gap: number,
+): GroupLayout {
+  if (groupSizes.length === 0) return { positions: [], scale: 1, naturalWidth: 0, naturalHeight: 0 }
+
+  const usedHeights = Array.from({ length: columns }, () => 0)
+  const positions: { x: number; y: number }[] = []
+  let highestColumn = 0
+
+  for (const size of groupSizes) {
+    const groupHeight = size * tileHeight + (size - 1) * gap
+    let column = 0
+    for (let candidate = 1; candidate < columns; candidate++) {
+      if (usedHeights[candidate]! < usedHeights[column]!) column = candidate
+    }
+    const startY = usedHeights[column]! > 0 ? usedHeights[column]! + gap : 0
+    for (let i = 0; i < size; i++) {
+      positions.push({ x: column * (tileWidth + gap), y: startY + i * (tileHeight + gap) })
+    }
+    usedHeights[column] = startY + groupHeight
+    highestColumn = Math.max(highestColumn, column)
+  }
+
+  const naturalWidth = (highestColumn + 1) * tileWidth + highestColumn * gap
+  const naturalHeight = Math.max(...usedHeights)
+  const scale = Math.min(1, region.width / naturalWidth, region.height / naturalHeight)
+  return { positions, scale, naturalWidth, naturalHeight }
+}
+
+// At reveal, the concealed order is already four readable sets followed by
+// the pair. Keep those groups contiguous and split only BETWEEN groups, with
+// the first run placed in the physical outer column. This avoids the normal
+// live-hand balancer interleaving 2-3-4 / 3-4-5 / etc. across both columns.
+function packRevealedSideColumns(
+  groupSizes: readonly number[],
+  outerColumn: number,
+  region: Rect,
+  tileWidth: number,
+  tileHeight: number,
+  gap: number,
+): GroupLayout {
+  if (groupSizes.length === 0) return { positions: [], scale: 1, naturalWidth: 0, naturalHeight: 0 }
+  let split = 1
+  let bestDifference = Number.POSITIVE_INFINITY
+  for (let candidate = 1; candidate < groupSizes.length; candidate++) {
+    const first = groupSizes.slice(0, candidate).reduce((sum, size) => sum + size, 0)
+    const second = groupSizes.slice(candidate).reduce((sum, size) => sum + size, 0)
+    const difference = Math.abs(first - second)
+    if (difference < bestDifference) {
+      bestDifference = difference
+      split = candidate
+    }
+  }
+
+  const columns = [groupSizes.slice(0, split), groupSizes.slice(split)]
+  const positions: { x: number; y: number }[] = []
+  const usedHeights: number[] = []
+  for (let logicalColumn = 0; logicalColumn < columns.length; logicalColumn++) {
+    const physicalColumn = logicalColumn === 0 ? outerColumn : 1 - outerColumn
+    let cursor = 0
+    for (const size of columns[logicalColumn]!) {
+      for (let i = 0; i < size; i++) {
+        positions.push({ x: physicalColumn * (tileWidth + gap), y: cursor + i * (tileHeight + gap) })
+      }
+      cursor += size * tileHeight + size * gap
+    }
+    usedHeights.push(Math.max(0, cursor - gap))
+  }
+  const naturalWidth = 2 * tileWidth + gap
+  const naturalHeight = Math.max(...usedHeights)
+  const scale = Math.min(1, region.width / naturalWidth, region.height / naturalHeight)
+  return { positions, scale, naturalWidth, naturalHeight }
+}
 
 export interface SeatLineProps {
   seat: number
   hand: Hand
   region: Rect
-  // {columns:3, rows:9} for west/east (KICKOFF-phase7-board-rebuild.md's
-  // "3 columns x 9 rows", filled column-major — down one column, then the
-  // next, matching how a physically-stacked hand actually grows); omitted
-  // for north (a single row — "north seat: one row").
-  grid?: { columns: number; rows: number }
+  flowerRegion?: Rect
+  flowerAxis?: 'horizontal' | 'vertical'
+  // 2 columns x 9 rows for west/east; one 18-tile row for north. Flowers
+  // have their own compact region and do not participate in this solve.
+  grid: { columns: number; rows: number; axis?: 'horizontal' | 'vertical'; rotation?: 90 | -90 }
   // Once a hand ends (win or exhaustive draw), every seat's concealed tiles
   // turn face-up for review — real tile faces instead of backs, same as an
   // already-revealed meld. Defaults to false (normal mid-hand concealment).
@@ -82,6 +165,8 @@ interface FlatTile {
   // flattened tile, perpendicular nudge). Undefined for concealed tiles and
   // flowers, which get none of it.
   meldId?: string
+  // The discard physically turned sideways within an exposed meld.
+  claimed?: boolean
 }
 
 // Phase 7 (KICKOFF-phase7-board-rebuild.md): a bot seat's concealed hand,
@@ -113,6 +198,8 @@ export function SeatLine({
   seat,
   hand,
   region,
+  flowerRegion = region,
+  flowerAxis = 'horizontal',
   grid,
   revealConcealed,
   concealedOrder,
@@ -123,14 +210,29 @@ export function SeatLine({
   onTileClick,
 }: SeatLineProps) {
   const { tileScale } = useSettingsContext()
+  const packAxis = grid.axis ?? 'vertical'
+  const tileRotation = grid.rotation ?? 0
+  const rotated = Math.abs(tileRotation) === 90
+  const layoutGap = rotated ? 1 : TILE_GAP
   const nominal = SEAT_LINE_PX[tileScale]
   // West/east's own region.width (SIDE_WIDTH) happens to be a true
   // constant regardless of designWidth, but solving it the same way north
   // does keeps every seat line on one code path rather than two, and
   // stays correct even if that ever changes.
-  const { width: tileWidth, height: tileHeight } = grid
-    ? fitGridTileWidth(grid.columns, region.width, nominal.width, nominal.height, TILE_GAP, SEAT_LINE_WIDTH_FLOOR)
-    : fitRowTileWidth(NORTH_WORST_CASE_COUNT, region.width, nominal.width, nominal.height, TILE_GAP, SEAT_LINE_WIDTH_FLOOR)
+  const nominalLayoutWidth = rotated ? nominal.height : nominal.width
+  const nominalLayoutHeight = rotated ? nominal.width : nominal.height
+  const fittedLayout = fitGridTileWidth(
+    grid.columns,
+    region.width,
+    nominalLayoutWidth,
+    nominalLayoutHeight,
+    layoutGap,
+    SEAT_LINE_WIDTH_FLOOR,
+  )
+  const tileWidth = rotated ? fittedLayout.height : fittedLayout.width
+  const tileHeight = rotated ? fittedLayout.width : fittedLayout.height
+  const layoutTileWidth = fittedLayout.width
+  const layoutTileHeight = fittedLayout.height
 
   // The claimed winning discard joins the concealed block for display at
   // reveal — appended BEFORE the safeOrder guard so a concealedOrder that
@@ -156,56 +258,124 @@ export function SeatLine({
         kind: meld.kongSource === 'concealed' && (i === 0 || i === 3) ? 'kongBack' : 'face',
         testId: `meld-tile-${meld.id}-${i}`,
         meldId: meld.id,
+        claimed: meld.exposure === 'exposed' && meld.claimedFrom?.discardTile === id,
       })),
     ),
-    ...hand.flowers.map((id): FlatTile => ({ id, kind: 'face', testId: `flower-tile-${id}` })),
   ]
-  if (flat.length === 0) return null
+  if (flat.length === 0 && hand.flowers.length === 0) return null
 
-  // Group sizes matching `flat` exactly, in the same order — each meld one
-  // atomic group, every concealed tile and flower its own size-1 group (see
-  // the packing comment below for why they must NOT be one block). Mirrors
-  // how HandTiles.tsx builds its own `groups` for the human row.
+  // Group sizes matching `flat` exactly, in the same order — each meld is
+  // atomic and every concealed tile is its own size-1 group. Flowers have
+  // an independent compact layout below.
+  const regularConcealedSetCount = Math.max(0, 4 - hand.melds.length)
+  const looksLikeRegularWinningShape =
+    revealConcealed && hand.melds.length === 0 && concealed.length === regularConcealedSetCount * 3 + 2
+  const concealedGroups = looksLikeRegularWinningShape
+    ? [...Array.from({ length: regularConcealedSetCount }, () => 3), 2]
+    : concealed.map(() => 1)
   const groups: number[] = [
-    ...concealed.map(() => 1),
+    ...concealedGroups,
     ...hand.melds.map((meld) => meld.tiles.length),
-    ...hand.flowers.map(() => 1),
   ]
 
   // West/east pack GROUP-major down each column, so a meld is never split
   // across a column break.
   //
-  // This replaced computeColumnMajorGridPositions, which placed tile i at
-  // (col = floor(i/rows), row = i % rows) with no concept of groups at all —
-  // so a meld straddled a column whenever it happened to start fewer than 3
-  // (or 4, for a kong) rows from the bottom, and had to be read down one
-  // column and continued at the top of the next. packGroupsMajor's whole
-  // contract is that "a group is atomic: its tiles are never split across a
-  // wrap", and it already supported the vertical axis; this is a swap to an
-  // existing primitive, not new packing logic. North is untouched: it's a
-  // single row, so nothing can straddle there.
+  // A fixed item-by-item grid could split a meld around a column boundary.
+  // The side-specific balanced packer keeps each group whole while sharing
+  // the 18-tile maximum evenly across two columns. North uses the existing
+  // group-major primitive and cannot split because it has one row.
   //
   // Three deliberate details:
   //
-  // 1. Concealed tiles and flowers are size-1 groups, NOT one atomic block.
+  // 1. Concealed tiles are size-1 groups, NOT one atomic block.
   //    A 13-back concealed hand as a single group of 13 could never fit a
   //    9-row column, and packGroupsMajor places an oversized group in full
   //    and lets fitScale shrink it — which would shrink every tile in the
   //    seat, exactly the regression SEAT_LINE_PX's >=10% bump exists to
   //    prevent. Concealed tiles flowing across a column break is fine: they
   //    are identical backs mid-hand and a sorted run at reveal.
-  // 2. interGap === intraGap (both TILE_GAP). The human row uses a larger
-  //    inter-group gap for rhythm, but here it would cost real height: the
-  //    worst-case column (1 concealed + 2 kongs) is 572px of a 600px
-  //    budget at a uniform 4px gap, and only 596px at 16px. The meld shelf
-  //    now carries that visual separation instead.
+  // 2. The rotated side rack uses a 1px gap to keep nine enlarged tiles in
+  //    its fixed height; the meld shelf carries the grouping cue.
   // 3. Tile SIZE still comes from fitGridTileWidth's column count, never the
   //    tile count, so it can't move as melds are claimed mid-hand
   //    (CLAUDE.md: layout never reflows mid-hand).
-  const layout = grid
-    ? packGroupsMajor(groups, 'vertical', region, tileWidth, tileHeight, TILE_GAP, TILE_GAP, TILE_GAP)
-    : computeRowPositions(flat.length, region, tileWidth, tileHeight, TILE_GAP)
-  const placed = placeGroup(layout, region, tileWidth, tileHeight)
+  const layout = rotated
+    ? revealConcealed && looksLikeRegularWinningShape
+      ? packRevealedSideColumns(groups, tileRotation === -90 ? 1 : 0, region, layoutTileWidth, layoutTileHeight, layoutGap)
+      : packBalancedSideColumns(groups, grid.columns, region, layoutTileWidth, layoutTileHeight, layoutGap)
+    : packGroupsMajor(groups, packAxis, region, layoutTileWidth, layoutTileHeight, layoutGap, layoutGap, layoutGap)
+  let placed = placeGroup(layout, region, layoutTileWidth, layoutTileHeight)
+
+  const tileVisualWidth = (rotated ? tileHeight : tileWidth) * layout.scale
+  const tileVisualHeight = (rotated ? tileWidth : tileHeight) * layout.scale
+  // North's flowers belong to the same physical row as its playing tiles.
+  // Derive their tray from the actual right edge of the centered main block
+  // instead of stageLayout's old below-hand overlay. A fixed-column grid
+  // keeps every flower on this one row; only the compact flower tiles scale
+  // if the rare high-flower case exhausts the remaining side space.
+  const northInlineFlowers = !rotated && packAxis === 'horizontal'
+  const flowerSize = TILE_FACE_COMPACT_PX[tileScale]
+  const mainLeft = placed.length > 0 ? Math.min(...placed.map((p) => p.x - tileVisualWidth / 2)) : region.x + region.width / 2
+  const unshiftedMainRight = placed.length > 0 ? Math.max(...placed.map((p) => p.x + tileVisualWidth / 2)) : mainLeft
+  const mainWidth = unshiftedMainRight - mainLeft
+  const flowerNaturalWidth =
+    hand.flowers.length > 0 ? hand.flowers.length * flowerSize.width + (hand.flowers.length - 1) * TILE_GAP : 0
+  const flowerAvailableWidth = Math.max(1, region.width - mainWidth - (placed.length > 0 && hand.flowers.length > 0 ? TILE_GAP : 0))
+  const inlineFlowerScale = Math.min(1, flowerAvailableWidth / Math.max(1, flowerNaturalWidth), region.height / flowerSize.height)
+  const inlineFlowerWidth = flowerNaturalWidth * inlineFlowerScale
+  if (northInlineFlowers && hand.flowers.length > 0) {
+    // Centre the complete north rack, not the playing tiles alone. Flowers
+    // are appended on the right, so centring only `placed` made the whole
+    // hand look right-heavy.
+    const combinedWidth = mainWidth + (placed.length > 0 ? TILE_GAP : 0) + inlineFlowerWidth
+    const combinedLeft = region.x + (region.width - combinedWidth) / 2
+    const shiftX = combinedLeft - mainLeft
+    placed = placed.map((p) => ({ ...p, x: p.x + shiftX }))
+  }
+  const mainRight = placed.length > 0 ? Math.max(...placed.map((p) => p.x + tileVisualWidth / 2)) : region.x
+  const effectiveFlowerRegion = northInlineFlowers
+    ? {
+        x: mainRight + TILE_GAP,
+        y: region.y,
+        width: Math.max(1, inlineFlowerWidth),
+        height: region.height,
+      }
+    : flowerRegion
+  const flowerLayout = northInlineFlowers
+    ? computeGridPositions(hand.flowers.length, Math.max(1, hand.flowers.length), effectiveFlowerRegion, flowerSize.width, flowerSize.height, TILE_GAP)
+    : packGroupsMajor(
+        hand.flowers.map(() => 1),
+        flowerAxis,
+        effectiveFlowerRegion,
+        flowerSize.width,
+        flowerSize.height,
+        TILE_GAP,
+        TILE_GAP,
+        TILE_GAP,
+      )
+  const flowerPlaced = placeGroup(flowerLayout, effectiveFlowerRegion, flowerSize.width, flowerSize.height)
+
+  const occupied = [
+    ...placed.map((p) => ({
+      left: p.x - tileVisualWidth / 2,
+      right: p.x + tileVisualWidth / 2,
+      top: p.y - tileVisualHeight / 2,
+      bottom: p.y + tileVisualHeight / 2,
+    })),
+    ...flowerPlaced.map((p) => ({
+      left: p.x - (flowerSize.width * flowerLayout.scale) / 2,
+      right: p.x + (flowerSize.width * flowerLayout.scale) / 2,
+      top: p.y - (flowerSize.height * flowerLayout.scale) / 2,
+      bottom: p.y + (flowerSize.height * flowerLayout.scale) / 2,
+    })),
+  ]
+  const rackBounds = {
+    left: Math.min(...occupied.map((box) => box.left)) - RACK_PAD,
+    right: Math.max(...occupied.map((box) => box.right)) + RACK_PAD,
+    top: Math.min(...occupied.map((box) => box.top)) - RACK_PAD,
+    bottom: Math.max(...occupied.map((box) => box.bottom)) + RACK_PAD,
+  }
 
   // Revealed-meld treatment, the bot-seat counterpart of the human row's own
   // (KICKOFF-phase9-human-melds.md items 1-3). Only once the hand is revealed:
@@ -235,14 +405,14 @@ export function SeatLine({
         const pad = SEAT_LINE_MELD_SHELF_PAD_PX
         // Along the fill axis the meld spans its own tile count; across it,
         // exactly one tile.
-        const along = indices.length * (grid ? tileHeight : tileWidth) + (indices.length - 1) * TILE_GAP
+        const along = indices.length * (packAxis === 'vertical' ? layoutTileHeight : layoutTileWidth) + (indices.length - 1) * layoutGap
         return [
           {
             meldId: meld.id,
             x: (first.x + last.x) / 2 + meldShift.dx * layout.scale,
             y: (first.y + last.y) / 2 + meldShift.dy * layout.scale,
-            width: (grid ? tileWidth : along) + 2 * pad,
-            height: (grid ? along : tileHeight) + 2 * pad,
+            width: (packAxis === 'vertical' ? layoutTileWidth : along) + 2 * pad,
+            height: (packAxis === 'vertical' ? along : layoutTileHeight) + 2 * pad,
           },
         ]
       })
@@ -250,6 +420,53 @@ export function SeatLine({
 
   return (
     <div role="list" aria-label={`Seat ${seat} hand`}>
+      <Positioned
+        x={(rackBounds.left + rackBounds.right) / 2}
+        y={(rackBounds.top + rackBounds.bottom) / 2}
+        naturalWidth={rackBounds.right - rackBounds.left}
+        naturalHeight={rackBounds.bottom - rackBounds.top}
+      >
+        <div
+          aria-hidden
+          data-testid={`seat-${seat}-wooden-rack`}
+          className="relative h-full w-full overflow-hidden rounded-xl border border-[#351708] shadow-[inset_0_3px_3px_rgba(255,211,145,0.32),inset_0_-7px_8px_rgba(24,8,2,0.68),0_5px_9px_rgba(0,0,0,0.48)]"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(7deg,rgba(255,218,155,0.055) 0 1px,transparent 1px 5px),linear-gradient(180deg,#8b4d25 0%,#6b3518 30%,#54250f 67%,#351508 100%)',
+          }}
+        >
+          {rotated && (
+            <>
+              <div
+                data-testid={`seat-${seat}-rack-column-one`}
+                className="absolute inset-y-0 left-0 w-1/2 bg-[repeating-linear-gradient(12deg,rgba(255,224,169,0.08)_0_1px,transparent_1px_6px),linear-gradient(90deg,rgba(151,83,39,0.2),transparent)]"
+              />
+              <div
+                data-testid={`seat-${seat}-rack-column-two`}
+                className="absolute inset-y-0 right-0 w-1/2 bg-[repeating-linear-gradient(-8deg,rgba(35,12,4,0.09)_0_1px,transparent_1px_7px),linear-gradient(270deg,rgba(53,21,7,0.18),transparent)]"
+              />
+              <div
+                data-testid={`seat-${seat}-rack-column-indent`}
+                className="absolute bottom-[8px] left-1/2 top-[9px] w-[3px] -translate-x-1/2 bg-[linear-gradient(90deg,rgba(35,13,4,0.72),rgba(255,211,142,0.55)_50%,rgba(48,18,6,0.62))] shadow-[0_0_3px_rgba(0,0,0,0.42)]"
+              />
+            </>
+          )}
+          {/* A raised back stop and rounded front ledge give the holder a
+              real sloped-rack profile instead of a flat brown rectangle. */}
+          <div
+            data-testid={`seat-${seat}-rack-back-lip`}
+            className="absolute inset-x-0 top-0 h-[9px] border-b border-[#3c1a0a] bg-[linear-gradient(180deg,#b36f3b,#6e3518_70%,#3b1809)] shadow-[0_3px_4px_rgba(0,0,0,0.38),inset_0_1px_rgba(255,226,177,0.45)]"
+          />
+          <div
+            data-testid={`seat-${seat}-rack-groove`}
+            className="absolute inset-x-[5px] bottom-[7px] h-[5px] rounded-full border-t border-black/60 bg-[#291006]/80 shadow-[0_2px_1px_rgba(255,190,110,0.14)]"
+          />
+          <div
+            data-testid={`seat-${seat}-rack-front-lip`}
+            className="absolute inset-x-0 bottom-0 h-[8px] border-t border-[#2a1006] bg-[linear-gradient(180deg,#7d3d1b,#3a1708)] shadow-[inset_0_2px_1px_rgba(255,193,115,0.2),0_-2px_3px_rgba(0,0,0,0.28)]"
+          />
+        </div>
+      </Positioned>
       {/* Rendered before the tiles so it sits behind them — absolutely
           positioned siblings with no z-index, same as HandTiles' own shelf.
           Background only: its size is derived from the already-solved
@@ -285,6 +502,7 @@ export function SeatLine({
             naturalWidth={tileWidth}
             naturalHeight={tileHeight}
             scale={layout.scale}
+            rotation={tileRotation + (tile.claimed ? 90 : 0)}
           >
             {tile.kind === 'back' ? (
               <div
@@ -299,6 +517,7 @@ export function SeatLine({
               <div
                 data-tile-id={tile.id}
                 data-testid={tile.testId}
+                data-claimed-tile={tile.claimed || undefined}
                 role="listitem"
                 onClick={onTileClick ? () => onTileClick(tile.id) : undefined}
                 title={revealConcealed && tile.id === winningTileId ? 'Winning tile' : undefined}
@@ -326,6 +545,40 @@ export function SeatLine({
                 {tile.kind === 'kongBack' ? <TileBackContent /> : <TileFaceContent typeId={typeId!} />}
               </div>
             )}
+          </Positioned>
+        )
+      })}
+      {hand.flowers.map((id, index) => {
+        const p = flowerPlaced[index]!
+        const typeId = typeIdOfInstance(id)
+        return (
+          <Positioned
+            key={id}
+            // A flower is replaced directly into this permanent tray and
+            // never needs a cross-zone FLIP animation. Omitting layoutId is
+            // also essential for the synthetic full-board preview, where
+            // the finite eight flower ids are reused across seats; Motion
+            // otherwise merges matching flowers and hides all but one.
+            x={p.x}
+            y={p.y}
+            naturalWidth={flowerSize.width}
+            naturalHeight={flowerSize.height}
+            scale={flowerLayout.scale}
+            rotation={tileRotation}
+          >
+            <div
+              data-tile-id={id}
+              data-testid={`flower-tile-${id}`}
+              role="listitem"
+              onClick={onTileClick ? () => onTileClick(id) : undefined}
+              className={tileFaceCompactClassName({
+                highlighted: selectedTypeId === typeId,
+                extra: onTileClick ? 'cursor-pointer' : undefined,
+                scale: tileScale,
+              })}
+            >
+              <TileFaceContent typeId={typeId} />
+            </div>
           </Positioned>
         )
       })}
