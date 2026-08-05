@@ -177,3 +177,86 @@ that's too slow to run gets disabled, which is worse than one scoped to fit.
 - Report honestly. A run that finds twenty mismatches is a *successful* run
   — that is the point. A run reporting zero mismatches should be treated as
   suspicious until its coverage figure proves it compared anything.
+
+## Resume here (2026-08-05)
+
+Steps 0-2 of the post-Stage-1 findings work are done and committed (7
+commits, `938bfb9`..`3aed2d8`): CLAUDE.md's bug count corrected, the
+knitted-tile shape gap fixed (fans 20/34/35, plus the 7-detector
+`sets.length !== 4` guard it exposed, its own separate/revertable commit),
+and fan 48 "Two Concealed Kongs" confirmed at 8 points (no engine change).
+Harness coverage is 80/81 (only fan 81, out of scope by design, remains
+uncovered). Full findings in `docs/rules/decisions.md` #20/#21.
+
+**Step 3 (the six original exclusion/detector bugs) is next.** Both checks
+below were actually run while writing this note, not left as reasoning or
+TODOs — results follow.
+
+**(a) Evidence the detector-guard's "zero behavioral change" claim from the
+harness delta, not from reasoning alone.** Done: checked out the 7 files at
+their pre-fix content (`git show <commit>~1:<path>`, the commit right before
+`d2e5115`), regenerated the same `runSeed=20260805` cases, and compared
+every hand touching the 7 affected fans (All Terminals, All Honors, All
+Terminals and Honors, All Even Pungs, All Fives, All Pungs, All Chows)
+against the post-fix run by seed:
+  - Before: 123 hands touched these fans, 79 mismatched.
+  - After: 122 hands touched these fans, 78 mismatched.
+  - Exact set difference: **`{20260860}` (= `targeted-35-knitted-straight`)
+    is the only seed that changed — present in the "before" mismatch list,
+    absent from "after."** Every other mismatched hand (78 of them) is
+    byte-for-byte the same seed in both runs. Zero new mismatches
+    introduced, zero mismatches removed other than the one the fix targeted.
+  - This is the harness-delta evidence the "zero behavioral change" claim
+    was missing — confirmed empirically, not just via the full test suite
+    staying green and the `sets.length` invariant argument (both still
+    true, but now corroborated rather than standing alone).
+
+**(b) Confirm no hand previously classified `our_bug` became non-`our_bug`
+under the new multi-cause (peeling) classifier.** Done for all 6
+`OUR_BUG_FAMILIES` entries, not left as a TODO — ran the systematic sweep
+while writing this note (query each family for hands whose diff is
+*exactly* that family, i.e. genuinely isolated, not just a loose subset
+match). Results:
+  - `[60,73]`/`[61,73]` (Prevalent/Seat Wind vs Pung of Terminals or
+    Honors): **solid, 89 isolated hands**, every one confirmed to have a
+    Prevalent Wind or Seat Wind fan present on our side (so the bare
+    `{"Pung of Terminals or Honors"}` diff genuinely is this mechanism, not
+    a stray terminal pung explained some other way).
+  - `{Fully Concealed Hand, Self-Drawn}` (missing `[4,56]`/`[6,56]`/
+    `[7,56]`/`[12,56]`/`[19,56]`): **solid, 78 hands with the exact 2-name
+    diff.**
+  - `{No Honors}` (missing `[68,76]`/`[13,76]`): **solid, 52 exact hits.**
+  - `{Tile Hog}`: **solid, 78 exact hits.**
+  - `{Half Flush, One Voided Suit}` (missing `[3,50]`/`[3,75]`): **thin but
+    clean** — only 1 occurrence in this sample (All Green is rare), but
+    unambiguous: `All Green` itself matches on both sides, the only diff is
+    an extra `Half Flush` on ours, no alternative explanation fits.
+  - `[46,80]` (Out with Replacement Tile should exclude Self-Drawn): **NOT
+    solid — zero genuine occurrences.** All 31 hands that used to cite this
+    family (under the old, non-peeling classifier) turned out to be bare
+    `{"Out with Replacement Tile"}` diffs — decisions.md #13's overlap, not
+    `[46,80]` at all. The peeling classifier already fixed the
+    misclassification (it now correctly reports these as `ambiguity`); this
+    is not a new problem the peeling change introduced, it's a pre-existing
+    one the peeling change happened to reveal (the old single-family subset
+    check was already loose enough to match a diff of size 1 against a
+    2-name family). Recorded in `decisions.md` #20.
+  - **Net conclusion**: the peeling classifier did not silently downgrade
+    any real bug — priority ordering (`our_bug` > `ambiguity` > `their_bug`)
+    holds correctly wherever a genuine our_bug signature is present. The
+    one family that turned out unreliable was unreliable before the peeling
+    change too; peeling just exposed it. `[46,80]` is still believed to be
+    a real bug (direct evidence from `fan_calculator.cpp`'s "杠上开花不计自摸"),
+    just not yet seen in isolation in this sample — when fixing it in
+    Step 3, do not rely on this harness run to validate the fix; construct
+    a dedicated targeted-46-style case that isolates it first (self-drawn
+    kong-replacement win, `Self-Drawn` and `Out with Replacement Tile` both
+    genuinely eligible on the same hand), confirm PyMahjongGB agrees, then
+    fix.
+
+Also worth remembering going into Step 3: the ~55 unclassified mismatches
+this run reports (`decisions.md` #19/#20) are almost certainly going to
+shift again once Step 3's fixes land, the same way item #20's own fix
+shifted 126 hands out of unclassified without changing engine behavior —
+don't assume the residual count is stable, re-run after each fix per
+CLAUDE.md's standing rule.
