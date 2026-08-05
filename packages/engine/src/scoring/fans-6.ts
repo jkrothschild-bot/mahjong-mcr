@@ -7,6 +7,10 @@ import { allSets, isDragonTypeId, isWindTypeId, parseSuited, SUIT_PERMUTATIONS, 
 function detectAllPungs(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` can be empty, which would otherwise make `.every()` vacuously
+  // true (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   return sets.every((s) => s.kind !== 'chow') ? [{ fanId: 49, count: 1 }] : []
 }
 

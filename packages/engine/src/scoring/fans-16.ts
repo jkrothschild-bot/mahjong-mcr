@@ -81,6 +81,10 @@ function detectPureShiftedChows(ctx: HandContext): FanMatch[] {
 function detectAllFives(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` only covers the non-knitted remainder, so this loop would
+  // otherwise never see the 3 invisible knitted sets (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   for (const s of sets) {
     const parsed = parseSuited(s.typeId)
     if (!parsed) return []

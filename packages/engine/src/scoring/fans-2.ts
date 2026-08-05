@@ -60,6 +60,12 @@ function detectConcealedHand(ctx: HandContext): FanMatch[] {
 function detectAllChows(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // A knittedStraight candidate's decomposition only covers the non-knitted
+  // remainder (0-1 real sets) — allSets() can't see the other 3 (knitted)
+  // sets, so `sets.every(...)` below would otherwise pass vacuously on an
+  // empty/near-empty list. Every OTHER candidate always has sets.length===4
+  // already, so this guard is a no-op for them (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   if (!sets.every((s) => s.kind === 'chow')) return []
   if (isHonorTypeId(ctx.decomposition.pair)) return []
   return [{ fanId: 63, count: 1 }]

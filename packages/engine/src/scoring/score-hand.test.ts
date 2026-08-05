@@ -309,6 +309,30 @@ describe('scoreHand — knitted-tile shapes (fans 20/34/35) reach real scoring, 
     expect(winningShape?.decomposition).toEqual({ pair: 'C1', sets: [{ type: 'pung', tiles: ['WE', 'WE', 'WE'] }] })
   })
 
+  // A Knitted Straight candidate's decomposition covers only the 0-1 real
+  // sets left over after the 9 knitted tiles are set aside — allSets() never
+  // sees the other 3 (knitted) sets at all. Found via the validation harness
+  // (targeted-35): several "whole-hand universal" detectors trusted `sets`
+  // to be the complete 4-set picture and fired incorrectly on an empty or
+  // 1-element list (docs/rules/decisions.md #20). Each of the 7 below was
+  // fixed with a `sets.length !== 4` guard; this hand structurally can NEVER
+  // legitimately qualify for any of them (the knitted portion always
+  // includes non-terminal middle-rank tiles), so none should ever fire.
+  it('does not let a Knitted Straight hand falsely trigger whole-hand-universal fans', () => {
+    const concealedTiles = [
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('C2', 1), ...idsFor('C5', 1), ...idsFor('C8', 1),
+      ...idsFor('B3', 1), ...idsFor('B6', 1), ...idsFor('B9', 1),
+      ...idsFor('WE', 3),
+      ...idsFor('C1', 2),
+    ]
+    const result = scoreHand({ concealedTiles, melds: [] })
+    const falselyVulnerable = [8, 11, 18, 21, 31, 49, 63] // All Terminals, All Honors, All Terminals and Honors, All Even Pungs, All Fives, All Pungs, All Chows
+    for (const fanId of falselyVulnerable) {
+      expect(result.fanMatches).not.toContainEqual({ fanId, count: 1 })
+    }
+  })
+
   it('a Knitted Straight hand is no longer stuck at Chicken Hand\'s 8-point floor', () => {
     // Before the fix, isWinningHand was false for this exact hand, so it
     // couldn't even be declared a win. Sanity-check the floor didn't just

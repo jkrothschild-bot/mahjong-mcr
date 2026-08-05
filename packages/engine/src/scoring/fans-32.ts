@@ -43,6 +43,13 @@ function detectThreeKongs(ctx: HandContext): FanMatch[] {
 function detectAllTerminalsAndHonors(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` can be empty or partial, which would otherwise make the "no
+  // chows"/"every set is terminal-or-honor" checks below pass vacuously or
+  // incompletely (docs/rules/decisions.md #20) — this is the exact false
+  // positive first observed via the validation harness on a real Knitted
+  // Straight case (targeted-35).
+  if (sets.length !== 4) return []
   if (sets.some((s) => s.kind === 'chow')) return []
   if (!sets.every((s) => isTerminalTypeId(s.typeId) || isHonorTypeId(s.typeId))) return []
   const pair = ctx.decomposition.pair

@@ -10,6 +10,11 @@ import { allSets, isDragonTypeId, isHonorTypeId, isTerminalTypeId, isWindTypeId 
 function detectAllTerminals(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` can be empty or partial, which would otherwise make the "no
+  // chows"/"every set is terminal" checks below pass vacuously or
+  // incompletely (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   if (sets.some((s) => s.kind === 'chow')) return []
   if (!sets.every((s) => isTerminalTypeId(s.typeId))) return []
   if (!isTerminalTypeId(ctx.decomposition.pair)) return []
@@ -50,6 +55,11 @@ function detectLittleThreeDragons(ctx: HandContext): FanMatch[] {
 function detectAllHonors(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` can be empty or partial, which would otherwise make the "no
+  // chows"/"every set is honor" checks below pass vacuously or incompletely
+  // (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   if (sets.some((s) => s.kind === 'chow')) return []
   if (!sets.every((s) => isHonorTypeId(s.typeId))) return []
   if (!isHonorTypeId(ctx.decomposition.pair)) return []

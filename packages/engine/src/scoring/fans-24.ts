@@ -71,6 +71,11 @@ const EVEN_RANKS = new Set([2, 4, 6, 8])
 function detectAllEvenPungs(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` can be empty or partial, which would otherwise make the "no
+  // chows"/"every set is even" checks below pass vacuously or incompletely
+  // (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   if (sets.some((s) => s.kind === 'chow')) return []
   const parsedSets = sets.map((s) => parseSuited(s.typeId))
   if (parsedSets.some((p) => p === null)) return []

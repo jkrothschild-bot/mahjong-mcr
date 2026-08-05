@@ -11,6 +11,11 @@ import { allSets, isHonorTypeId, isTerminalTypeId, parseSuited } from './set-hel
 function detectOutsideHand(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
+  // See fans-2.ts's detectAllChows comment: a knittedStraight candidate's
+  // `sets` only covers the non-knitted remainder, so this loop would
+  // otherwise pass over an incomplete list without ever seeing the 3
+  // invisible knitted sets (docs/rules/decisions.md #20).
+  if (sets.length !== 4) return []
   for (const s of sets) {
     if (s.kind === 'chow') {
       const parsed = parseSuited(s.typeId)
