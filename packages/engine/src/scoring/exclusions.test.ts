@@ -73,20 +73,21 @@ describe('Prevalent Wind / Seat Wind do not blanket-exclude Pung of Terminals or
 // double-counts both instead of keeping only the higher-value one
 // (§3.9.1.5's Non-Repeat Principle). Each is cited to the exact PyMahjongGB
 // source line that independently implements the same suppression.
-describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-check', () => {
+describe('All Simples / Pure Terminal Chows exclude No Honors', () => {
   it('All Simples (68) should exclude No Honors (76) — All Simples structurally has no honors', () => {
     // fan_calculator.cpp, "断幺不计无字" ("All Simples doesn't count No
     // Honors"). Our table already has this same pattern for 8 other fans
-    // (see [8,76],[22,76],[25,76],[26,76],[27,76],[29,76],[36,76],[37,76],
-    // [63,76] above) — 68 and 13 (below) were simply missed when the table
-    // was transcribed.
-    expect(areExclusive(68, 76)).toBe(false) // SHOULD be true
+    // (see [8,76],[22,76],[25,76],[26,76],[29,76],[36,76],[37,76],[63,76]) —
+    // 68 and 13 were simply missed when the table was transcribed.
+    expect(areExclusive(68, 76)).toBe(true)
   })
 
   it('Pure Terminal Chows (13) should exclude No Honors (76) — one suit\'s terminal chows only, never an honor', () => {
-    expect(areExclusive(13, 76)).toBe(false) // SHOULD be true
+    expect(areExclusive(13, 76)).toBe(true)
   })
+})
 
+describe('KNOWN BUG — missing exclusion pairs, found via PyMahjongGB cross-check', () => {
   it('Out with Replacement Tile (46) should exclude Self-Drawn (80) — its own definition requires self-draw', () => {
     // fan_calculator.cpp, "杠上开花不计自摸". Same pattern our table already
     // has for Last Tile Draw ([44,80]) — 46 was missed.

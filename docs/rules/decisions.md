@@ -663,13 +663,59 @@ corrected to match. See each item's status.
     54 (−1); `ambiguity`/`their_bug` unchanged; coverage unchanged at 80/81. Full engine suite
     green (430 passed, 1 skipped — no new tests, existing fixture flipped in place).
 
+26. **Step 3, fix 4/6: All Simples (68) and Pure Terminal Chows (13) now exclude No Honors
+    (76) — `[68,76]`/`[13,76]` added to `exclusions.ts`.** Both fans are flat (whole-hand
+    condition, not countable) — All Simples (no terminal or honor tiles) and Pure Terminal Chows
+    (one suit's 1-2-3 and 7-8-9 chows only) each structurally can never include an honor tile, so
+    a hand satisfying either was double-scoring "no honors" as both the named fan's value and No
+    Honors's 1pt on top — same shape as the 8 other already-present `[X,76]` entries (8, 22, 25,
+    26, 27, 29, 36, 37, 63), just missed for these two when the table was transcribed. Unlike
+    item #24's fan 73 case, both 76 and its excluding fans here are flat, so a whole-fan
+    `exclusions.ts` entry is architecturally correct (no partial-credit-loss risk). Evidence:
+    PyMahjongGB's `fan_calculator.cpp`, `"断幺不计无字"` ("All Simples doesn't count No Honors").
+    Fixture: `exclusions.test.ts`'s two `it` blocks (moved out of the "KNOWN BUG" describe into
+    their own, since fixed), flipped to `toBe(true)`. **Also removed a now-stale
+    `OUR_BUG_FAMILIES` entry** from `validation/allowlist.py` (same pattern as item #24's
+    cleanup): its frozenset was just `{"No Honors"}`, loose enough to keep claiming credit for 2
+    residual mismatches after this fix landed. Direct inspection showed those 2 are a genuinely
+    **different, still-open gap**: All Even Pungs (21) and All Fives (31) each also structurally
+    exclude No Honors (both are pungs of numbered tiles only) but were never given `[21,76]`/
+    `[31,76]` entries either — noted below as new follow-up, not fixed here (out of Step 3's
+    original 6-bug scope). **Harness re-run:** `our_bug` 121 → 50 (−71, includes both this fix
+    landing and the stale-family cleanup); unclassified unchanged at 55 (the 2 newly-honest
+    hands are counted in the family-cleanup step below, not this one); coverage unchanged at
+    80/81. Full engine suite green (433 passed, 1 skipped).
+
+27. **New bug found while verifying item #25's Tile Hog fix — NOT one of Step 3's original 6:
+    `detectTileHog` only ever reports count 1, even when TWO separate tile types are each
+    hogged in the same hand.** `detectTileHog`'s loop does `return [{ fanId: 64, count: 1 }]` on
+    the *first* qualifying type it finds instead of continuing to tally every qualifying type.
+    PyMahjongGB scores this fan per qualifying type (cross-check evidence: several hands score
+    `'Tile Hog': 2` on PyMahjongGB's side against our `count: 1`, e.g. seed 1823602851 — a hand
+    with two independently-hogged tile types). **Fixture added, NOT fixed yet** (fixture-first
+    per CLAUDE.md): `fans-2.test.ts`'s Tile Hog describe, new `it` "BUG: only counts the first
+    tile-hogged type, not every qualifying type" asserts the current (wrong) `count: 1` for a
+    hand with two hogged types; fix should make it `count: 2`. `validation/allowlist.py`'s
+    `OUR_BUG_FAMILIES` entry for `"Tile Hog"` repointed to this new citation (the old
+    chow-miscounting citation it used to describe is item #25, already fixed — reusing the same
+    frozenset for a different citation was deliberate, not an oversight; see the entry's own
+    comment). Item #25's fixture (the chow-miscounting bug) stays fixed and green — this is a
+    separate, additional gap in the same detector, not a regression of that fix. Tracked below
+    as new follow-up, not part of Step 3 proper — out of the originally authorized scope for
+    this pass.
+
 ## Open follow-up work
 
-- Step 3 (three remaining exclusion/detector bugs from item #19): All Simples/Pure Terminal
-  Chows vs No Honors, Out with Replacement Tile vs Self-Drawn (validate with a dedicated
-  isolated case per item #20's note — this sample has never isolated it cleanly), All Green
-  family. Each already has a permanent fixture — see item #19 for the file/line and item #20
-  for the `[46,80]` isolation caveat. (Tile Hog chow-counting fixed — item #25.)
+- Step 3 (two remaining exclusion/detector bugs from item #19): Out with Replacement Tile vs
+  Self-Drawn (validate with a dedicated isolated case per item #20's note — this sample has
+  never isolated it cleanly), All Green family. Each already has a permanent fixture — see item
+  #19 for the file/line and item #20 for the `[46,80]` isolation caveat. (Tile Hog chow-counting
+  fixed — item #25; All Simples/Pure Terminal Chows vs No Honors fixed — item #26.)
+- New, found while verifying item #25/#26 (not part of Step 3's original 6-bug scope):
+  `detectTileHog` only reports count 1 even when two separate tile types are each hogged in the
+  same hand (item #27, fixture added, not fixed); All Even Pungs (21) and All Fives (31) also
+  structurally exclude No Honors (76) but have no `[21,76]`/`[31,76]` entries (found via
+  allowlist cleanup, no fixture yet).
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - Triage the remaining ~55 unclassified mismatches from item #20's run (rerun

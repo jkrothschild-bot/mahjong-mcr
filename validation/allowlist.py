@@ -117,13 +117,9 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),
     ),
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'All Simples/Pure Terminal Chows should exclude No Honors' "
-        "(missing [68,76]/[13,76])",
-        frozenset({"No Honors"}),
-    ),
-    (
-        "packages/engine/src/scoring/fans-2.test.ts — 'BUG: misses Tile Hog when the 4th copy comes from an exposed chow' "
-        "(detectTileHog's meldTileTypeId misuse for chow melds)",
+        "packages/engine/src/scoring/fans-2.test.ts — 'BUG: only counts the first tile-hogged type, not every qualifying "
+        "type' (detectTileHog returns on the first match instead of counting all) — docs/rules/decisions.md #27. NOT the "
+        "same bug as the now-fixed chow-meld-counting one (item #25); found while verifying that fix.",
         frozenset({"Tile Hog"}),
     ),
     (

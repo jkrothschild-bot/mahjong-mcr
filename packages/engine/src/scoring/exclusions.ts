@@ -187,6 +187,12 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   [13, 63], // All Chows
   [13, 69], // Pure Double Chow
   [13, 72], // Two Terminal Chows
+  // 13 -> 76: derived, same pattern as the other [X,76] entries below (8,
+  // 22, 25, 26, 27, 29, 36, 37, 63). Pure Terminal Chows (13: one suit's
+  // 1-2-3 and 7-8-9 chows only) can never include an honor tile — a chow
+  // has no honor-tile members at all. Simply missed when this fan's own
+  // section was originally transcribed. docs/rules/decisions.md #26.
+  [13, 76], // No Honors
   // 14. Quadruple Chow
   [14, 24], // Pure Shifted Pungs
   [14, 64], // Tile Hog
@@ -244,6 +250,12 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   [53, 79], // Single Wait
   // 63. All Chows — "No Honors is implied" (Non-Repeat Principle example)
   [63, 76], // No Honors
+  // 68. All Simples — derived, same "X structurally has no honors" pattern
+  // as 63->76 just above and the other [X,76] entries (8, 13, 22, 25, 26,
+  // 27, 29, 36, 37). All Simples (68: no terminal or honor tiles at all)
+  // trivially satisfies No Honors (76) too. Simply missed when this fan's
+  // own section was originally transcribed. docs/rules/decisions.md #26.
+  [68, 76], // No Honors
   // 77/78/79 — the three wait-types are mutually exclusive (a winning tile
   // can only be waited on one way)
   [77, 78],
