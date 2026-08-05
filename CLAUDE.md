@@ -30,13 +30,22 @@ both before any work.
 - packages/engine must stay pure TypeScript: no React/DOM imports, seeded RNG,
   fully serializable state (this also enables replay in M6 — don't shortcut it).
 - Scoring changes are not done until validated: rulebook fixtures pass AND the
-  PyMahjongGB cross-check in validation/ passes. **Currently unsatisfiable:**
-  validation/ contains only .gitkeep — no Python harness has ever been built,
-  despite PLAN.md §1/§4 describing one. Until it exists, this rule can only be
-  half-checked (rulebook fixtures only); treat that as a known gap, not a pass,
-  and don't cite this rule as satisfied without saying so. Building the harness
-  is outstanding work — see KICKOFF-phase10-strategy-coach.md's "State of play"
-  section, which flags it as the right place to start next, ahead of Stage 2.
+  PyMahjongGB cross-check in validation/ has been rerun for the fan(s) touched,
+  introducing no NEW `our_bug`/UNCLASSIFIED mismatches (see
+  validation/README.md for the exact command; validation/allowlist.py's module
+  docstring for what `their_bug`/`ambiguity`/`our_bug`/UNCLASSIFIED mean). The
+  harness exists and has been run for real (docs/rules/decisions.md #19,
+  2026-08-05: 1200 hands, 77/81 fans covered) — this rule is satisfiable now,
+  but not fully clean: that run found 6 pre-existing engine bugs (each with a
+  permanent failing-by-design fixture already committed, per the rule below —
+  see decisions.md #19 for the full list) plus ~180 hands still genuinely
+  unclassified. Don't cite "PyMahjongGB
+  cross-check passes" for the WHOLE engine without qualification — it means
+  clean *for the fans your change touches*, checked against the current
+  baseline in decisions.md #19, not zero mismatches system-wide (some are
+  expected forever: PyMahjongGB's own house-rule extensions, and one
+  still-provisional rulebook ambiguity, #11). Stage 2 (CI integration, gating
+  every push) is separate follow-up work, not started.
 - Run typecheck + full test suite before every commit. Never commit red.
 - Every scoring bug found becomes a permanent test fixture before it is fixed.
 - Record any rulebook-ambiguity ruling in docs/rules/decisions.md.

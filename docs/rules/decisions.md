@@ -342,12 +342,114 @@ corrected to match. See each item's status.
     order of 2000 seeds — not yet run. See KICKOFF-phase10-strategy-coach.md's "State of play"
     section for the decision this blocks and what to do once a real number exists.
 
+19. **Validation harness Stage 1 (`KICKOFF-validation-harness.md`) — the PyMahjongGB cross-check
+    now exists and has been run for real (2026-08-05).** 1200 hands generated (seed range: run
+    seed `20260805`, per-hand seeds derived from it via the engine's own `mulberry32`/`nextSeed`;
+    52 hand-crafted "targeted" cases plus 1148 random cases across the standard/seven-pairs/
+    thirteen-orphans shapes — see `validation/README.md` for the exact rerun command),
+    scored by both this engine's `scoreHand` and PyMahjongGB 1.3.0, compared at both the
+    points level and the exact fan-multiset level (`validation/compare.py`). **This is the
+    first number CLAUDE.md's scoring-validation rule can point to; see item below restoring
+    that rule to a truthful state.**
+    - **Coverage: 77/81 fans exercised at least once.** The 4 uncovered are fan 81 (Flower
+      Tiles — out of scope by design, every generated case has `flowerCount: 0` since
+      `scoreHand` never takes one) and fans 20/34/35 (Greater/Lesser Honors and Knitted
+      Tiles, Knitted Straight) — a genuine, newly-found engine gap, not a generator
+      shortfall: see the next bullet.
+    - **NEW real bug, more severe than item #6's "not yet implemented" framing suggested:
+      `decomposeHand` has no notion of a "knitted" set at all**, so `isWinningHand` returns
+      `false` for every hand fans 20/34/35 require — a player could never even legally
+      declare such a hand won (`moves.ts`'s win-legality gate calls `isWinningHand`
+      directly), and `scoreHand` returns `{fanMatches: [], basicPoints: 0}` for one, not even
+      Chicken Hand's 8-point floor. The three fans' own detector functions are correctly
+      implemented and unit-tested (`fans-24.test.ts`/`fans-12.test.ts`) — the gap is entirely
+      in candidate generation never producing a matching `HandContext` for the detectors to
+      run against, meaning they are currently dead code. Permanent fixture:
+      `packages/engine/src/win-detection.test.ts`'s "KNOWN BUG" `describe` block (two cases:
+      a valid Knitted Straight and a valid Greater Honors and Knitted Tiles hand, both
+      asserting `isWinningHand(...) === false`, which is the wrong answer). **Not fixed here**
+      per this phase's "no game logic changes" scope — tracked below.
+    - **Six confirmed engine bugs, each a missing entry in `exclusions.ts`'s Non-Repeat table,
+      found by cross-referencing PyMahjongGB's own suppression logic
+      (`fan_calculator.cpp`'s `adjust_fan_table`) fan-by-fan.** Each has a permanent fixture in
+      `packages/engine/src/scoring/exclusions.test.ts` (plus one in `fans-2.test.ts` for the
+      Tile Hog case, which is a detector bug rather than a missing exclusion) asserting the
+      current wrong `areExclusive(...) === false`; the fix (adding the pair, or for Tile Hog,
+      correcting the chow-handling) is separate follow-up work, not done in this phase. 1200-hand
+      occurrence counts (a hand can trip more than one):
+      - 113x — Fully Concealed Hand (56) should be excluded by any fan whose own definition
+        already requires full concealment: Nine Gates (4) and Four Concealed Pungs (12)
+        explicitly (PyMahjongGB's own comment: "把不求人修正为自摸" — "correct Fully Concealed
+        Hand to Self-Drawn"), plus Seven Shifted Pairs (6), Seven Pairs (19), and Thirteen
+        Orphans (7) implicitly (PyMahjongGB's special-shape path never calls the function that
+        sets Fully Concealed Hand at all). Missing: `[4,56]`, `[6,56]`, `[7,56]`, `[12,56]`,
+        `[19,56]`.
+      - 90x — Prevalent Wind (60) / Seat Wind (61) should exclude Pung of Terminals or Honors
+        (73) for the *same physical wind pung* — PyMahjongGB never double-awards it. Missing:
+        `[60,73]`, `[61,73]`.
+      - 78x — **Tile Hog (64) detector bug, not a missing exclusion.** `detectTileHog`
+        (`fans-2.ts`) sums a meld's contribution as `meldTileTypeId(meld)` (the chow's *lowest*
+        tile) `+= meld.tiles.length`, which is correct for a pung/kong (all tiles really are
+        that one type) but wrong for a chow: it attributes all 3 of the chow's *different*
+        tiles to a single count bump on the low tile's type instead of crediting each of the
+        3 distinct types +1. A real Tile Hog spanning an exposed pung plus an adjacent exposed
+        chow is silently missed.
+      - 52x — All Simples (68) / Pure Terminal Chows (13) should exclude No Honors (76) — the
+        same pattern our table already has for 8 *other* fans ([8,76] etc.), just missed for
+        these two. Missing: `[68,76]`, `[13,76]`.
+      - 31x — Out with Replacement Tile (46) should exclude Self-Drawn (80) — its own
+        definition requires self-draw (PyMahjongGB: "杠上开花不计自摸"), same pattern as the
+        already-present `[44,80]`. Missing: `[46,80]`.
+      - 1x — All Green (3) currently has **zero** exclusion entries at all; should exclude Half
+        Flush (50) and One Voided Suit (75) (PyMahjongGB: "绿一色不计混一色、缺一门"). Missing:
+        `[3,50]`, `[3,75]`.
+    - **One confirmed point-value divergence, not yet triaged against the rulebook.** Fan 48
+      "Two Concealed Kongs": `registry.ts` lists it at 8 points in its own tier (cited to
+      §3.8.1); PyMahjongGB's `fan_value_table` lists the identically-named fan at 6 points,
+      grouped with All Pungs/Half Flush/Mixed Shifted Chows/All Types/Melded Hand/Two Dragons
+      Pungs. Recorded in `validation/fan-map.json`'s `_pointValueDivergence` note and filed
+      `their_bug` in `validation/allowlist.py` provisionally (our own registry cites a
+      rulebook section already; PyMahjongGB is "a second opinion, not an oracle" per
+      `KICKOFF-validation-harness.md` 1e) — **genuinely needs a `rules-lawyer` pass against
+      §3.8.1's table directly before either side is trusted over the other.**
+    - **One genuine rulebook ambiguity, now backed by independent-implementation evidence —
+      item #11 above.** PyMahjongGB marks a pung as *exposed* for scoring whenever it's
+      completed by a discard or robbed-kong win (not a chow) — the common "a triplet completed
+      by ron isn't concealed" convention from other mahjong families
+      (`fan_calculator.cpp`: "点和的牌张，如果不能解释为顺子中的一张，那么将其解释为刻子，并标记这个
+      刻子为明刻"). Item #11's provisional ruling says the opposite. This was, by a wide
+      margin, the single largest source of mismatches in the 1200-hand run (96 hands
+      classified `ambiguity`, plus it's the majority contributor inside several of the
+      `our_bug` counts above via interaction — e.g. downgrading Four Concealed Pungs to Three
+      Concealed Pungs also changes which Non-Repeat suppression applies). **Per
+      `KICKOFF-validation-harness.md` 1e's explicit instruction, item #11's ruling is NOT
+      changed here without a rulebook citation** — this entry exists so the evidence is on
+      record for whoever revisits it. Still provisional.
+    - **180 of 1200 hands (15%) remain genuinely unclassified** — mostly combinations of the
+      root causes above (e.g. a hand hitting both the concealment ambiguity AND a missing
+      Fully-Concealed-Hand exclusion simultaneously isn't caught by either classifier pattern
+      alone) plus at least one more not-yet-isolated interaction involving Outside Hand (55)
+      that a `targeted-1-big-four-winds` case surfaced but wasn't chased to a root cause.
+      Tracked as follow-up, not swept under the rug — see `validation/compare.py`'s own
+      `--json-report` output for the full list, reproducible from `runSeed=20260805`.
+    - **`CLAUDE.md`'s scoring-validation rule restored to a truthful, satisfiable state** (was
+      unconditionally unsatisfiable since it was written — see that file's own updated wording
+      and `validation/README.md` for how to rerun).
+
 ## Open follow-up work
 
-- Implement Thirteen Orphans in `win-detection.ts` (this fix pass).
-- Implement Lesser Honors and Knitted Tiles in `win-detection.ts`/`scoring/` — same rendering
-  approach as fan #20 (item #12) should resolve it directly once that batch comes up; likely
-  differs from Greater only in allowing fewer than 7 honors (compensated by more suit tiles).
+- Fix the six missing-exclusion-pair bugs and the Tile Hog chow-counting bug found by item
+  #19's validation harness (each already has a permanent fixture — see that item for the exact
+  file/line and the `[id,id]` pairs to add).
+- Implement the "knitted" set concept in `win-detection.ts` so `decomposeHand`/`isWinningHand`
+  can recognize Greater/Lesser Honors and Knitted Tiles (fans 20/34) and Knitted Straight (fan
+  35) — see item #19; this was already tracked below for 20/34 specifically, but item #19 found
+  the root cause is shared with fan 35 and is more severe than "detector not written yet" (the
+  detectors already exist and are correct; the shape is structurally unreachable).
+- Get a `rules-lawyer` ruling on fan 48 "Two Concealed Kongs"'s point value (8 vs PyMahjongGB's
+  6) directly against §3.8.1's table — see item #19.
+- Triage the remaining ~180 unclassified mismatches from item #19's run (rerun
+  `validation/compare.py --json-report` for the current list).
 - Appendix 4 (seat/table rotation detail) is missing from the available PDF — if a more
   complete copy ever turns up, re-verify item #4 (dealer rotation) against it specifically.
 - Fan encyclopedia (M5, `scoring/encyclopedia.ts`) example hands: v1 ships id/name/points/rule

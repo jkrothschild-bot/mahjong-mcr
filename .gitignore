@@ -21,3 +21,12 @@ npm-debug.log*
 # link to the source instead of redistributing it. See docs/rules/README.md.
 docs/rules/mcr_EN.pdf
 
+# Validation harness (KICKOFF-validation-harness.md): generated hand cases
+# and ad-hoc reports are reproducible from a recorded seed (see
+# docs/rules/decisions.md) — not checked in. validation/README.md documents
+# the exact command to regenerate them.
+validation/cases/*.json
+validation/.report.json
+validation/__pycache__/
+*.pyc
+

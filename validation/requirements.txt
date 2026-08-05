@@ -1,0 +1,7 @@
+# KICKOFF-validation-harness.md's cross-check oracle. Pinned to an exact
+# version — an unpinned comparison oracle would silently change what
+# "validated" means run to run (see the Constraints section of that doc).
+# PyMahjongGB ships as source only (no prebuilt wheel); `pip install` builds
+# it locally, so a C/C++ toolchain must be available (works out of the box
+# with MSVC Build Tools on Windows, gcc/clang elsewhere).
+PyMahjongGB==1.3.0

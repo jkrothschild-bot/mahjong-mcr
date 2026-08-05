@@ -1,0 +1,102 @@
+# Validation harness
+
+Cross-checks this engine's scoring (`packages/engine/src/scoring`) against
+**PyMahjongGB**, an independent MCR fan calculator, per
+`KICKOFF-validation-harness.md`. This is Stage 1: a seeded hand generator, a
+JSON bridge, and a Python comparison script. See that doc for the full
+design rationale and `docs/rules/decisions.md` for the recorded results of
+the last run.
+
+`packages/` never imports anything from here, and this package never
+touches scoring logic — it only calls `scoreHand` and reports what comes
+back.
+
+## One-time setup
+
+```sh
+npm install                              # from the repo root — installs tsx etc.
+pip install -r validation/requirements.txt   # builds PyMahjongGB locally (needs a C/C++ toolchain)
+```
+
+## Running the harness
+
+```sh
+# 1. Generate hands (TypeScript) — writes validation/cases/<runSeed>.json
+npm run generate --workspace=@mahjong-mcr/validation -- <count> <runSeed>
+# e.g.
+npm run generate --workspace=@mahjong-mcr/validation -- 1200 20260805
+
+# 2. Compare against PyMahjongGB (Python)
+python validation/compare.py
+# optionally write a machine-readable report:
+python validation/compare.py --json-report validation/.report.json
+```
+
+`<count>` defaults to 1000, `<runSeed>` defaults to the current time. Every
+individual hand also carries its own derived seed (`runSeed` mixed through
+the engine's `mulberry32`/`nextSeed`), printed in `compare.py`'s output, so
+any mismatch is reproducible on its own without needing the whole batch.
+
+`compare.py` reads every `*.json` file under `validation/cases/` (not just
+the most recent one), so multiple runs accumulate rather than overwrite each
+other — remove old files if you want a clean single-run report.
+
+## Reading the report
+
+Each hand is compared at two levels (points and the exact fan multiset) and
+every mismatch is classified into one of four buckets — see
+`allowlist.py`'s module docstring for the full triage rules:
+
+- **their_bug** — a PyMahjongGB-specific implementation choice or house-rule
+  extension (e.g. its non-standard "Concealed Kong and Melded Kong" fan,
+  transparently folded back into the two official fans it replaces before
+  comparison — see `compare.py`'s `translate_pmgb_result`).
+- **ambiguity** — a `docs/rules/decisions.md` provisional ruling that
+  PyMahjongGB happens to implement differently. Never "fixed" to match
+  PyMahjongGB without a rulebook citation.
+- **our_bug** — a confirmed engine bug. Each one already has a permanent,
+  intentionally-failing-by-design test fixture committed (see the file/line
+  cited in the report's breakdown) documenting the *actual* (wrong)
+  behavior; CLAUDE.md's rule is fixture first, fix in a separate commit.
+- **UNCLASSIFIED** — genuinely untriaged; see `docs/rules/decisions.md` for
+  the current residual count and what's known about it.
+
+The report also prints a coverage line: how many of the 81 fans were
+exercised at least once, and which weren't. A coverage drop should be
+treated as a regression — see `KICKOFF-validation-harness.md` 1f.
+
+## Known, permanent gaps
+
+Fans 20 (Greater Honors and Knitted Tiles), 34 (Lesser Honors and Knitted
+Tiles), and 35 (Knitted Straight) can never appear in a generated case:
+`decomposeHand` has no notion of a "knitted" set, so `isWinningHand` returns
+`false` for every hand these fans require — see the "KNOWN BUG" block in
+`packages/engine/src/win-detection.test.ts`. Fan 81 (Flower Tiles) is out of
+scope by design: every generated case has `flowerCount: 0` (see
+`generate.ts`'s header comment).
+
+## Layout
+
+```
+validation/
+  src/
+    tile-codes.ts        this engine's tile ids <-> PyMahjongGB's tile codes
+    fan-map.json          the single source of truth joining both fan tables by name (loaded by both TS and Python)
+    fan-map.ts             loads + asserts fan-map.json is total against FAN_REGISTRY
+    hand-helpers.ts        TileAllocator, meld constructors, small RNG-based pickers
+    case-types.ts           GeneratedCase — one verified-winning hand plus its scoring context
+    win-circumstance.ts      randomizes win-method/wind/rare-flag context consistently
+    generators/
+      standard.ts             random four-sets-plus-pair hands (melds, kongs, chows, pungs)
+      seven-pairs.ts            random Seven Pairs / Seven Shifted Pairs
+      thirteen-orphans.ts        random Thirteen Orphans
+      targeted.ts                 hand-crafted constructors for fans random generation can't reach
+    build-pmgb-input.ts   converts a GeneratedCase into MahjongFanCalculator's exact argument shape
+    score-with-engine.ts  thin wrapper around this engine's own scoreHand
+    generate.ts           CLI entry point (see "Running the harness" above)
+  fan-map.json           (see above — read by both languages)
+  compare.py              the Python half: scores every case with PyMahjongGB and reports
+  allowlist.py             the triage classifier + the cited known-divergence record
+  requirements.txt
+  cases/                  generated output (gitignored; regenerate with the command above)
+```
