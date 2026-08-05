@@ -554,14 +554,25 @@ corrected to match. See each item's status.
       family definition alone — the family as currently written is technically correct (a real
       bug) but has not been seen in isolation, only in a form that reads as something else.
 
+21. **Fan 48 "Two Concealed Kongs" point value — CONFIRMED 8 points, `registry.ts` was already
+    correct.** Resolved via the same `rules-lawyer` pass as item #20. **§3.8.1 p.16** (summary
+    table, the "8" tier spanning fans 43-48: Chicken Hand, Last Tile Draw, Last Tile Claim, Out
+    with Replacement Tile, Robbing The Kong, **Two Concealed Kongs**) and **Appendix 1 p.37**
+    ("8-Point Fan" section, fan 48's own heading and worked example) both independently state 8
+    points, matching `registry.ts` exactly. PyMahjongGB's 6-point figure describes the
+    rulebook's ACTUAL 6-point tier (fans 49-54: All Pungs, Half Flush, Mixed Shifted Chows, All
+    Types, Melded Hand, Two Dragons Pungs — a real 6-point group, just for different fans) — a
+    mismap on PyMahjongGB's side, not a rulebook ambiguity. **No engine change** — `registry.ts`
+    stands as-is. Filed `their_bug` in `validation/allowlist.py` with this citation, replacing
+    the earlier provisional filing from item #19.
+
 ## Open follow-up work
 
 - Fix the six missing-exclusion-pair bugs and the Tile Hog chow-counting bug found by item
   #19's validation harness (each already has a permanent fixture — see that item for the exact
   file/line and the `[id,id]` pairs to add).
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
-- Get a `rules-lawyer` ruling on fan 48 "Two Concealed Kongs"'s point value (8 vs PyMahjongGB's
-  6) directly against §3.8.1's table — see item #19.
+- ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - Triage the remaining ~55 unclassified mismatches from item #20's run (rerun
   `validation/compare.py --json-report` for the current list — down from ~180 after item #20's
   fix plus the classifier's new pattern-composition logic).

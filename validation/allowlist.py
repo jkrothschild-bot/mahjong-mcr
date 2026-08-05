@@ -58,13 +58,16 @@ CONCEALMENT_FAMILY = {
 }
 
 # ---------------------------------------------------------------------------
-# Root cause C (their_bug, scoped out) — fan-map.json's
-# _pointValueDivergence: "Two Concealed Kongs" fires on both sides but at
-# different point values (ours 8 per registry.ts's own point tier, citing
-# §3.8.1; PyMahjongGB 6). Not yet triaged against mcr_EN.pdf directly (see
-# fan-map.json) — filed as 'their_bug' provisionally since our own
-# registry.ts already cites a rulebook section for its value and PyMahjongGB
-# is "a second opinion, not an oracle" (KICKOFF-validation-harness.md 1e).
+# Root cause C (their_bug, CONFIRMED 2026-08-05 — docs/rules/decisions.md
+# #21). "Two Concealed Kongs" fires on both sides but at different point
+# values (ours 8, PyMahjongGB 6). Directly verified against mcr_EN.pdf via
+# rules-lawyer: §3.8.1 p.16's summary table AND Appendix 1 p.37 both give
+# fan 48 exactly 8 points, in the same tier as Chicken Hand/Last Tile Draw/
+# Last Tile Claim/Out with Replacement Tile/Robbing The Kong — matching
+# registry.ts exactly. PyMahjongGB's 6-point figure describes the rulebook's
+# ACTUAL 6-point tier (fans 49-54: All Pungs/Half Flush/Mixed Shifted Chows/
+# All Types/Melded Hand/Two Dragons Pungs) — a mismap on their side, not a
+# rulebook ambiguity. No engine change; registry.ts's 8 points is correct.
 POINT_VALUE_DIVERGENT_NAMES = {"Two Concealed Kongs"}
 
 # ---------------------------------------------------------------------------
@@ -171,7 +174,7 @@ def classify_mismatch(our_fans: Counter, pmgb_fans: Counter) -> Classification |
         # Fan multisets match exactly; a points-only mismatch here can only
         # be the point-value divergence.
         if our_fans.keys() & POINT_VALUE_DIVERGENT_NAMES:
-            return Classification("their_bug", "fan-map.json _pointValueDivergence — Two Concealed Kongs: ours 8pts (§3.8.1) vs PyMahjongGB 6pts")
+            return Classification("their_bug", "docs/rules/decisions.md #21 — Two Concealed Kongs: ours 8pts confirmed correct (§3.8.1 p.16 / App.1 p.37), PyMahjongGB's 6pts describes a different fan's tier")
         return None
 
     remaining = set(all_diff_names)
