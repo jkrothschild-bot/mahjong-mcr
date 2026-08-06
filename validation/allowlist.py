@@ -51,6 +51,24 @@ class Classification:
 # shift value depending on which side of this one rule a hand lands on —
 # NOT six separate ambiguities, just this one propagating through the
 # concealed-pung/kong-counting family of fans.
+#
+# KNOWN LIMITATION, found during Step 4/5 triage, not resolved here: "Two
+# Concealed Pungs" in this family is now known to be OVERBROAD in one
+# specific way. detectTwoConcealedPungs (fans-2.ts) has its own separate,
+# confirmed our_bug (fixtured in fans-2.test.ts: it filters `s.kind ===
+# 'pung'`, wrongly excluding concealed kongs from its count — see App.1
+# p.40's own worked example for fan 66, which combines a concealed pung
+# + a concealed kong to reach "two"). That bug produces the exact same
+# fan-name diff signature ({"Two Concealed Pungs"}, isolated) as a genuine
+# item #11 concealment-completion mismatch — classify_mismatch works on
+# fan-name diffs only, with no access to whether a hand actually contains a
+# concealed kong, so it CANNOT distinguish the two causes and everything
+# with a bare "Two Concealed Pungs" diff is filed under this ambiguity
+# family. Some unknown fraction of the current "ambiguity #11" count is
+# therefore actually the kong-counting our_bug, not the concealment
+# ambiguity. Not fixed here (would need classify_mismatch to see raw hand
+# data, out of scope for this pass) — flagged so a future session doesn't
+# treat the item #11 count as clean.
 CONCEALMENT_FAMILY = {
     "Four Concealed Pungs", "Three Concealed Pungs", "Two Concealed Pungs",
     "Concealed Hand", "Concealed Kong", "Two Concealed Kongs",
@@ -112,8 +130,12 @@ LAST_DISCARD_OVERLAP_NAMES = {"Out with Replacement Tile"}
 # them "known, tracked" instead of "unknown."
 OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'Fully Concealed Hand should be excluded by fans requiring full "
-        "concealment' (missing [4,56]/[6,56]/[7,56]/[12,56]/[19,56])",
+        "packages/engine/src/scoring/fans-4.test.ts / fans-2.test.ts — 'BUG: incorrectly rejects a self-drawn/discard win "
+        "that includes only a CONCEALED kong' (detectFullyConcealedHand/detectConcealedHand check ctx.melds.length === 0 "
+        "instead of exposure, so a concealed kong wrongly disqualifies fans 56/62) — found during Step 4/5 triage, NOT the "
+        "same bug as the old, now-fixed [4,56]/[6,56]/[7,56]/[12,56]/[19,56] missing-exclusion citation this family used to "
+        "point to (that citation is stale as of decisions.md's correction to item #23 — see exclusions.test.ts's "
+        "'KNOWN REGRESSION' describe block).",
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),
     ),
     (
@@ -123,12 +145,22 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
         frozenset({"Tile Hog"}),
     ),
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'Out with Replacement Tile should exclude Self-Drawn' (missing [46,80])",
-        frozenset({"Out with Replacement Tile", "Self-Drawn"}),
+        "packages/engine/src/scoring/exclusions.test.ts — 'All Even Pungs / All Fives should exclude No Honors' (missing "
+        "[21,76]/[31,76]) — found via allowlist cleanup, docs/rules/decisions.md #26; fixtured during Step 4/5 triage.",
+        frozenset({"No Honors"}),
     ),
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'All Green should exclude Half Flush and One Voided Suit' (fan 3 has no exclusion entries at all; missing [3,50]/[3,75])",
-        frozenset({"Half Flush", "One Voided Suit"}),
+        "packages/engine/src/scoring/exclusions.test.ts — 'All Terminals and Honors should exclude Outside Hand' (missing "
+        "[18,55]) — same 'narrower named fan implies a broader one' shape as the existing [8,55]/[11,55] entries (18 is "
+        "the union of 8 and 11); found during Step 4/5 triage of the unclassified mismatches.",
+        frozenset({"Outside Hand"}),
+    ),
+    (
+        "packages/engine/src/scoring/fans-6.test.ts — 'BUG: never fires for a Seven Pairs hand, even when its 7 pairs "
+        "span all 5 categories' (detectAllTypes bails out on ctx.decomposition === null instead of also checking "
+        "specialShape === 'sevenPairs') — rules-lawyer confirmed fan 19's own Appendix 1 worked example is captioned "
+        "'Combined with All Types'; found during Step 4/5 triage of the unclassified mismatches.",
+        frozenset({"All Types"}),
     ),
 ]
 

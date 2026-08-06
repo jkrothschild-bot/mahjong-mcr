@@ -238,6 +238,18 @@ def main() -> int:
                 }
                 for r in unexplained
             ],
+            "ourBugDetail": [
+                {
+                    "seed": r.seed,
+                    "label": r.label,
+                    "ours": r.our_points,
+                    "pmgb": r.pmgb_points,
+                    "oursOnly": dict(r.our_fans - r.pmgb_fans),
+                    "pmgbOnly": dict(r.pmgb_fans - r.our_fans),
+                    "citation": c.citation,
+                }
+                for r, c in by_category["our_bug"]
+            ],
         }
         Path(args.json_report).write_text(json.dumps(report, indent=2), encoding="utf-8")
 
