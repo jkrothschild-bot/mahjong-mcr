@@ -108,16 +108,16 @@ describe('All Green excludes Half Flush and One Voided Suit', () => {
   })
 })
 
-// REGRESSION, not a fixed bug — docs/rules/decisions.md #23 was WRONG and is
-// pending revert (see the new item logged during Step 4/5 triage). #23 added
-// these five pairs on PyMahjongGB-only evidence (fan_calculator.cpp's
-// "把不求人修正为自摸" downgrade for Nine Gates/Four Concealed Pungs, plus the
-// special-shape path never setting Fully Concealed Hand at all), WITHOUT the
-// direct rulebook citation KICKOFF-validation-harness.md 1e requires before
-// changing engine behavior to match PyMahjongGB. Direct re-read of
-// docs/rules/mcr_EN.pdf's §3.8.1 fan table (p.14-15) shows the rulebook says
-// the opposite for every one of these five fans — each entry ends with the
-// table's own explicit parenthetical:
+// FIXED REGRESSION — docs/rules/decisions.md #23 was WRONG and has been
+// reverted (docs/rules/decisions.md #32). #23 added these five pairs on
+// PyMahjongGB-only evidence (fan_calculator.cpp's "把不求人修正为自摸" downgrade
+// for Nine Gates/Four Concealed Pungs, plus the special-shape path never
+// setting Fully Concealed Hand at all), WITHOUT the direct rulebook citation
+// KICKOFF-validation-harness.md 1e requires before changing engine behavior
+// to match PyMahjongGB. Direct re-read of docs/rules/mcr_EN.pdf's §3.8.1 fan
+// table (p.14-15) shows the rulebook says the opposite for every one of
+// these five fans — each entry ends with the table's own explicit
+// parenthetical:
 //   - Fan 4 (Nine Gates): "...creating the nine-sided wait of
 //     1,2,3,4,5,6,7,8,9. (Fully Concealed may be combined if Self-Drawn)."
 //   - Fan 6 (Seven Shifted Pairs): "...(Fully Concealed may be combined if
@@ -130,27 +130,28 @@ describe('All Green excludes Half Flush and One Voided Suit', () => {
 //     may be combined if Self-Drawn)."
 // This is a case KICKOFF-validation-harness.md 1e warned about directly:
 // "quietly replace our misreadings with theirs" — our engine and
-// PyMahjongGB apparently share the SAME wrong answer here (both suppress
-// fan 56 for these shapes), which is exactly why the 1200-hand cross-check
-// never flagged it as a mismatch; only a direct rulebook re-read caught it.
-// These `it`s below still assert the CURRENT (buggy) `true` — matching
-// exclusions.ts's still-present [4,56]/[6,56]/[7,56]/[12,56]/[19,56] entries
-// — pending the revert; flip to `false` once exclusions.ts is corrected.
-describe('KNOWN REGRESSION (decisions.md #23 was wrong): Fully Concealed Hand should NOT be excluded by these five fans', () => {
-  it('Nine Gates (4) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
-    expect(areExclusive(4, 56)).toBe(true) // WRONG, should be false — see comment above
+// PyMahjongGB shared the SAME wrong answer here (both suppressed fan 56 for
+// these shapes), which is exactly why the 1200-hand cross-check never
+// flagged it as a mismatch; only a direct rulebook re-read caught it. This
+// is the general, reusable lesson, not just an item-#23-specific one: an
+// engine change justified ONLY by matching PyMahjongGB's behavior, with no
+// independent rulebook citation, is invisible to this harness forever after
+// it ships — both sides then agree, so no future run can ever flag it again.
+describe('Fully Concealed Hand should NOT be excluded by these five fans', () => {
+  it('Nine Gates (4) does not exclude Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(4, 56)).toBe(false)
   })
-  it('Four Concealed Pungs (12) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
-    expect(areExclusive(12, 56)).toBe(true) // WRONG, should be false
+  it('Four Concealed Pungs (12) does not exclude Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(12, 56)).toBe(false)
   })
-  it('Seven Shifted Pairs (6) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
-    expect(areExclusive(6, 56)).toBe(true) // WRONG, should be false
+  it('Seven Shifted Pairs (6) does not exclude Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(6, 56)).toBe(false)
   })
-  it('Seven Pairs (19) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
-    expect(areExclusive(19, 56)).toBe(true) // WRONG, should be false
+  it('Seven Pairs (19) does not exclude Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(19, 56)).toBe(false)
   })
-  it('Thirteen Orphans (7) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
-    expect(areExclusive(7, 56)).toBe(true) // WRONG, should be false
+  it('Thirteen Orphans (7) does not exclude Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(7, 56)).toBe(false)
   })
 })
 

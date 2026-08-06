@@ -99,27 +99,21 @@ const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // the same win. Same pattern as fan 44's existing (rulebook-stated)
   // exclusion of 80.
   [56, 80],
-  // 4/6/7/12/19 -> 56: derived. Fully Concealed Hand (56) means "won by
-  // self-draw with no melded sets" — these five fans each already
-  // structurally guarantee that same all-concealed shape by their own
-  // definition (Nine Gates/Seven Shifted Pairs/Thirteen Orphans/Four
-  // Concealed Pungs/Seven Pairs can never contain an exposed meld), so any
-  // one of them completed by self-draw would otherwise double-score the
-  // concealment itself as both the named fan's own value AND 56's 6pts on
-  // top. Not stated in any of the six fans' own rulebook text (derived, same
-  // shape as [56,80] just above). Evidence this was missing: PyMahjongGB's
-  // `adjust_fan_table` explicitly downgrades Fully Concealed Hand to plain
-  // Self-Drawn for Nine Gates (4) and Four Concealed Pungs (12) ("把不求人
-  // 修正为自摸"), and its `calculate_special_form_fan` path (Seven Pairs
-  // family/Thirteen Orphans/Honors-and-Knitted) never calls
-  // `adjust_by_self_drawn` at all — the only place Fully Concealed Hand is
-  // ever set — so 56 can structurally never fire for those shapes either.
-  // docs/rules/decisions.md #23.
-  [4, 56],
-  [6, 56],
-  [7, 56],
-  [12, 56],
-  [19, 56],
+  // NOTE: 4/6/7/12/19 -> 56 (Fully Concealed Hand) deliberately do NOT
+  // belong in this table, despite having been added here for a while —
+  // docs/rules/decisions.md #23 added them on PyMahjongGB-only evidence
+  // (`adjust_fan_table`'s "把不求人修正为自摸" downgrade), without the direct
+  // rulebook citation KICKOFF-validation-harness.md 1e requires before
+  // changing engine behavior to match PyMahjongGB. Direct re-read of
+  // mcr_EN.pdf's §3.8.1 primary fan table (p.14-15) shows the rulebook
+  // states the OPPOSITE for exactly these five fans — each entry ends with
+  // "(Fully Concealed may be combined if Self-Drawn)" in the table itself.
+  // Removed per docs/rules/decisions.md #32 (which also records the general
+  // lesson: this class of error — an engine "fix" that only matches
+  // PyMahjongGB, with no independent citation — is invisible to the
+  // PyMahjongGB cross-check FOREVER after it ships, because both sides then
+  // agree on the same wrong answer; only a direct rulebook re-read caught
+  // this one, not the harness).
   // NOTE: [60,73]/[61,73] (Prevalent/Seat Wind vs Pung of Terminals or
   // Honors) deliberately do NOT belong in this table, unlike every other
   // "named exact-count fan implies the generic per-unit fan" pair above
