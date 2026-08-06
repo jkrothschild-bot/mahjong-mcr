@@ -31,7 +31,12 @@
 // overlap depends on which pair tile the hand happens to have (not a
 // universal implication), so it's a legitimate independent stack, not a
 // Non-Repeat case.
-const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
+// Exported (not just used internally) so exclusion-citations.ts's guard test
+// can walk every pair without duplicating this list — see that file's
+// header comment for why an uncited exclusion (docs/rules/decisions.md #23)
+// is invisible to the PyMahjongGB cross-check forever once it ships, and
+// what the guard does about it.
+export const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // 8/11 -> 18: derived (see comment above), not a literal rulebook quote
   [8, 18],
   [11, 18],

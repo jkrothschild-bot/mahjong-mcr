@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { areExclusive, EXCLUDES } from './exclusions.js'
+import { areExclusive, EXCLUDES, RAW_EXCLUSION_PAIRS } from './exclusions.js'
+import { isCovered, pairKey } from './exclusion-citations.js'
+
+// Guard against docs/rules/decisions.md #23's exact failure mode: an
+// exclusion added on PyMahjongGB's behavior alone, with no independent
+// rulebook citation, which is then invisible to the cross-check forever —
+// see exclusion-citations.ts's header comment for the full mechanism.
+describe('every exclusion pair is covered by a citation', () => {
+  it('every pair in RAW_EXCLUSION_PAIRS is either grandfathered or cited', () => {
+    const uncovered = RAW_EXCLUSION_PAIRS.filter(([a, b]) => !isCovered(a, b))
+    expect(uncovered).toEqual([])
+  })
+
+  it('no duplicate pairs (same physical exclusion listed twice under different keys)', () => {
+    const seen = new Set<string>()
+    const duplicates: [number, number][] = []
+    for (const [a, b] of RAW_EXCLUSION_PAIRS) {
+      const key = pairKey(a, b)
+      if (seen.has(key)) duplicates.push([a, b])
+      seen.add(key)
+    }
+    expect(duplicates).toEqual([])
+  })
+})
 
 describe('EXCLUDES / areExclusive', () => {
   it('is symmetric: both directions of a known pair are registered', () => {
