@@ -52,23 +52,18 @@ class Classification:
 # NOT six separate ambiguities, just this one propagating through the
 # concealed-pung/kong-counting family of fans.
 #
-# KNOWN LIMITATION, found during Step 4/5 triage, not resolved here: "Two
-# Concealed Pungs" in this family is now known to be OVERBROAD in one
-# specific way. detectTwoConcealedPungs (fans-2.ts) has its own separate,
-# confirmed our_bug (fixtured in fans-2.test.ts: it filters `s.kind ===
-# 'pung'`, wrongly excluding concealed kongs from its count — see App.1
-# p.40's own worked example for fan 66, which combines a concealed pung
-# + a concealed kong to reach "two"). That bug produces the exact same
-# fan-name diff signature ({"Two Concealed Pungs"}, isolated) as a genuine
-# item #11 concealment-completion mismatch — classify_mismatch works on
-# fan-name diffs only, with no access to whether a hand actually contains a
-# concealed kong, so it CANNOT distinguish the two causes and everything
-# with a bare "Two Concealed Pungs" diff is filed under this ambiguity
-# family. Some unknown fraction of the current "ambiguity #11" count is
-# therefore actually the kong-counting our_bug, not the concealment
-# ambiguity. Not fixed here (would need classify_mismatch to see raw hand
-# data, out of scope for this pass) — flagged so a future session doesn't
-# treat the item #11 count as clean.
+# RESOLVED (docs/rules/decisions.md #33, 2026-08-06): "Two Concealed Pungs"
+# in this family was OVERBROAD for a while — detectTwoConcealedPungs
+# (fans-2.ts) had its own separate our_bug (filtered `s.kind === 'pung'`,
+# wrongly excluding concealed kongs from its count; see App.1 p.40's own
+# worked example for fan 66, which combines a concealed pung + a concealed
+# kong to reach "two") that produced the identical fan-name diff signature
+# as a genuine item #11 concealment-completion mismatch, so classify_mismatch
+# couldn't tell them apart and everything fell into this ambiguity family.
+# Now that the detector is fixed, this family's own count dropped by ~25
+# hands in the same harness re-run that confirmed the fix (219 -> 194) —
+# direct evidence of how much it had been hiding. No longer flagged as
+# overbroad; the remaining count is genuinely item #11 only.
 CONCEALMENT_FAMILY = {
     "Four Concealed Pungs", "Three Concealed Pungs", "Two Concealed Pungs",
     "Concealed Hand", "Concealed Kong", "Two Concealed Kongs",
@@ -124,21 +119,14 @@ KNITTED_STRAIGHT_BONUS_STACK_NAMES = {"Lesser Honors and Knitted Tiles", "Knitte
 LAST_DISCARD_OVERLAP_NAMES = {"Out with Replacement Tile"}
 
 # ---------------------------------------------------------------------------
-# Root causes B/D/E/F/H (our_bug) — confirmed engine bugs, each with a
-# permanent fixture already committed. Fix is separate/later work per
-# CLAUDE.md's triage protocol; these entries exist so the report can label
-# them "known, tracked" instead of "unknown."
-OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
-    (
-        "packages/engine/src/scoring/fans-4.test.ts / fans-2.test.ts — 'BUG: incorrectly rejects a self-drawn/discard win "
-        "that includes only a CONCEALED kong' (detectFullyConcealedHand/detectConcealedHand check ctx.melds.length === 0 "
-        "instead of exposure, so a concealed kong wrongly disqualifies fans 56/62) — found during Step 4/5 triage, NOT the "
-        "same bug as the old, now-fixed [4,56]/[6,56]/[7,56]/[12,56]/[19,56] missing-exclusion citation this family used to "
-        "point to (that citation is stale as of decisions.md's correction to item #23 — see exclusions.test.ts's "
-        "'KNOWN REGRESSION' describe block).",
-        frozenset({"Fully Concealed Hand", "Self-Drawn"}),
-    ),
-]
+# our_bug families — confirmed engine bugs, each with a permanent fixture
+# already committed, kept here only until fixed (then removed, confirmed
+# zero-match first). Empty as of docs/rules/decisions.md #33 (2026-08-06):
+# all 6 distinct our_bug causes found in Step 4/5 (item #30(b)-(f)) are now
+# fixed. The NEXT entry added here should come with a real citation in
+# exclusion-citations.ts if it's an exclusions.ts change (the guard requires
+# it) — see that file's header comment.
+OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = []
 
 
 # ---------------------------------------------------------------------------

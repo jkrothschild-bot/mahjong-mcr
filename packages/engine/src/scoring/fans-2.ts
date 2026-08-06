@@ -144,21 +144,26 @@ function detectDoublePung(ctx: HandContext): FanMatch[] {
 // 66. Two Concealed Pungs — 2 pts. §3.8.1 p.16 / App.1 p.40: "Two Pungs
 // achieved without melding."
 //
-// KNOWN BUG (fixtured in fans-2.test.ts, not fixed here): this detector
-// only counts s.kind === 'pung', excluding concealed kongs. That was
-// believed to be a deliberate rulebook distinction from Three/Four
-// Concealed Pungs' "Pungs or Kongs" wording, but a direct re-read of
-// App.1 p.40's own worked example for fan 66 ("Concealed Pung; Concealed
-// Kong... Combined with Double Pung, Concealed Kong...") shows the example
-// itself composes "Two" from one concealed pung PLUS one concealed kong —
-// contradicting the "pungs only" reading. Should filter on
+// FIXED (docs/rules/decisions.md #30(c), then #33, re-confirmed fresh via
+// a second independent rules-lawyer pass before fixing — see #33). Used
+// to filter `s.kind === 'pung'`, excluding concealed kongs — believed to
+// be a deliberate rulebook distinction from Three/Four Concealed Pungs'
+// "Pungs or Kongs" wording, but that distinction doesn't exist in the
+// actual text. Fan 66's OWN Appendix 1 worked example settles it directly:
+// "Concealed Pung; Concealed Kong, won with a discarded 3 Character...
+// Combined with Double Pung, Concealed Kong..." — the example itself
+// composes "Two [Concealed Pungs]" from one concealed pung PLUS one
+// concealed kong (the "Combined with... Concealed Kong" is fan 67, a
+// separate 1pt fan, additionally scored for the same physical kong —
+// permitted since §3.9.1.5's Non-Identical Principle only forbids reusing
+// a set to form the SAME fan twice, not different fans). Fixed to filter
 // `s.kind !== 'chow'`, matching every sibling concealed-pung-count
 // detector (fans-16.ts's Three Concealed Pungs, fans-64.ts's Four
 // Concealed Pungs).
 function detectTwoConcealedPungs(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
-  const count = sets.filter((s) => s.kind === 'pung' && s.concealed).length
+  const count = sets.filter((s) => s.kind !== 'chow' && s.concealed).length
   return count === 2 ? [{ fanId: 66, count: 1 }] : []
 }
 
