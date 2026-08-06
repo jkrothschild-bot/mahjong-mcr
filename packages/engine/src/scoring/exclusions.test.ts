@@ -207,3 +207,48 @@ describe('All Terminals and Honors excludes Outside Hand', () => {
     expect(areExclusive(18, 55)).toBe(true)
   })
 })
+
+// FIXED (docs/rules/decisions.md #34). Found during Part 1 re-triage of the
+// validation harness's unclassified residual (seeds 20260826/20260828):
+// Upper Tiles (25: ranks {7,8,9} only) and Lower Tiles (27: ranks {1,2,3}
+// only) each trivially imply their "Four" sibling's broader range ({6,7,8,9}
+// / {1,2,3,4} respectively) — same "narrower named fan implies a broader
+// one" shape as [18,55]/[8,55]/[11,55]. Simply missed when these fans were
+// transcribed.
+describe('Upper/Lower Tiles exclude their "Four" siblings', () => {
+  it('Upper Tiles (25) excludes Upper Four (36)', () => {
+    expect(areExclusive(25, 36)).toBe(true)
+  })
+  it('Lower Tiles (27) excludes Lower Four (37)', () => {
+    expect(areExclusive(27, 37)).toBe(true)
+  })
+})
+
+// FIXED (docs/rules/decisions.md #34). Found during Part 1 re-triage (seed
+// 20260830): Three-Suited Terminal Chows (29) requires a 1-2-3 AND a 7-8-9
+// chow in each of two suits, consuming all 4 sets by construction — the two
+// 1-2-3 chows (same numbers, different suits) are trivially one Mixed
+// Double Chow (70), and the two 7-8-9 chows are a second, independent
+// instance for the same 4 physical sets. Simply missed when this fan was
+// transcribed.
+describe('Three-Suited Terminal Chows excludes Mixed Double Chow', () => {
+  it('Three-Suited Terminal Chows (29) excludes Mixed Double Chow (70)', () => {
+    expect(areExclusive(29, 70)).toBe(true)
+  })
+})
+
+// NEW (docs/rules/decisions.md #34) — a side effect of fixing
+// detectPureShiftedPungs/detectPureShiftedChows to search any 3-combination
+// instead of requiring an exact count of 3 (fans-24.ts/fans-16.ts). That fix
+// means a genuine Four Pure Shifted Pungs / Four Shifted Chows hand now also
+// triggers the 3-set sibling fan for its own qualifying 3-subset — these
+// entries are what suppress the resulting double-count, replacing the old
+// exact-count check's incidental (and incomplete) mutual exclusion.
+describe('Four Pure Shifted Pungs / Four Shifted Chows exclude their 3-set siblings', () => {
+  it('Four Pure Shifted Pungs (15) excludes Pure Shifted Pungs (24)', () => {
+    expect(areExclusive(15, 24)).toBe(true)
+  })
+  it('Four Shifted Chows (16) excludes Pure Shifted Chows (30)', () => {
+    expect(areExclusive(16, 30)).toBe(true)
+  })
+})

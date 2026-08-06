@@ -211,8 +211,19 @@ export const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // 15. Four Pure Shifted Pungs
   [15, 23], // Pure Triple Chow
   [15, 49], // All Pungs
+  // 15 -> 24: derived. Four Pure Shifted Pungs (15: all 4 sets same-suit
+  // pungs, consecutively shifted) trivially contains a qualifying 3-subset
+  // for Pure Shifted Pungs (24) too, once detectPureShiftedPungs was fixed
+  // to search any 3-combination instead of requiring the whole hand to have
+  // exactly 3 pung-type sets (docs/rules/decisions.md #34) — the old
+  // exact-count check happened to prevent this overlap as an accidental
+  // side effect; this entry replaces that with an explicit one.
+  [15, 24], // Pure Shifted Pungs
   // 16. Four Shifted Chows
   [16, 71], // Short Straight
+  // 16 -> 30: derived, same pattern as [15,24] just above, for the chow
+  // analog (detectPureShiftedChows, fans-16.ts). docs/rules/decisions.md #34.
+  [16, 30], // Pure Shifted Chows
   // 18. All Terminals and Honors
   [18, 49], // All Pungs
   [18, 73], // Pung of Terminals or Honors
@@ -249,16 +260,37 @@ export const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   [23, 69], // Pure Double Chow
   // 25. Upper Tiles
   [25, 76], // No Honors
+  // 25 -> 36: derived, "narrower named fan implies a broader one" (same
+  // shape as [18,55]/[8,55]/[11,55]). Upper Tiles restricts every tile to
+  // ranks {7,8,9} (fans-24.ts's UPPER_RANKS); Upper Four's own condition is
+  // ranks {6,7,8,9} (fans-12.ts's UPPER_FOUR_RANKS) — a strict superset, so
+  // any Upper Tiles hand trivially also satisfies Upper Four for the same
+  // tiles. Simply missed when these two fans were transcribed.
+  // docs/rules/decisions.md #34.
+  [25, 36], // Upper Four
   // 26. Middle Tiles
   [26, 76], // No Honors
   [26, 68], // All Simples
   // 27. Lower Tiles
   [27, 76], // No Honors
+  // 27 -> 37: derived, same pattern as [25,36] just above. Lower Tiles
+  // restricts every tile to ranks {1,2,3} (LOWER_RANKS); Lower Four's own
+  // condition is ranks {1,2,3,4} (LOWER_FOUR_RANKS) — a strict superset.
+  // docs/rules/decisions.md #34.
+  [27, 37], // Lower Four
   // 29. Three-Suited Terminal Chows
   [29, 69], // Pure Double Chow
   [29, 72], // Two Terminal Chows
   [29, 76], // No Honors
   [29, 63], // All Chows
+  // 29 -> 70: derived, same "named exact-count fan implies the generic
+  // per-unit fan" pattern as [54,59]/[32,65]/[41,70] above. Three-Suited
+  // Terminal Chows requires a 1-2-3 AND a 7-8-9 chow in each of two suits —
+  // the two 1-2-3 chows (same numbers, different suits) are trivially one
+  // Mixed Double Chow, and the two 7-8-9 chows are trivially a SECOND,
+  // independent Mixed Double Chow instance for the same 4 physical sets.
+  // docs/rules/decisions.md #34.
+  [29, 70], // Mixed Double Chow
   // 31. All Fives
   [31, 68], // All Simples
   // 31 -> 76: derived, same pattern as [21,76] just above. All Fives's own

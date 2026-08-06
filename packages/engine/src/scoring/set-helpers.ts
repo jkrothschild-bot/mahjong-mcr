@@ -90,3 +90,21 @@ export function parseSuited(id: TileTypeId): ParsedSuited | null {
   if (!match) return null
   return { suit: match[1] as 'C' | 'D' | 'B', rank: Number(match[2]) }
 }
+
+// Every 3-element combination of `items` (order-independent) — used by
+// fans-24.ts's detectPureShiftedPungs and fans-16.ts's detectPureShiftedChows
+// to search for a qualifying trio AMONG the hand's pung/chow-type sets,
+// rather than requiring the whole hand to have exactly 3 of them (a 4-set
+// hand can have a 4th, unrelated pung/chow alongside a genuine 3-shifted-set
+// run — see docs/rules/decisions.md #34's fixture for a real case).
+export function combinations3<T>(items: readonly T[]): T[][] {
+  const result: T[][] = []
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      for (let k = j + 1; k < items.length; k++) {
+        result.push([items[i]!, items[j]!, items[k]!])
+      }
+    }
+  }
+  return result
+}

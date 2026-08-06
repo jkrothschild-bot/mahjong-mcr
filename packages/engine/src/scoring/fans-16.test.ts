@@ -146,7 +146,14 @@ describe('Pure Shifted Chows (fan 30)', () => {
     expect(FANS_16_DETECTORS[30]!(ctx)).toEqual([])
   })
 
-  it('rejects 4 shifted chows (that is Four Shifted Chows, fan 16, not this one)', () => {
+  // FIXED (docs/rules/decisions.md #34): this used to assert `[]`, relying
+  // on the old exact-3-chows check to (incidentally, and incompletely — see
+  // detectPureShiftedPungs' own comment for the isolated real case that
+  // exposed this) keep this mutually exclusive with Four Shifted Chows (fan
+  // 16). The detector now correctly fires for the qualifying 3-subset;
+  // exclusions.ts's new [16,30] entry suppresses the double-count when fan
+  // 16 also fires.
+  it('matches a qualifying 3-subset even when a 4th chow extends the same shifted run (Four Shifted Chows territory too — exclusions.ts[16,30] handles the overlap)', () => {
     const decomposition: Decomposition = {
       pair: 'B2',
       sets: [
@@ -157,7 +164,24 @@ describe('Pure Shifted Chows (fan 30)', () => {
       ],
     }
     const ctx = ctxWith({ decomposition })
-    expect(FANS_16_DETECTORS[30]!(ctx)).toEqual([])
+    expect(FANS_16_DETECTORS[30]!(ctx)).toEqual([{ fanId: 30, count: 1 }])
+  })
+
+  // docs/rules/decisions.md #34: a 4th chow that does NOT extend the same
+  // suit/sequence (found via the validation harness, seed 3563778031) must
+  // still let the qualifying 3-subset fire.
+  it('matches a qualifying 3-subset even when a 4th, unrelated chow is also present', () => {
+    const decomposition: Decomposition = {
+      pair: 'B2',
+      sets: [
+        { type: 'chow', tiles: ['C1', 'C2', 'C3'] },
+        { type: 'chow', tiles: ['C2', 'C3', 'C4'] },
+        { type: 'chow', tiles: ['C3', 'C4', 'C5'] },
+        { type: 'chow', tiles: ['D7', 'D8', 'D9'] }, // different suit, not part of the run
+      ],
+    }
+    const ctx = ctxWith({ decomposition })
+    expect(FANS_16_DETECTORS[30]!(ctx)).toEqual([{ fanId: 30, count: 1 }])
   })
 })
 

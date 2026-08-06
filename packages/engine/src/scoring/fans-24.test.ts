@@ -252,7 +252,15 @@ describe('Pure Shifted Pungs (fan 24)', () => {
     expect(FANS_24_DETECTORS[24]!(ctx)).toEqual([{ fanId: 24, count: 1 }])
   })
 
-  it('rejects 4 pungs shifted by 1 (that is Four Pure Shifted Pungs, fan 15, not this one)', () => {
+  // FIXED (docs/rules/decisions.md #34): this used to assert `[]` here,
+  // relying on the old exact-3-pungs check to (incidentally, and as it
+  // turned out incompletely — see the seeds cited on detectPureShiftedPungs'
+  // own comment) keep this mutually exclusive with Four Pure Shifted Pungs
+  // (fan 15). The detector now correctly fires for the qualifying 3-subset
+  // (any 3 of the 4 consecutive pungs) — exclusions.ts's new [15,24] entry
+  // is what actually suppresses the double-count when fan 15 also fires,
+  // not the detector declining to look.
+  it('matches a qualifying 3-subset even when a 4th pung extends the same shifted run (Four Pure Shifted Pungs territory too — exclusions.ts[15,24] handles the overlap)', () => {
     const decomposition: Decomposition = {
       pair: 'D5',
       sets: [
@@ -263,7 +271,25 @@ describe('Pure Shifted Pungs (fan 24)', () => {
       ],
     }
     const ctx = ctxWith({ decomposition })
-    expect(FANS_24_DETECTORS[24]!(ctx)).toEqual([])
+    expect(FANS_24_DETECTORS[24]!(ctx)).toEqual([{ fanId: 24, count: 1 }])
+  })
+
+  // docs/rules/decisions.md #34: a 4th pung that does NOT extend the same
+  // suit/sequence (found via the validation harness, seeds
+  // 1613793028/3097971845) must still let the qualifying 3-subset fire —
+  // this is the actual bug the exact-count check caused.
+  it('matches a qualifying 3-subset even when a 4th, unrelated pung is also present', () => {
+    const decomposition: Decomposition = {
+      pair: 'D5',
+      sets: [
+        { type: 'pung', tiles: ['C2', 'C2', 'C2'] },
+        { type: 'pung', tiles: ['C3', 'C3', 'C3'] },
+        { type: 'pung', tiles: ['C4', 'C4', 'C4'] },
+        { type: 'pung', tiles: ['B7', 'B7', 'B7'] }, // different suit, not part of the run
+      ],
+    }
+    const ctx = ctxWith({ decomposition })
+    expect(FANS_24_DETECTORS[24]!(ctx)).toEqual([{ fanId: 24, count: 1 }])
   })
 
   it('rejects a gap in the shift sequence', () => {

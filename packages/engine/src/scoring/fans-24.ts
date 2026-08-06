@@ -1,7 +1,7 @@
 import { isSevenPairs } from '../win-detection.js'
 import { typeIdOfInstance } from '../tiles.js'
 import type { FanMatch, HandContext } from './types.js'
-import { allSets, isHonorTypeId, parseSuited } from './set-helpers.js'
+import { allSets, combinations3, isHonorTypeId, parseSuited } from './set-helpers.js'
 
 // 19. Seven Pairs — 24 pts. §3.8.1 p.15 / App.1 p.29: "A hand formed by
 // seven pairs." Direct reuse of win-detection.ts's isSevenPairs (M1). Note:
@@ -115,20 +115,32 @@ function detectPureTripleChow(ctx: HandContext): FanMatch[] {
 }
 
 // 24. Pure Shifted Pungs — 24 pts. §3.8.1 p.15 / App.1 p.32: "Three Pungs
-// or Kongs of the same suit, each shifted one up from the last." Exactly 3
-// pung-type sets (not 4 — that's Four Pure Shifted Pungs, fan 15).
+// or Kongs of the same suit, each shifted one up from the last."
+//
+// FIXED (docs/rules/decisions.md #34): used to require the WHOLE hand to
+// have exactly 3 pung-type sets, incorrectly rejecting a hand with a 4th,
+// unrelated pung/kong alongside a genuine qualifying trio (found via the
+// validation harness, seeds 1613793028/3097971845 — both had a 4th pung in
+// a different suit or non-adjacent rank). Now searches every 3-combination
+// of the hand's pung-type sets for one that's same-suit and consecutively
+// shifted, rather than requiring the count to be exactly 3. This also now
+// fires on a genuine Four Pure Shifted Pungs hand (fan 15, all 4
+// consecutively shifted) — the old exact-count check happened to also
+// prevent that overlap as a side effect; now handled explicitly via
+// exclusions.ts's new [15,24] entry.
 function detectPureShiftedPungs(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
   const pungs = sets.filter((s) => s.kind !== 'chow')
-  if (pungs.length !== 3) return []
-  const parsed = pungs.map((s) => parseSuited(s.typeId))
-  if (parsed.some((p) => p === null)) return []
-  const suits = new Set(parsed.map((p) => p!.suit))
-  if (suits.size !== 1) return []
-  const ranks = parsed.map((p) => p!.rank).sort((a, b) => a - b)
-  if (ranks[1] !== ranks[0]! + 1 || ranks[2] !== ranks[1]! + 1) return []
-  return [{ fanId: 24, count: 1 }]
+  for (const trio of combinations3(pungs)) {
+    const parsed = trio.map((s) => parseSuited(s.typeId))
+    if (parsed.some((p) => p === null)) continue
+    const suits = new Set(parsed.map((p) => p!.suit))
+    if (suits.size !== 1) continue
+    const ranks = parsed.map((p) => p!.rank).sort((a, b) => a - b)
+    if (ranks[1] === ranks[0]! + 1 && ranks[2] === ranks[1]! + 1) return [{ fanId: 24, count: 1 }]
+  }
+  return []
 }
 
 function detectAllTilesInRankSet(ctx: HandContext, ranks: ReadonlySet<number>, fanId: number): FanMatch[] {

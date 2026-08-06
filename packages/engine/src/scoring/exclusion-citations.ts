@@ -62,6 +62,44 @@ export const CITATIONS: ReadonlyMap<string, string> = new Map([
       'Terminals and Honors in each element or set, including the Pair"), same shape as this table\'s existing ' +
       '[8,55]/[11,55] (18 is the union of 8 and 11). docs/rules/decisions.md #30(d)/#33.',
   ],
+  [
+    pairKey(25, 36),
+    'docs/rules/mcr_EN.pdf §3.8.1 p.15: Upper Tiles (25) restricts every tile to ranks {7,8,9} ' +
+      '(fans-24.ts\'s UPPER_RANKS); Upper Four (36) restricts every tile to ranks {6,7,8,9} (fans-12.ts\'s ' +
+      'UPPER_FOUR_RANKS) — a strict superset, so an Upper Tiles hand trivially also satisfies Upper Four for the ' +
+      'same tiles. docs/rules/decisions.md #34.',
+  ],
+  [
+    pairKey(27, 37),
+    'docs/rules/mcr_EN.pdf §3.8.1 p.15: Lower Tiles (27) restricts every tile to ranks {1,2,3} (LOWER_RANKS); ' +
+      'Lower Four (37) restricts every tile to ranks {1,2,3,4} (LOWER_FOUR_RANKS) — a strict superset, same shape ' +
+      'as [25,36] above. docs/rules/decisions.md #34.',
+  ],
+  [
+    pairKey(29, 70),
+    'docs/rules/mcr_EN.pdf §3.8.1 p.15: Three-Suited Terminal Chows (29) requires a 1-2-3 AND a 7-8-9 chow in each ' +
+      'of two suits (fans-16.ts\'s detectThreeSuitedTerminalChows: sets.length===4, all chows, exactly this shape ' +
+      '— no room for an unrelated 5th set) — the two 1-2-3 chows (same numbers, different suits) are trivially one ' +
+      'Mixed Double Chow (70: "two chows of the same numbers but in different suits"), and the two 7-8-9 chows are ' +
+      'a second, independent instance for the same 4 physical sets. Both flat fans, so a whole-fan exclusion is ' +
+      'architecturally safe (fan 29 consumes all 4 sets by construction, unlike fan 73\'s countable case — item ' +
+      '#24). docs/rules/decisions.md #34.',
+  ],
+  [
+    pairKey(15, 24),
+    'Derived from fans-24.ts\'s own detectPureShiftedPungs fix (docs/rules/decisions.md #34): Four Pure Shifted ' +
+      'Pungs (15: all 4 sets same-suit pungs, consecutively shifted, §3.8.1 p.14) trivially contains a qualifying ' +
+      '3-subset for Pure Shifted Pungs (24, §3.8.1 p.15) once that detector was fixed to search any 3-combination ' +
+      'instead of requiring exactly 3 pung-type sets in the whole hand. Both flat fans (count always 1), so a ' +
+      'whole-fan exclusion is architecturally safe.',
+  ],
+  [
+    pairKey(16, 30),
+    'Derived from fans-16.ts\'s own detectPureShiftedChows fix (docs/rules/decisions.md #34): Four Shifted Chows ' +
+      '(16: all 4 sets same-suit chows, consecutively shifted by 1 or 2, §3.8.1 p.14) trivially contains a ' +
+      'qualifying 3-subset for Pure Shifted Chows (30, §3.8.1 p.15) once that detector was fixed the same way as ' +
+      'detectPureShiftedPungs — see [15,24]\'s citation just above for the identical reasoning, applied to chows.',
+  ],
 ])
 
 export function pairKey(a: number, b: number): string {

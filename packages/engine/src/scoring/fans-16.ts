@@ -1,5 +1,5 @@
 import type { FanMatch, HandContext } from './types.js'
-import { allSets, parseSuited, type ParsedSuited } from './set-helpers.js'
+import { allSets, combinations3, parseSuited, type ParsedSuited } from './set-helpers.js'
 
 const SUITS = ['C', 'D', 'B'] as const
 
@@ -54,24 +54,37 @@ function detectThreeSuitedTerminalChows(ctx: HandContext): FanMatch[] {
 
 // 30. Pure Shifted Chows — 16 pts. §3.8.1 p.15 / App.1 p.33: "Three chows in
 // one suit each shifted up either one or two numbers from the last, but
-// not a combination of both." Exactly 3 chows (not 4 — that's Four Shifted
-// Chows, fan 16, kept mutually exclusive by exact count).
+// not a combination of both."
+//
+// FIXED (docs/rules/decisions.md #34): used to require the WHOLE hand to
+// have exactly 3 chows, incorrectly rejecting a hand with a 4th, unrelated
+// chow alongside a genuine qualifying trio (found via the validation
+// harness, seed 3563778031: 4 exposed chows, only 3 of which formed a
+// same-suit shifted-by-1 run). Now searches every 3-combination of the
+// hand's chow-type sets, matching detectPureShiftedPungs' identical fix
+// just above (fans-24.ts) — and, symmetrically, this now ALSO fires on a
+// genuine Four Shifted Chows hand (fan 16, all 4 consecutively shifted),
+// same as detectPureShiftedPungs now also fires alongside Four Pure Shifted
+// Pungs (fan 15) — both handled by new exclusions.ts entries ([16,30] and
+// [15,24]) rather than relying on the old exact-count check's incidental
+// (and, as this fix shows, incomplete) mutual exclusion.
 function detectPureShiftedChows(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
   const chows = sets.filter((s) => s.kind === 'chow')
-  if (chows.length !== 3) return []
-  const parsed = chows.map((s) => parseSuited(s.typeId))
-  if (parsed.some((p) => p === null)) return []
-  const suits = new Set(parsed.map((p) => p!.suit))
-  if (suits.size !== 1) return []
-  const ranks = parsed.map((p) => p!.rank).sort((a, b) => a - b)
-  const diffs = new Set<number>()
-  for (let i = 1; i < ranks.length; i++) diffs.add(ranks[i]! - ranks[i - 1]!)
-  if (diffs.size !== 1) return []
-  const shift = diffs.values().next().value!
-  if (shift !== 1 && shift !== 2) return []
-  return [{ fanId: 30, count: 1 }]
+  for (const trio of combinations3(chows)) {
+    const parsed = trio.map((s) => parseSuited(s.typeId))
+    if (parsed.some((p) => p === null)) continue
+    const suits = new Set(parsed.map((p) => p!.suit))
+    if (suits.size !== 1) continue
+    const ranks = parsed.map((p) => p!.rank).sort((a, b) => a - b)
+    const diffs = new Set<number>()
+    for (let i = 1; i < ranks.length; i++) diffs.add(ranks[i]! - ranks[i - 1]!)
+    if (diffs.size !== 1) continue
+    const shift = diffs.values().next().value!
+    if (shift === 1 || shift === 2) return [{ fanId: 30, count: 1 }]
+  }
+  return []
 }
 
 // 31. All Fives — 16 pts. §3.8.1 p.15 / App.1 p.33: "A hand in which every
