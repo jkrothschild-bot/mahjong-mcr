@@ -165,6 +165,36 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Root cause L (their_bug, CONFIRMED 2026-08-06 — docs/rules/decisions.md
+# #32, the item #23 revert). PyMahjongGB's adjust_fan_table downgrades Fully
+# Concealed Hand (56) to plain Self-Drawn for Nine Gates (4) / Four Concealed
+# Pungs (12), and its calculate_special_form_fan path never sets Fully
+# Concealed Hand at all for Seven Shifted Pairs (6) / Thirteen Orphans (7) /
+# Seven Pairs (19) — directly contradicting mcr_EN.pdf's own §3.8.1 primary
+# fan table, which explicitly annotates all five of those fans with "(Fully
+# Concealed may be combined if Self-Drawn)". decisions.md #23 previously
+# "fixed" our engine to match this PyMahjongGB behavior with no independent
+# citation; #32 reverted that. This family exists for the OPPOSITE direction
+# from OUR_BUG_FAMILIES's concealed-kong entry below: here OUR side correctly
+# has "Fully Concealed Hand" and PyMahjongGB doesn't. Distinguishing these
+# two by fan-name diff alone is not possible (both produce a
+# {"Fully Concealed Hand", "Self-Drawn"}-shaped diff) — classify_mismatch
+# below disambiguates by checking whether any of these five shape names
+# appear in the hand's full fan set (not just the diff), since the
+# concealed-kong bug is shape-independent and these five names only ever
+# appear together with a Fully-Concealed-Hand divergence when this specific
+# PyMahjongGB gap is the cause.
+FULLY_CONCEALED_COMBINES_SHAPE_NAMES = {
+    "Nine Gates", "Seven Shifted Pairs", "Thirteen Orphans", "Four Concealed Pungs", "Seven Pairs",
+}
+FULLY_CONCEALED_COMBINES_CITATION = (
+    "docs/rules/decisions.md #32 — PyMahjongGB never awards Fully Concealed Hand alongside Nine Gates/Seven Shifted "
+    "Pairs/Thirteen Orphans/Four Concealed Pungs/Seven Pairs on a self-drawn win, contradicting §3.8.1's own explicit "
+    "\"(Fully Concealed may be combined if Self-Drawn)\" annotation for all five fans. Confirmed by direct PDF read, "
+    "not just rules-lawyer; this is the corrected direction of the reverted item #23."
+)
+
 CATEGORY_PRIORITY = {"our_bug": 0, "ambiguity": 1, "their_bug": 2}
 
 # Every known pattern, as (category, citation, family-of-names). A hand can
@@ -192,6 +222,18 @@ def classify_mismatch(our_fans: Counter, pmgb_fans: Counter) -> Classification |
     only_ours = set((our_fans - pmgb_fans).keys())
     only_pmgb = set((pmgb_fans - our_fans).keys())
     all_diff_names = only_ours | only_pmgb
+
+    # Root cause L special-case (see its own comment above): must run BEFORE
+    # the generic peeling loop, since it needs to see the full our_fans set
+    # (whether one of the 5 shape names is present at all), not just the
+    # diff — and it must take priority over OUR_BUG_FAMILIES's concealed-kong
+    # entry for these hands specifically, even though `our_bug` normally
+    # outranks `their_bug`, because this diff shape is genuinely ambiguous
+    # between the two causes and the shape-name check is how we know which
+    # one actually applies to THIS hand.
+    if all_diff_names <= {"Fully Concealed Hand", "Self-Drawn"} and "Fully Concealed Hand" in only_ours:
+        if our_fans.keys() & FULLY_CONCEALED_COMBINES_SHAPE_NAMES:
+            return Classification("their_bug", FULLY_CONCEALED_COMBINES_CITATION)
 
     if not all_diff_names:
         # Fan multisets match exactly; a points-only mismatch here can only
