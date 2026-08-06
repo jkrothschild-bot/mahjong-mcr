@@ -35,22 +35,27 @@ both before any work.
   validation/README.md for the exact command; validation/allowlist.py's module
   docstring for what `their_bug`/`ambiguity`/`our_bug`/UNCLASSIFIED mean). The
   harness exists and has been run for real, most recently 2026-08-06
-  (docs/rules/decisions.md #33, superseding #19/#31/#32: 1200 hands, seed
-  20260805, 80/81 fans covered). **Current tally, read as HAND counts, not
-  distinct-cause counts: their_bug 110, ambiguity 194, our_bug 0,
-  unclassified 23.** `our_bug` is genuinely 0 — every distinct engine bug
-  found in the 2026-08-06 Step 4/5 triage (`detectTileHog` undercounting,
-  `[21,76]`/`[31,76]` and `[18,55]` missing exclusions,
+  (docs/rules/decisions.md #34, superseding #19/#31/#32/#33: 1200 hands,
+  seed 20260805, 80/81 fans covered). **Current tally, read as HAND
+  counts, not distinct-cause counts: their_bug 110, ambiguity 195,
+  our_bug 0, unclassified 18.** `our_bug` is genuinely 0 — every distinct
+  engine bug found across TWO full triage passes (2026-08-06's Step 4/5
+  triage, then a re-triage of its own unclassified residual the same day:
+  `detectTileHog` undercounting; `[21,76]`/`[31,76]`, `[18,55]`,
+  `[25,36]`/`[27,37]`, `[29,70]`, `[15,24]`/`[16,30]` missing exclusions;
   `detectFullyConcealedHand`/`detectConcealedHand`/`detectTwoConcealedPungs`
-  mishandling concealed kongs, `detectAllTypes` never checking Seven Pairs)
-  is fixed, each its own commit, each re-verified against `mcr_EN.pdf`
-  before fixing — decisions.md #33 for the full list. Of the 23
-  `unclassified` hands, ~14 are believed to be benign equal-scoring
-  decomposition ties (two valid decompositions score the same total, no
-  rulebook tiebreak exists, neither side is wrong) but this should be
-  reconfirmed against the current run, not assumed from an earlier
-  snapshot — see decisions.md #33's own note and KICKOFF-validation-
-  harness.md's open-items list.
+  mishandling concealed kongs; `detectAllTypes` never checking Seven
+  Pairs; `detectPureShiftedPungs`/`detectPureShiftedChows`'s exact-count
+  bug — 11 distinct causes in total) is fixed, each its own commit, each
+  re-verified against `mcr_EN.pdf` before fixing — decisions.md #30/#34
+  for the full list. Of the 18 `unclassified` hands, 15 are CONFIRMED
+  (not just believed) benign equal-scoring decomposition ties — verified
+  directly by checking `ours == pmgb` point totals, not assumed from the
+  diff shape alone (two valid decompositions score the same total, no
+  rulebook tiebreak exists, neither side is wrong). The remaining 3 are
+  genuinely open (2 partial-rules-questions, 1 likely harness-generator
+  artifact) — see decisions.md #34(d) and KICKOFF-validation-harness.md's
+  open-items list for exactly what's unresolved in each.
   **A more severe class of defect was found and fixed on 2026-08-06
   (decisions.md #32): item #23, an already-SHIPPED commit, turned out to
   directly contradict `mcr_EN.pdf`'s own primary fan table** — it had
@@ -72,7 +77,7 @@ both before any work.
   not just a code comment. Don't cite "PyMahjongGB cross-check passes" for
   the WHOLE engine without qualification — it means clean *for the fans
   your change touches*, checked against the current baseline in
-  decisions.md #33, not zero mismatches system-wide (some are expected
+  decisions.md #34, not zero mismatches system-wide (some are expected
   forever: PyMahjongGB's own house-rule extensions, and one still-
   provisional rulebook ambiguity, #11). Stage 2 (CI integration, gating
   every push) is separate follow-up work, not started.

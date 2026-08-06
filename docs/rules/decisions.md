@@ -1206,6 +1206,110 @@ corrected to match. See each item's status.
     (see item #30(h) for what was known about each at the time it was written; this item does
     not re-verify that residual, only reports the current total).
 
+34. **Part 1 re-triage of the unclassified residual against the CURRENT run (2026-08-06) —
+    23 hands re-derived from scratch, not trusted from item #30(h)'s pre-fix snapshot.** Full
+    per-hand fan-set detail pulled (not just diffs) for every hand not already an obvious
+    equal-total tie, per `KICKOFF-validation-harness.md`'s explicit instruction to confirm
+    rather than assume. **Found and fixed 5 more real bugs along the way** — see the previous
+    commit's message for the full technical detail (`[25,36]`, `[27,37]`, `[29,70]`,
+    `detectPureShiftedPungs`/`detectPureShiftedChows`'s exact-count bug, and the resulting
+    `[15,24]`/`[16,30]` entries); this item records the re-triage's own findings and final
+    breakdown.
+
+    **(a) Confirmed: 15 of the 23 (was ~14 before one more resolved into this bucket) are
+    benign equal-scoring decomposition ties, not a bug on either side.** Verified by directly
+    checking `ours == pmgb` point totals for every hand whose diff is a "Single Wait" ↔
+    "Closed Wait"/"Edge Wait" swap (fans 77/78/79, each worth exactly 1 point) — 13 hands are a
+    clean 1-for-1 swap at equal totals; 2 more (`1589741832`, `768779158`) combine the same
+    swap with the already-cited item #13 ambiguity (`Out with Replacement Tile`), confirmed by
+    the point gap between `ours`/`pmgb` matching fan 46's exact value (8) in both cases, not an
+    unequal/unexplained residual. No rulebook tiebreak exists for two equally-scoring
+    decompositions (§3.9.1's "Freedom to Choose the Highest Points" principle resolves ties in
+    favor of the higher score, not between two options that already tie) — this is genuinely
+    undecidable in the sense that neither engine is wrong, not undecidable for lack of
+    investigation.
+
+    **(b) Found and fixed: 5 hands traced to the 5 new bugs above**, reclassified from
+    unclassified into (in each case) a clean, structurally-verified root cause — not
+    rules-lawyer-dependent, since each is a direct logical entailment from already-cited
+    rulebook text or a straightforward detector-logic bug, matching the same "self-evident
+    entailment" standard item #32(c)'s audit already validated as sound. One of the five
+    (`targeted-27-lower-tiles`) turned out to be a compound case: fixing `[27,37]` peeled away
+    its `Lower Four` component, and what was left underneath was just another instance of the
+    benign wait-type tie in (a) — moved there, not double-counted.
+
+    **(c) One hand's residual reclassified into the ALREADY-EXISTING item #11 ambiguity, not a
+    new finding**: `targeted-25-upper-tiles`'s diff was `{Upper Four, Concealed Hand}` before
+    the `[25,36]` fix; once `Upper Four` was correctly excluded, the sole remaining name
+    (`Concealed Hand`) was already a member of `allowlist.py`'s `CONCEALMENT_FAMILY` — it
+    reclassified automatically, with no further code change needed. Worth remembering
+    generally: a hand that LOOKS like it needs new investigation can turn out to be an
+    already-solved cause simply obscured by an unrelated, now-fixed name in the same diff — the
+    same shape as item #30(d)'s `[18,55]` finding hiding behind item #11's diff in 6 other hands.
+
+    **(d) Two hands genuinely still open, honestly characterized but NOT fully resolved —
+    real uncertainty, not unexamined:**
+    - `targeted-4-nine-gates` (seed `20260809`) and `targeted-8-all-terminals` (seed
+      `20260811`): both hands' `Fully Concealed Hand`/`Self-Drawn` component IS already
+      explained by item #32/#33's confirmed `their_bug` (PyMahjongGB not implementing the
+      rulebook's stated Fully-Concealed-combines-with-these-5-shapes rule) — both hands' own
+      fan sets include `Four Concealed Pungs`/`Nine Gates`, two of the five named shapes. But
+      `classify_mismatch`'s `FULLY_CONCEALED_COMBINES_SHAPE_NAMES` check is a strict
+      all-diff-names-must-be-exactly-these-two pre-check, not a peelable pattern like the rest
+      of `ALL_PATTERNS` — so when EITHER hand's diff contains anything else, the whole hand
+      falls through uncaught, even though part of it is fully explained. **This is a real
+      classifier limitation, left unfixed this pass** (a deliberate scope decision, not an
+      oversight — see the Open follow-up work entry below) so it's recorded honestly rather
+      than silently working around it.
+      - Nine Gates's OWN remaining residual (`No Honors` ours-only, `Pung of Terminals or
+        Honors` pmgb-only) is a genuine open question, not resolved: Nine Gates is always
+        single-suit, so `No Honors` (76) should always be structurally true for it, suggesting
+        a possible missing `[4,76]` exclusion (matching the many `[X,76]` entries already
+        found this project) — but `Pung of Terminals or Honors` appearing on PyMahjongGB's side
+        (count 1) with NOTHING on ours is not explained by that alone. Manually re-decomposing
+        this hand's own 14 tiles (`W1×3, W2,W3,W4, W5×2 [one is the winning tile], W6,W7,W8,
+        W9×3`) into a standard 4-sets+pair shape (`111` pung + `234` chow + `55` pair + `678`
+        chow + `999` pung) suggests PyMahjongGB might stack a regular per-unit fan onto Nine
+        Gates from an ALTERNATE decomposition of the same tiles — but that reading would predict
+        count 2 (both terminal pungs), not PyMahjongGB's actual count 1, so this hypothesis is
+        NOT confirmed. Whether special shapes should ever additionally score regular per-unit
+        fans from an alternate decomposition at all is a genuine rules-architecture question,
+        not something resolved by inspection — needs a dedicated `rules-lawyer` pass in a future
+        session, not a guess here.
+      - All-Terminals' own remaining residual (`Double Pung` count 2, ours-only) is similarly
+        unresolved: the hand's 4 pungs genuinely do form two independent same-rank/
+        different-suit pairs (Characters-1/Dots-1 and Characters-9/Bamboo-9), so our count of 2
+        is arithmetically defensible by Double Pung's own definition — but unlike `[25,36]`-
+        style findings, this is NOT a universal logical entailment of All Terminals (a hand
+        could easily have 4 terminal pungs with no rank collision at all), so there's no clean
+        "always implied" argument to derive an exclusion from by inspection. Whether All
+        Terminals structurally excludes Double Pung for some OTHER rulebook reason is unverified.
+    - `4009266348` (seed, `standard`): unchanged from item #30(h)'s own investigation —
+      manually reconstructing this hand's exact tile composition against the live engine
+      produces the CORRECT answer (matches PyMahjongGB), so the stored case's own mismatch is
+      most likely a harness-generator artifact distinct from anything fixed in items #33/#34,
+      not a `scoreHand` bug. Not re-investigated further this pass (single hand, already
+      time-boxed once).
+
+    **Final re-triaged breakdown of the 23 (now 18 after (b)/(c)'s fixes): 15 benign ties (a),
+    3 genuinely still open (d) — `targeted-4-nine-gates`, `targeted-8-all-terminals`,
+    `4009266348`.** Harness re-run: `unclassified` 23 → 18, `ambiguity` 194 → 195 (the (c)
+    reclassification), `our_bug`/`their_bug` unchanged at 0/110. Full suite green (452 passed,
+    1 skipped), typecheck clean.
+
+    **On the citation-backfill item**: deliberately NOT done this session, per explicit
+    instruction. The guard (item #33(a)) already makes a NEW uncited exclusion impossible to
+    land silently — the risk item #23 represented — and this session's own work is a second,
+    independent data point that the EXISTING (grandfathered) table is behaving correctly: six
+    more genuinely-new bugs were found and fixed via the harness cross-check in this pass alone
+    (bringing the running total found via this method to 11 across items #30/#34), and not one
+    of them turned out to be caused by an already-existing, wrongly-transcribed entry — every
+    fix added something that was MISSING, never corrected something already present and wrong.
+    `our_bug` sitting at 0 across a 1200-hand sample, sustained across two full triage passes
+    now, is real evidence for the existing table's health, not proof of it — the citation
+    backfill remains open but correctly deprioritized, not forgotten (see
+    `KICKOFF-validation-harness.md`'s own updated list).
+
 ## Open follow-up work
 
 - ~~**Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/
@@ -1223,12 +1327,39 @@ corrected to match. See each item's status.
 - ~~Fix `detectTileHog`'s multi-type undercount~~ — **done, item #33(b).**
 - ~~Add `exclusions.ts`'s `[21,76]`/`[31,76]`~~ — **done, item #33(b).**
 - ~~Fix `validation/src/win-circumstance.ts`'s `otherCopiesInOwnHand`~~ — **done, item #33(c).**
-- **The ~9-hand "genuinely still open" residual from item #30(h)'s third bullet needs
-  re-triage against the CURRENT run, not the pre-fix one it was written against** — several of
-  the fixes in item #33 changed classifications broadly enough (`ambiguity` alone moved 219 -> 194
-  across two different fixes) that assuming any specific hand's old characterization still holds
-  is unsafe. Re-run `validation/compare.py --json-report`, pull the current `unclassifiedDetail`
-  (23 hands as of item #33), and redo the reproduce/cite/classify pass fresh.
+- ~~Re-triage the unclassified residual against the current run~~ — **done, item #34: 5 more bugs
+  found and fixed ([25,36], [27,37], [29,70], the PureShiftedPungs/Chows exact-count bug and its
+  [15,24]/[16,30] follow-on), 15 of 23 confirmed benign ties, 3 genuinely still open (below).**
+- **`classify_mismatch`'s `FULLY_CONCEALED_COMBINES_SHAPE_NAMES` check (item #32's their_bug) is
+  a strict all-or-nothing pre-check, not a peelable pattern like the rest of `ALL_PATTERNS`** —
+  found during item #34's re-triage: `targeted-4-nine-gates` and `targeted-8-all-terminals` both
+  have this already-known cause as PART of their diff, but it doesn't get peeled off because
+  something else is also present, so the whole hand falls through to unclassified instead of
+  showing as "already explained + genuinely new residual." Low risk, well-scoped fix (make it a
+  peelable entry with the same shape-name gate, not a strict subset check) — deliberately not
+  done in item #34's pass to keep that session's own scope bounded.
+- **Two genuinely open rules questions from item #34(d), not yet resolved:**
+  - Does Nine Gates (4) structurally exclude No Honors (76) (missing `[4,76]`, matching the
+    many other `[X,76]` entries)? And separately: does PyMahjongGB stack regular per-unit fans
+    (like Pung of Terminals or Honors) onto a special-shape hand from an alternate standard
+    decomposition of the same tiles — and if so, does the rulebook support that, or is it
+    another PyMahjongGB-specific behavior? `targeted-4-nine-gates`'s own residual doesn't
+    resolve cleanly under either single hypothesis alone (see item #34(d) for the exact
+    numbers that don't fit). Needs a dedicated `rules-lawyer` pass.
+  - Does All Terminals (8) exclude Double Pung (65) for some rulebook reason not yet found?
+    `targeted-8-all-terminals`'s own Double Pung count (2) is arithmetically defensible by
+    fan 65's own definition, so this isn't a clean "always implied" case the way `[25,36]` was
+    — needs independent verification, not assumed either way.
+  - `4009266348` (seed): a likely harness-generator artifact (manual reconstruction produces
+    the correct answer against the live engine), distinct from anything fixed in items
+    #33/#34 — single hand, low priority, not re-investigated this pass.
+- **Backfill real citations for the ~91 grandfathered exclusion pairs in
+  `exclusion-citations.ts`** — deliberately deferred again in item #34 (explicit instruction).
+  The guard already prevents a new uncited entry from landing; two full triage passes now
+  (items #30 and #34, 11 genuinely-new bugs found and fixed total) have found the existing
+  table's entries to be MISSING things, never WRONG about something already present — real,
+  accumulating evidence the grandfathered table is healthy, not just an assumption. Still
+  formally unverified pair-by-pair; still open; still correctly low priority.
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
 - ~~Triage the remaining ~55 unclassified mismatches~~ — **done, item #30.**

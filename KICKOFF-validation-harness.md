@@ -296,25 +296,48 @@ fixed, not left deferred the way item #6's knitted-shape gap once was:
   two separately-scoped functions. Also fixed a related bug in
   `generators/targeted.ts`'s `targeted-58-last-tile` case in the same pass.
 
-**Final baseline (decisions.md #33): 1200 hands, `their_bug` 110,
-`ambiguity` 194, `our_bug` 0, `unclassified` 23, coverage 80/81 fans.**
+## Part 1 re-triage complete (2026-08-06) — see decisions.md #34
+
+The unclassified residual was re-triaged against the current run rather than
+trusted from the pre-fix snapshot above. Found and fixed 5 MORE real bugs
+along the way (`[25,36]`, `[27,37]`, `[29,70]`,
+`detectPureShiftedPungs`/`detectPureShiftedChows`'s exact-count bug and its
+`[15,24]`/`[16,30]` follow-on) — bringing the running total of genuinely-new
+bugs found via this harness to 11 across the two sessions (items #30 and
+#34). 15 of the 23 hands confirmed (not assumed) as benign equal-scoring
+decomposition ties by directly checking `ours == pmgb` totals.
+
+**Final baseline (decisions.md #34): 1200 hands, `their_bug` 110,
+`ambiguity` 195, `our_bug` 0, `unclassified` 18, coverage 80/81 fans.**
 
 **What's actually still open:**
 
 1. **Backfill real citations for the ~91 grandfathered exclusion pairs**
-   in `exclusion-citations.ts` — deliberately deferred when the guard was
-   built (decisions.md #33(a)), now lower-priority than before since the
-   guard already prevents a NEW uncited entry, but the existing table is
-   still formally unverified pair-by-pair.
-2. **Re-triage the 23-hand unclassified residual against the CURRENT
-   run** — decisions.md #30(h)'s "~9 genuinely open" characterization was
-   written against a pre-fix snapshot; `ambiguity` alone moved by 25 hands
-   in one fix and 6 in another since then, so re-derive which hands are
-   actually still unexplained rather than trusting the old list. ~14 of
-   the 23 are very likely still the benign equal-scoring decomposition
-   ties from #30(h)'s first bullet (no rulebook tiebreak exists, neither
-   engine is wrong), but confirm rather than assume.
-3. Phase 10's 2000-seed self-play regression question
+   in `exclusion-citations.ts` — deliberately deferred AGAIN this session
+   (explicit instruction). The guard already prevents a new uncited entry
+   from landing; two full triage passes now (11 genuinely-new bugs found
+   and fixed total) have found the existing table's entries to be MISSING
+   things, never WRONG about something already present — real,
+   accumulating evidence the grandfathered table is healthy, not just an
+   assumption, but still formally unverified pair-by-pair. Still open,
+   still correctly low priority.
+2. **`classify_mismatch`'s `FULLY_CONCEALED_COMBINES_SHAPE_NAMES` check is
+   a strict all-or-nothing pre-check, not a peelable `ALL_PATTERNS` entry**
+   — found during this re-triage: two hands (`targeted-4-nine-gates`,
+   `targeted-8-all-terminals`) have this already-known cause as PART of
+   their diff, but it doesn't get peeled off because something else is
+   also present, so the whole hand falls through to unclassified instead
+   of correctly showing "already explained + genuinely new residual." Low
+   risk, well-scoped fix, deliberately not done this session to keep its
+   own scope bounded.
+3. **Two genuinely open rules questions** (decisions.md #34(d)): does Nine
+   Gates (4) exclude No Honors (76), and does PyMahjongGB stack regular
+   per-unit fans onto special shapes from an alternate decomposition at
+   all; does All Terminals (8) exclude Double Pung (65). Neither resolves
+   cleanly by inspection — both need a dedicated `rules-lawyer` pass.
+4. `4009266348` (seed): a likely harness-generator artifact, single hand,
+   low priority, not re-investigated this pass.
+5. Phase 10's 2000-seed self-play regression question
    (`KICKOFF-phase10-strategy-coach.md`'s "State of play" section) —
-   unrelated to scoring validation; still parked unless picked up as
-   explicitly-authorized time-permitting work in a given session.
+   unrelated to scoring validation; already resolved negative at 300 seeds
+   and acted on (see that doc) rather than left parked indefinitely.
