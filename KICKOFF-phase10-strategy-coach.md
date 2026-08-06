@@ -2,10 +2,11 @@
 
 Read `CLAUDE.md`, `SPEC.md` §6, and `PLAN.md` before starting. This phase
 upgrades the shared hint/bot evaluation core in `packages/engine` and the
-coach UI that renders it. It is deliberately staged: **Stage 1 is this
-session's deliverable.** Stages 2 and 3 are specified so the Stage 1 data
-shapes don't have to be reworked to accommodate them, but do NOT start them
-until Stage 1 is merged, validated, and reviewed by the owner.
+coach UI that renders it. It is deliberately staged. **Stage 1 is complete,
+reviewed, and accepted (2026-08-06) — see its own decision-tree resolution
+below.** **Stage 3 is now active, chosen deliberately ahead of Stage 2**
+(same date, same section) — read Stage 3's own "design" subsection before
+writing any estimator code. Stage 2 remains specified but not started.
 
 ## State of play / resume here (2026-08-06)
 
@@ -60,8 +61,15 @@ a penalty constant") is the next real chance for route-awareness to help bot
 play, not just hint display. **Stage 2 was NOT started this session** — the
 instruction that produced this revert was explicit: do not start it.
 
-**Stage 3 is unchanged** — still gated, still not started, still the same
-scope (fan-distance partial matchers for the "Route to eight points" panel).
+**Stage 3 is now UN-GATED and ACTIVE (2026-08-06), chosen deliberately ahead
+of Stage 2** — see Stage 3's own section below for the full reasoning and
+design. Short version: Stage 2 is another bet on bot-ranking quality, and
+that whole class of change has a 0-for-3 track record in this project so
+far (the self-play runs above); Stage 3 adds a capability the coach never
+had at all, and now has the precondition it always needed (a cross-validated
+scoring engine — `validation/`'s harness now shows `our_bug` 0 across 1200
+hands, per decisions.md #30-#34). Stage 2 remains fully specified and can
+still be picked up later; choosing Stage 3 first doesn't retire it.
 
 A properly-powered re-test (2000 seeds, a FRESH seed range — not another
 `0..1999` sweep from the same generator, which would just repeat seeds
@@ -73,10 +81,12 @@ decisions.md #18 for exactly why (time-boxed to a "report honestly, change
 no code" request, and raising the timeout would have meant editing the
 test file being measured).
 
-**Next session should still consider the `validation/` PyMahjongGB
-harness's own remaining follow-up work** (see CLAUDE.md and
-`KICKOFF-validation-harness.md`) before Stage 2 — unrelated to this phase's
-ranking question, but was the older, bigger gap and has its own open items.
+**The `validation/` PyMahjongGB harness's own remaining follow-up work**
+(see CLAUDE.md and `KICKOFF-validation-harness.md`) is mostly addressed as
+of 2026-08-06 (decisions.md #30-#34: 11 bugs found and fixed, `our_bug` 0) —
+what's left there (citation backfill, 2 open rules questions, a classifier
+peeling gap, one likely harness-generator artifact) is now lower-priority
+than either Stage 2 or 3 of this phase, not blocking either.
 
 ## The problem, from a live hand
 
@@ -197,7 +207,7 @@ player taps Hint (CLAUDE.md hard rule — the mockup's always-visible side
 panel does NOT override it). Check against SPEC §5a AND §5c separately
 before calling it done.
 
-## Stage 2 — depth-2 evaluation (LATER SESSION, do not start)
+## Stage 2 — depth-2 evaluation (DEPRIORITIZED, not started — see Stage 3 below)
 
 Replace 1b's hand-tuned threshold with ukeire-2: for each candidate, weight
 each improving draw by the quality of the position it leads to (its own
@@ -208,7 +218,22 @@ fallback if depth-2 can't hit interactive latency on an iPad. Confidence
 then becomes the margin on the depth-2 score. Validation: same self-play
 harness, new-vs-Stage-1.
 
-## Stage 3 — "Route to eight points" fan planning (LATER SESSION, do not start)
+**Deliberately NOT picked up next, as of 2026-08-06 — the owner chose Stage 3
+instead, explicitly.** Reasoning recorded here since it's a real prioritization
+call, not a default ordering: Stage 2 is another bet on improving BOT
+RANKING specifically, and three self-play runs (decisions.md #18) have
+already shown that entire class of change — tuning the discard comparator —
+not paying off in this project so far (Stage 1's own regret-aware ranking
+never once beat plain greedy across three tries). Stage 3 instead adds a
+capability the coach genuinely doesn't have at all yet (not a refinement of
+an existing one), was in the owner's original mockup from the start, and now
+has a precondition it always needed but didn't have until this session: a
+cross-validated scoring engine underneath it (decisions.md #30-#34 — 11
+confirmed bugs found and fixed via the PyMahjongGB harness, `our_bug` now 0
+across a 1200-hand sample). Stage 2 remains fully specified above and can be
+picked up later; nothing about choosing Stage 3 first invalidates it.
+
+## Stage 3 — "Route to eight points" fan planning (ACTIVE — un-gated 2026-08-06)
 
 The mockup panel the engine genuinely can't feed yet: fan DISTANCE on
 incomplete hands. All 81 detectors run only on complete hands;
@@ -223,6 +248,150 @@ each gets fixtures. This stage feeds both the "Route to eight points" panel
 and, eventually, value-aware ranking (points × probability rather than pure
 efficiency) — that last step changes bot behaviour again, so it re-runs the
 self-play gate.
+
+**Un-gated 2026-08-06 — Stage 1 reviewed and accepted by the owner, Stage 3
+explicitly chosen ahead of Stage 2** (see Stage 2's own note above for the
+reasoning). Do NOT touch `packages/engine`'s scoring, win-detection, or
+exclusion table for this stage — Stage 3 only ADDS new partial-hand
+estimators alongside them; if it surfaces a scoring discrepancy in the
+existing 81 detectors, stop, fixture first, fix separately (unchanged from
+this doc's original "Explicitly NOT in this phase" list), and re-run the
+validation harness, not the self-play one.
+
+### Stage 3 design (2026-08-06) — data shapes, families, and how probability
+is estimated, agreed BEFORE writing any estimator ("see the shape before the
+volume")
+
+**Data shape** (`packages/engine/src/fan-targets.ts`, new file — mirrors
+`hints.ts`'s `computeHandPlan` in spirit: pure, takes a `Hand` +
+`WinCircumstanceContext`, returns a plain data structure, no UI):
+
+```ts
+export interface FanTargetEstimate {
+  fanId: number
+  points: number
+  // 'locked': already structurally guaranteed (same bar as hints.ts's
+  // lockedInFansFromMelds — not this file's own separate judgment call).
+  // 'inProgress': not locked, but the hand has a real structural lean
+  // toward it, worth surfacing as a target.
+  // (Nothing lower than these two is ever returned — a family judged
+  // unreachable simply isn't in the array. Exhaustiveness isn't the bar;
+  // an empty array for a given family on a given hand is a normal,
+  // expected result, not a gap to fill.)
+  status: 'locked' | 'inProgress'
+  tilesNeeded: TileTypeId[]        // distinct types that would help, deduped
+  completionProbability: number    // 0-1, see "How probability is estimated" below
+  value: number                    // completionProbability * points, for ranking/selection
+}
+
+export function estimateFanTargets(hand: Hand, context: WinCircumstanceContext = {}): FanTargetEstimate[]
+// Sorted by value descending. No fixed cap in the engine layer itself —
+// "top N for display" is a UI-layer decision for the later panel-building
+// step, not baked into the estimator.
+```
+
+Each family gets its OWN private matcher (`estimateSevenPairs`,
+`estimateAllPungs`, etc.), all called from `estimateFanTargets` and merged.
+This mirrors `scoring/fans-*.ts`'s own per-fan-function convention
+deliberately — Stage 3 is not a generic pattern-matching framework, it's a
+dozen bespoke, individually-citable estimators, same posture as the real
+detectors.
+
+**Not solving in the engine layer**: which SUBSET of `FanTargetEstimate`s to
+feature in the actual "Route to eight points" card, and how to phrase the
+mockup's "done / developing / needed" narrative around a running total. That
+composition (locked-in fans + best candidate(s) discussed together) is a
+`hints.ts`-level orchestration concern for a later step in this same stage,
+analogous to how Stage 1's own `computeBestMoveHint` sat one layer above
+`evaluateDiscards`. Keeping `estimateFanTargets` a flat, per-family list (not
+a pre-composed "plan") is what lets it be independently fixtured and cited
+per family, same as the real detectors.
+
+**The dozen families** (mapping the KICKOFF's 6 named groups onto concrete
+fan ids from `registry.ts`):
+
+1. Seven Pairs (fan 19, 24pts)
+2. All Pungs (fan 49, 6pts)
+3. Half Flush (fan 50, 6pts) / 4. Full Flush (fan 22, 24pts) — one shared
+   suit-concentration metric, two point tiers depending on whether honors
+   remain
+5. Pure Straight (fan 28, 16pts) / 6. Mixed Straight (fan 39, 8pts) — "the
+   straight family"
+7. Dragon Pung (fan 59, 2pts/unit) / 8. Prevalent Wind (fan 60, 2pts) /
+   9. Seat Wind (fan 61, 2pts) — "wind/dragon pungs"; Big Three Dragons
+   (fan 2, 88pts) deliberately excluded from v1 (needs all 3 dragon pungs
+   simultaneously — a narrow, late-game-only target not worth a partial
+   estimator; players heading there will see it via the 3 individual Dragon
+   Pung estimates already climbing)
+10. All Simples (fan 68, 2pts) / 11. No Honors (fan 76, 1pt) — closely
+    related (All Simples is strictly narrower — no honors AND no terminals),
+    kept as two estimators since they're two different fans a hand can be
+    working toward independently
+
+11 total, matching "a dozen." Not exhaustive by design (per the doc's own
+text) — e.g. Big Four Winds, knitted shapes, and the shifted-pung/chow
+families are all real but rarer, later-addition candidates, not v1.
+
+**How probability is estimated.** Explicitly a TEACHING heuristic, not a
+rigorously-derived statistical model — same posture as `defense.ts`'s own
+danger-tile signals (decisions.md #16: "a teaching heuristic... not a rules
+mechanic"). Two different mechanisms depending on what "completing" the
+family structurally means:
+
+- **Shape families (Seven Pairs, All Pungs)** — completion means reaching a
+  specific STRUCTURE. Reuse the project's own already-validated shanten
+  machinery directly rather than inventing a parallel one:
+  - Seven Pairs: `sevenPairsShantenFromCounts` already exists
+    (`shanten.ts`) and is exactly this family's own distance metric —
+    `tilesNeeded` = the types with count 1 (need a second copy);
+    `completionProbability` derived from shanten the same way
+    `hints.ts`'s existing wait-viability margin already treats "how many
+    steps away" as a probability proxy (fewer steps = higher probability,
+    monotonic, not a literal draw-simulation).
+  - All Pungs: a NEW, analogous "steps from all-pung" count — how many of
+    the current decomposition's non-pung/kong groups (chows, or an
+    unpaired partial) would need converting; `tilesNeeded` = the specific
+    tiles that would complete a pung for each such group (reuses
+    `tile-efficiency.ts`'s existing per-candidate ukeire machinery rather
+    than a new tile-counting pass).
+- **Tile-membership families (Half/Full Flush, All Simples/No Honors,
+  wind/dragon pungs)** — completion means "every remaining/kept tile
+  satisfies some predicate" (single suit; no terminal/honor; a specific
+  wind/dragon reaches pung count). `tilesNeeded` = the OFFENDING tiles that
+  would need to go (for suit/simples families) or the exact tile(s) that
+  would complete the pung (for wind/dragon). `completionProbability` from a
+  simple, explicitly-labeled-as-rough formula: something monotonic in
+  "how many offending tiles remain, relative to the concealed hand's own
+  size" (exact formula to be pinned down per-family against fixture hands
+  when writing each estimator, same "pick constants against fixtures, not
+  by feel" discipline as Stage 1's `EARLY_GAME_MIN_SHANTEN`/
+  `VIABLE_ROUTE_SHANTEN_MARGIN` were).
+- **Straight family (Pure/Mixed Straight)** — a presence-based check, same
+  pattern `detectPureStraight`'s own comment already uses ("chow-starts at
+  1/4/7 present among the sets, not exact counts"): count how many of the
+  3 needed chow-starts already exist among the hand's chow-type groups (as
+  sets, or as ukeire-reachable partials), `tilesNeeded` = tiles completing
+  the missing start(s).
+
+**`MINIMUM_POINTS_TO_WIN` as a hard constraint**: not enforced inside
+`estimateFanTargets` itself (a single family's own points are usually well
+under 8 alone) — enforced at the future orchestration layer, by requiring
+the FEATURED combination (locked-in fans, from the already-existing
+`computeHandPlan`/`lockedInFansFromMelds`, plus the top candidate(s)) to sum
+to >= `MINIMUM_POINTS_TO_WIN` before it's presented as a real plan, same
+"hard constraint, not a suggestion" bar `computeHandPlan`'s own
+`bestCaseReachesMinimum`/`worstCaseReachesMinimum` already apply at tenpai.
+
+**Citations and fixtures**: every estimator's own comment cites its fan's
+`mcr_EN.pdf` section, matching the real detectors' own convention exactly
+(no exception for being "just an estimator") — verified fresh via
+`rules-lawyer` where the estimator's own structural reading isn't already
+settled by an existing, already-cited detector for the SAME fan (most of
+these 11 already have a real detector in `scoring/fans-*.ts` with its own
+citation — the estimator's job is "how close," not "is it true," so it can
+often cite the SAME already-verified passage rather than needing a fresh
+rules-lawyer pass per family). Each family gets its own fixtures in a new
+`fan-targets.test.ts`, same discipline as every `fans-N.test.ts` file.
 
 ## Explicitly NOT in this phase (any stage)
 
