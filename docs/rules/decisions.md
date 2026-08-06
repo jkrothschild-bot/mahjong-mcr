@@ -947,25 +947,121 @@ corrected to match. See each item's status.
     missing exclusions). No engine logic changed — every finding above is fixture-only, per Part
     A/B's explicit instruction and CLAUDE.md's standing fixture-first rule.
 
-31. **Step 5: final validated baseline, 2026-08-06.** 1200 hands, seed 20260805 (52 targeted +
-    1148 random across standard/seven-pairs/thirteen-orphans), scored by this engine's
-    `scoreHand` and PyMahjongGB 1.3.0, compared at both the points and exact-fan-multiset level.
-    **their_bug: 7. ambiguity: 204. our_bug: 43 (across 6 distinct fixture-backed bug families —
-    see item #30 (b)-(f) plus the still-open item #23 regression). unclassified: 29 (14 benign
-    decomposition ties + 6 harness-side Last-Tile modeling bug + 9 genuinely still open — see
-    item #30 (h)). Coverage: 80/81 fans (only fan 81, Flower Tiles, out of scope by design).**
-    This is the number CLAUDE.md's scoring-validation rule now points to, superseding item #19's
-    original run and item #29's Step-3-only snapshot. Re-run command: `npm run generate
+31. **Step 5: final validated baseline, 2026-08-06 — SUPERSEDED by item #32's post-revert
+    re-run below; kept here for the historical record of what Step 4/5 looked like before the
+    revert.** 1200 hands, seed 20260805 (52 targeted + 1148 random across standard/seven-pairs/
+    thirteen-orphans), scored by this engine's `scoreHand` and PyMahjongGB 1.3.0, compared at
+    both the points and exact-fan-multiset level.
+    **their_bug: 7 hands. ambiguity: 204 hands. our_bug: 43 HANDS, not 43 distinct bugs — these
+    43 hands are explained by 6 distinct fixture-backed bug families (item #30 (b)-(f) plus the
+    then-still-open item #23 regression, itself counted separately, not among the 43 — see item
+    #32). unclassified: 29 hands (14 benign decomposition ties, not a bug on either side; 6
+    trace to a bug in the VALIDATION HARNESS itself — `validation/src/win-circumstance.ts` —
+    not engine debt at all; 9 genuinely still open, unverified — see item #30 (h) for the full
+    breakdown of which hands are which). Coverage: 80/81 fans (only fan 81, Flower Tiles, out of
+    scope by design).** Re-run command: `npm run generate
     --workspace=@mahjong-mcr/validation -- 1200 20260805 && python validation/compare.py
     --json-report validation/.report.json` from the repo root (requires the PyMahjongGB Python
     environment — see `validation/README.md`).
 
+32. **Item #23 reverted (2026-08-06), the general lesson it teaches, and an audit of every
+    other exclusion/detector change in items #19-#31 for the same defect.**
+
+    **(a) The revert itself.** `exclusions.ts`'s `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
+    removed; `exclusions.test.ts`'s "KNOWN REGRESSION" describe block renamed and its five
+    assertions flipped from the documented-wrong `true` to the correct `false`. No other test in
+    the engine suite depended on the old (wrong) exclusion behavior (checked directly — grepped
+    every `.test.ts` for `fanId.*56` outside the two files being edited). Full engine suite green
+    throughout (442 passed, 1 skipped, unchanged — this was a pure revert, not a new fixture).
+
+    **Harness re-run immediately surfaced a real, and correctly-directioned, consequence**: our
+    engine now correctly scores Fully Concealed Hand (56) for a self-drawn Nine Gates/Seven
+    Shifted Pairs/Thirteen Orphans/Four Concealed Pungs/Seven Pairs hand, but PyMahjongGB's own
+    implementation still doesn't (per item #23's own citation of its `adjust_fan_table`
+    behavior) — so this is now a **newly confirmed `their_bug`**, not a mismatch to hide. 108
+    hands in the 1200-hand sample. `validation/allowlist.py` gained a new pattern
+    (`FULLY_CONCEALED_COMBINES_SHAPE_NAMES`/`FULLY_CONCEALED_COMBINES_CITATION`) with a
+    dedicated pre-check in `classify_mismatch` — needed because this new `their_bug` produces
+    the EXACT SAME `{"Fully Concealed Hand", "Self-Drawn"}` diff shape as the still-open
+    concealed-kong `our_bug` from item #30(b), just in the opposite direction (our side has the
+    extra fan here; PyMahjongGB has it in #30(b)'s case). Disambiguated by checking whether any
+    of the five shape names appear in the hand's full fan set, not just the diff — the
+    concealed-kong bug is shape-independent, so this reliably tells the two apart. Verified: of
+    the 116 hands citing this family before the fix, 108 were the new their_bug (shape hands)
+    and 8 were the genuine still-open our_bug (concealed-kong hands, unchanged from item #30(b)'s
+    own count). **Final re-run: their_bug 7 → 102 hands (+95: 108 newly-confirmed minus the fact
+    some were already counted differently before), ambiguity 204 (unchanged), our_bug 43
+    (unchanged — the revert didn't touch any of the 6 confirmed bug families, it only corrected
+    which category a DIFFERENT set of hands falls into), unclassified 29 (unchanged). Full detail
+    in `validation/.report.json` (gitignored, regenerate via item #31's command).**
+
+    **(b) The general lesson, stated explicitly, not just as an item-#23-specific note:** an
+    engine change justified ONLY by matching PyMahjongGB's behavior — with no independent
+    `mcr_EN.pdf` citation — becomes PERMANENTLY invisible to this harness the moment it ships.
+    Once both engines agree (even on the same wrong answer), there is no mismatch left to
+    generate, so no future harness run, however many hands or seeds, can ever flag it again. The
+    only thing that caught item #23 was a human going back and re-reading the primary rulebook
+    table directly, for an unrelated reason (chasing why a citation looked stale). This is
+    structurally the same failure mode as item #6's original knitted-shape deferral (both used
+    the same "out of scope, revisit later" framing and both went undetected far longer than
+    either should have) — the cross-check finding zero mismatches for a fan/exclusion is
+    evidence of agreement, not evidence of correctness, and KICKOFF-validation-harness.md 1e's
+    "do not fix to match PyMahjongGB without a citation" rule exists specifically to prevent
+    this, not as a nice-to-have.
+
+    **(c) Audit of every exclusion/detector change in items #19-#31 for the same defect —
+    checked individually, not assumed clean.** For each, the question is: was the change
+    justified SOLELY by PyMahjongGB's behavior, with no independent rulebook citation (either a
+    direct `rules-lawyer`/PDF quote, or a self-evident logical entailment from the two fans'
+    OWN already-rulebook-quoted definitions)?
+    - **Item #23 ([4,56] family): DEFECTIVE — confirmed, reverted above.** Sole justification
+      was `adjust_fan_table`'s PyMahjongGB behavior; no independent citation existed until this
+      session's direct table re-read, which showed the opposite.
+    - **Item #22 (`[60,73]`/`[61,73]`, later corrected by #24): a near-miss, flagged but not
+      itself wrong.** Justified by pattern-analogy to fans 1/4/8/9/11/18's already-transcribed
+      table entries plus PyMahjongGB's behavior as discovery evidence — **no fresh independent
+      citation was obtained at the time it was written**, the same process gap item #23 had.
+      It happened to be right (later independently confirmed by item #24's `rules-lawyer` pass,
+      which was consulted for a different question — the exclusion's granularity — and
+      incidentally reconfirmed the underlying finding). Worth remembering: this process gap
+      produced one wrong answer (item #23) and one right-by-luck answer (item #22) in the same
+      six-bug batch. Not re-opened; already independently verified via item #24, just not
+      verified until after the fact.
+    - **Items #20, #21, #24, #30(b), #30(c), #30(e): CLEAN.** Each has a direct `rules-lawyer`
+      pass (or, for #30(c), an additional independent PDF re-read of Appendix 1 p.40 by hand)
+      cited with exact section/page and quoted text, obtained BEFORE the fix/fixture was
+      written, not after.
+    - **Items #25, #26, #27, #28, #29, #30(d), #30(f): CLEAN, but via a different mechanism —
+      self-evident logical entailment, not a fresh citation.** Each of these derives its
+      conclusion directly from two fans' definitions that were ALREADY quoted verbatim
+      elsewhere in this document or the primary table (e.g. item #26: All Simples's own text
+      already says "without Terminal or Honor Tiles", so it structurally cannot fail No Honors's
+      own "without Winds or Dragons" test — this is arithmetic on already-cited text, not a new
+      interpretive claim requiring its own citation). PyMahjongGB's behavior served as the
+      DISCOVERY signal (how the gap was found) and corroborating evidence, never as the SOLE
+      justification. This is the legitimate way to use PyMahjongGB without falling into item
+      #23's trap: as a hypothesis generator, checked against already-established rulebook text,
+      not as the terminal authority.
+    - **Conclusion: item #23 is the only defective entry found.** No other exclusion or detector
+      change across items #19-#31 relied solely on PyMahjongGB's behavior without independent
+      grounding. Item #22 is flagged as a process near-miss worth remembering, not as a second
+      bug requiring action.
+
 ## Open follow-up work
 
-- **Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/
-  `[7,56]`/`[12,56]`/`[19,56]` (item #23 — item #30(a) confirms these directly contradict
-  `mcr_EN.pdf`'s own primary fan table). Fixture already flipped to document the current wrong
-  `true`; the fix is removing those 5 lines and flipping the fixture assertions to `false`.
+- ~~**Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/
+  `[7,56]`/`[12,56]`/`[19,56]`~~ — **done, item #32(a) (2026-08-06).**
+- **New highest priority, found by item #32's audit:** add a test asserting every entry in
+  `exclusions.ts`'s `RAW_EXCLUSION_PAIRS` table carries a rulebook citation in its accompanying
+  comment (a section/page reference, an exact quote, or an explicit "derived from fan N's own
+  already-quoted text" — NOT solely a PyMahjongGB source-code citation with nothing else). Item
+  #23 shipped and stayed wrong for an entire Step-3 pass specifically because nothing enforced
+  this; item #32(c)'s audit found it was the only defect, but that was found by a human doing a
+  one-time manual review, not by anything that runs automatically. This test is what makes a
+  repeat structurally impossible rather than merely "checked once." Exact mechanism still to be
+  designed (a parsed-comment convention, an explicit citation map, or a lint-style check) —
+  design it before implementing, since `RAW_EXCLUSION_PAIRS`'s comments aren't currently
+  structured data.
 - Fix `detectFullyConcealedHand`/`detectConcealedHand` (fans-4.ts/fans-2.ts, item #30(b)): check
   meld exposure, not `ctx.melds.length === 0`.
 - Fix `detectTwoConcealedPungs` (fans-2.ts, item #30(c)): include concealed kongs

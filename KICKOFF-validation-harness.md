@@ -261,26 +261,43 @@ shifted 126 hands out of unclassified without changing engine behavior —
 don't assume the residual count is stable, re-run after each fix per
 CLAUDE.md's standing rule.
 
-## Steps 4/5 complete (2026-08-06) — see decisions.md #30/#31 for the full record
+## Steps 4/5 complete (2026-08-06) — see decisions.md #30/#31/#32 for the full record
 
 Step 3's six original bugs are fixed. Step 4 (triage the unclassified
 residual) and Step 5 (record a final baseline) are also done: the harness
 was re-run fresh, every `our_bug` hand was individually inspected (not just
 counted — `compare.py` now emits an `ourBugDetail` array alongside
 `unclassifiedDetail`), and the allowlist was re-validated against the
-current run rather than trusted as-is. **This surfaced four more confirmed
+current run rather than trusted as-is. **This surfaced five more confirmed
 bugs, plus one already-shipped commit that turned out to be a regression —
 do not defer these the way item #6's knitted-shape gap was deferred (that
 deferral used the exact words "out of scope" and went on to become the most
-severe bug in the engine, per `decisions.md` #19). Each has a fixture
-already committed; none has been fixed yet. In priority order:**
+severe bug in the engine, per `decisions.md` #19).**
 
-1. **Revert `exclusions.ts`'s `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
-   (decisions.md #23, corrected by #30(a)).** This is a live scoring
-   regression in already-shipped code, not a gap — `mcr_EN.pdf`'s own
-   primary fan table explicitly says the opposite of what these five
-   exclusion-table entries encode. Highest priority of everything on this
-   list: it's actively wrong today, in a shipped commit, for real players.
+~~1. Revert `exclusions.ts`'s `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
+   (decisions.md #23, corrected by #30(a)).~~ **DONE, decisions.md #32(a)
+   (2026-08-06).** This was a live scoring regression in already-shipped
+   code — `mcr_EN.pdf`'s own primary fan table explicitly said the opposite
+   of what these five exclusion-table entries encoded. Reverting it
+   surfaced a real, newly-confirmed `their_bug` in the other direction
+   (PyMahjongGB itself doesn't implement what the rulebook states) — see
+   #32(a) for the harness delta.
+
+**New top priority, found by #32(c)'s audit of items #19-#31 for the same
+defect (only item #23 itself turned out to be affected, but nothing
+currently prevents a repeat):**
+
+1. **Add a test asserting every `exclusions.ts` `RAW_EXCLUSION_PAIRS` entry
+   carries a rulebook citation** in its comment (a section/page + quote, or
+   an explicit "derived from fan N's own already-quoted text" — never a
+   PyMahjongGB source citation alone, with nothing else). decisions.md
+   #32(c)'s "Open follow-up work" entry. Design the enforcement mechanism
+   first (parsed comments? a structured citation map alongside the pairs?
+   a lint rule?) — `RAW_EXCLUSION_PAIRS`'s comments aren't currently
+   structured data, so this needs a real design decision, not just a test.
+
+**The rest, in priority order (each already has a fixture; none fixed yet):**
+
 2. **Fix `detectFullyConcealedHand` (fan 56, fans-4.ts) and
    `detectConcealedHand` (fan 62, fans-2.ts)** — both check
    `ctx.melds.length === 0` where they should check "no EXPOSED meld",
@@ -313,16 +330,17 @@ already committed; none has been fixed yet. In priority order:**
    like an open rules question) when they're really a harness-generator
    defect. decisions.md #30(h).
 
-Each of 1-7 already has a fixture (a failing-by-design `it` documenting the
-current wrong behavior) — per CLAUDE.md's standing rule, the fix for each
-is a separate commit from a fresh session pass, not bundled together, and
-each needs its own harness re-run afterward to confirm the delta (same
-protocol Step 3 used for every one of its six fixes — see decisions.md
-#22/#23/#25/#26/#28/#29 for the exact "before/after" reporting format to
-match). After fixing 1-3 specifically, re-triage decisions.md #30(h)'s
-~9-hand "genuinely still open" residual too — some of those may turn out to
-be downstream symptoms of the same root causes, the same way item #30(d)'s
-`[18,55]` finding turned out to be hiding behind item #11's diff in 6 hands
+Per CLAUDE.md's standing rule, the fix for each of 2-7 is a separate commit
+from a fresh session pass, not bundled together, and each needs its own
+harness re-run afterward to confirm the delta (same protocol Step 3 used
+for every one of its six fixes — see decisions.md #22/#23/#25/#26/#28/#29
+for the exact "before/after" reporting format to match, and #32(a) for how
+that delta can surface a NEW their_bug rather than just shrinking our_bug,
+as it did for item #23's own revert). After fixing 2-3 specifically,
+re-triage decisions.md #30(h)'s ~9-hand "genuinely still open" residual
+too — some of those may turn out to be downstream symptoms of the same
+root causes, the same way item #30(d)'s `[18,55]` finding turned out to be
+hiding behind item #11's diff in 6 hands
 that looked unrelated at first glance.
 
 Still parked, not part of this list: Phase 10's 2000-seed self-play
