@@ -2,8 +2,8 @@ import type { GameState } from '../game-state.js'
 import type { Hand } from '../hand.js'
 import type { Seat } from '../meld.js'
 import { applyMove, legalMoves, type Move } from '../moves.js'
-import { calculateShanten, type ShantenResult } from '../shanten.js'
-import { ALL_SHANTEN_SHAPES, evaluateDiscards, type DiscardEvaluation } from '../tile-efficiency.js'
+import { calculateShanten } from '../shanten.js'
+import { evaluateDiscards, type DiscardEvaluation } from '../tile-efficiency.js'
 import { typeIdOfInstance, type TileInstanceId } from '../tiles.js'
 import { isHonorTypeId, isTerminalTypeId } from '../scoring/set-helpers.js'
 import { ORDERED_STANDARD_TYPE_IDS } from '../win-detection.js'
@@ -29,12 +29,21 @@ export const BOT_PRESETS: Record<'efficient' | 'balanced' | 'conservative', BotP
   conservative: { claimThreshold: 'onlyImproving', declineMarginalChows: true },
 }
 
-// The old (pre-Phase-10) whole ranking rule, kept as the tie-break — and, at
-// shanten < EARLY_GAME_MIN_SHANTEN below, the entire rule (see rankDiscards).
-// Prefers the most ukeire (keeps the hand most flexible), then a honor/
-// terminal over a simple (least flexible tiles go first when otherwise
-// tied), then a fixed type order — matching the placeholder bot's own
-// "deterministic, snapshot-testable" design philosophy.
+// The whole ranking rule (reverted to this, 2026-08-06, after three
+// same-direction self-play runs never showed the Stage 1 regret-aware
+// ranking helping — see docs/rules/decisions.md #18 and
+// KICKOFF-phase10-strategy-coach.md's own decision tree, which named this
+// exact revert as the negative-result branch). Prefers the most ukeire
+// (keeps the hand most flexible), then a honor/terminal over a simple
+// (least flexible tiles go first when otherwise tied), then a fixed type
+// order — matching the placeholder bot's own "deterministic,
+// snapshot-testable" design philosophy. `computeRouteRegret` and its two
+// Stage-1b constants moved to hints.ts, which still needs them for the
+// Best Move tab's confidence/alternatives/route-viability display — that
+// part of Stage 1 is kept per the KICKOFF doc's own reasoning: the coach
+// now SHOWS a player which routes stay alive and their real cost, so the
+// bot doesn't need to auto-commit to the flexible choice for the fix to
+// have worked.
 function legacyDiscardCompare(a: DiscardEvaluation, b: DiscardEvaluation): number {
   if (a.ukeire.totalCount !== b.ukeire.totalCount) return b.ukeire.totalCount - a.ukeire.totalCount
   const aType = typeIdOfInstance(a.tile)
@@ -45,138 +54,12 @@ function legacyDiscardCompare(a: DiscardEvaluation, b: DiscardEvaluation): numbe
   return ORDERED_STANDARD_TYPE_IDS.indexOf(aType) - ORDERED_STANDARD_TYPE_IDS.indexOf(bType)
 }
 
-// KICKOFF-phase10-strategy-coach.md §1b's two heuristic constants — hand-
-// tuned against the fixture hands in policy.test.ts/hints.test.ts, not
-// derived from theory. Both are explicitly Stage-2-replaceable: Stage 2
-// (ukeire-2) is meant to let flexibility fall out of the arithmetic instead
-// of a penalty constant like VIABLE_ROUTE_SHANTEN_MARGIN below.
-//
-// EARLY_GAME_MIN_SHANTEN: at or above this many shanten from tenpai, a
-// discard decision is "early" — worth spending flexibility on, since there's
-// still a real number of draws left to decide between routes. Below it
-// ("late"), the ranking collapses to exactly the old greedy rule: near
-// tenpai, committing to whichever route is already closest is correct, not
-// a bug to fix (doc's own "do not improve it").
-const EARLY_GAME_MIN_SHANTEN = 3
-// VIABLE_ROUTE_SHANTEN_MARGIN: a shape is "in play" this turn if the best
-// any candidate discard can achieve for it is within this many shanten of
-// the overall best achievable shanten. 1 is the smallest margin that can
-// ever matter (0 would mean "only the single best shape counts," collapsing
-// straight back to today's behavior) — chosen and verified against the
-// live hand this phase's own KICKOFF doc cites (a 2-Character triplet +
-// 5-Bamboo pair hand where Standard sits exactly 1 shanten behind Seven
-// Pairs and must stay "in play"). Exported so hints.ts's route table can
-// mark the SAME shapes "viable" that this file's own ranking treated that
-// way, rather than a second hardcoded copy of the number drifting out of
-// sync with it.
-export const VIABLE_ROUTE_SHANTEN_MARGIN = 1
-// MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY: regret only overrides raw ukeire
-// when the cost of doing so is this many outs or fewer — above it, the
-// sacrifice is judged not worth the flexibility and rankDiscards falls back
-// to legacyDiscardCompare (today's ukeire-first rule) for that comparison,
-// same as it always did. Added after Stage 1's own self-play validation
-// (300 seeded games, new-ranking vs. old) came back a regression (119 wins
-// vs. 145) with NO cap in place — a live-diagnostic re-run (150 seeds,
-// instrumented) found turns-to-tenpai barely moved (7.88 vs 7.90) and
-// divergences from old were rare (4.5% of early decisions), but averaged a
-// real, uncapped 4.19-out cost apiece with no ceiling on the worst cases.
-// 5 sits just above the doc's own worked-example cost (3 outs, WE/WS/WN vs.
-// 2C on the live hand) so that fixture still passes, while capping the
-// larger, likely-not-worth-it sacrifices the diagnostic surfaced.
-export const MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY = 5
-
-// KICKOFF-phase10-strategy-coach.md §1b: for each candidate at the best
-// achievable resultingShanten, how much worse it makes its own worst VIABLE
-// route, relative to the best any candidate could do for that same route —
-// "worst-case regret across viable routes." A candidate that keeps every
-// viable route exactly at its own best-achievable shanten scores 0 regret;
-// one that lets a still-viable route slip scores > 0, in shanten units.
-//
-// Exported (not just inlined into rankDiscards) so hints.ts's Stage 1c
-// confidence/alternative scoring can derive its numbers from the SAME
-// regret this function used to rank candidates, rather than an independently
-// re-derived approximation that could quietly drift out of sync with the
-// actual ranking rationale.
-//
-// Candidates below the best resultingShanten (never returned by rankDiscards
-// at all) get Infinity — they were never really in contention, so "regret"
-// isn't a meaningful number for them; callers should never rank by this
-// value without also filtering to resultingShanten === the best.
-export function computeRouteRegret(evaluations: readonly DiscardEvaluation[]): Map<TileInstanceId, number> {
-  const minShanten = Math.min(...evaluations.map((e) => e.resultingShanten))
-  const regret = new Map<TileInstanceId, number>()
-
-  if (minShanten < EARLY_GAME_MIN_SHANTEN) {
-    for (const e of evaluations) regret.set(e.tile, e.resultingShanten === minShanten ? 0 : Infinity)
-    return regret
-  }
-
-  const atMin = evaluations.filter((e) => e.resultingShanten === minShanten)
-  const routeShanten = (e: DiscardEvaluation, shape: ShantenResult['shape']): number =>
-    e.routes.find((r) => r.shape === shape)!.shanten
-
-  const bestForShape = new Map<ShantenResult['shape'], number>(
-    ALL_SHANTEN_SHAPES.map((shape) => [shape, Math.min(...atMin.map((e) => routeShanten(e, shape)))]),
-  )
-  const viableShapes = ALL_SHANTEN_SHAPES.filter((shape) => bestForShape.get(shape)! <= minShanten + VIABLE_ROUTE_SHANTEN_MARGIN)
-
-  for (const e of evaluations) {
-    if (e.resultingShanten !== minShanten) {
-      regret.set(e.tile, Infinity)
-      continue
-    }
-    regret.set(e.tile, Math.max(...viableShapes.map((shape) => routeShanten(e, shape) - bestForShape.get(shape)!)))
-  }
-  return regret
-}
-
-// Deterministic discard ranking, keyed to distance from tenpai
-// (KICKOFF-phase10-strategy-coach.md §1b):
-//
-// - shanten >= EARLY_GAME_MIN_SHANTEN ("early"): among the tiles achieving
-//   the lowest resultingShanten, primarily minimize worst-case regret across
-//   viable routes (computeRouteRegret above) — a candidate that quietly
-//   kills a route another candidate would have kept alive loses to that
-//   other candidate even if it has more raw ukeire, UNLESS the ukeire it
-//   would cost to prefer the lower-regret candidate exceeds
-//   MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY, in which case the sacrifice isn't
-//   worth it and ukeire decides instead (see that constant's own comment —
-//   added after self-play validation showed uncapped regret-preference is a
-//   real regression). Ties (including every hand where regret is 0 for all
-//   of atMin, the common case) fall through to legacyDiscardCompare.
-// - shanten < EARLY_GAME_MIN_SHANTEN ("late"): collapses to exactly the old
-//   greedy rule — committing to whichever route is already closest is
-//   correct this close to tenpai, not something to spend flexibility
-//   avoiding.
-//
 // Shared by chooseDiscard (bots, below) and computeBestMoveHint (hints.ts)
 // so the hint's "recommended discard" and "other reasonable choices" can
-// never disagree with what a bot would actually do with the same hand — this
-// change upgrades bot play too, and self-play is Stage 1's own validation
-// gate for it (policy.test.ts).
+// never disagree with what a bot would actually do with the same hand.
 export function rankDiscards(evaluations: DiscardEvaluation[]): DiscardEvaluation[] {
   const minShanten = Math.min(...evaluations.map((e) => e.resultingShanten))
   const atMin = evaluations.filter((e) => e.resultingShanten === minShanten)
-
-  if (minShanten >= EARLY_GAME_MIN_SHANTEN) {
-    const regret = computeRouteRegret(evaluations)
-    atMin.sort((a, b) => {
-      const regretA = regret.get(a.tile)!
-      const regretB = regret.get(b.tile)!
-      if (regretA !== regretB) {
-        const lowerRegretIsA = regretA < regretB
-        const lower = lowerRegretIsA ? a : b
-        const higher = lowerRegretIsA ? b : a
-        const sacrifice = higher.ukeire.totalCount - lower.ukeire.totalCount
-        if (sacrifice <= MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY) return lowerRegretIsA ? -1 : 1
-        // Sacrifice too big — fall through to the ordinary ukeire-first
-        // comparison below instead of letting regret decide.
-      }
-      return legacyDiscardCompare(a, b)
-    })
-    return atMin
-  }
-
   atMin.sort(legacyDiscardCompare)
   return atMin
 }

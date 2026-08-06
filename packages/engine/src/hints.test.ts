@@ -59,14 +59,25 @@ describe('computeBestMoveHint', () => {
 
   // KICKOFF-phase10-strategy-coach.md's own live hand, verbatim: a 2C
   // triplet, a 5B pair, eight isolated tiles (1C 2C2C2C 6C 9C 4D 3B 5B5B 8B
-  // WE WS WN). The OLD greedy ranking recommended discarding a 2C — arithmetic-
-  // ally defensible (Standard sits 5-shanten, Seven Pairs 4-shanten, so the
-  // triplet's third copy is dead weight under Seven Pairs, decisions.md #5)
-  // but strategically premature: it commits the hand to Seven Pairs at
-  // 4-shanten to buy only 3 extra outs (27 vs 24) while a plain isolated
-  // discard keeps BOTH Standard (5-shanten) and Seven Pairs (4-shanten)
-  // alive. Stage 1's regret-aware ranking (bots/policy.ts) must now prefer
-  // one of those isolated discards instead.
+  // WE WS WN). This is the hand the whole phase was built around: the
+  // pre-Stage-1 greedy ranking recommends discarding a 2C — arithmetically
+  // defensible (27 outs, the most of any candidate) but strategically
+  // premature, since it commits the hand harder to Seven Pairs (the
+  // triplet's third copy becomes genuinely dead weight there,
+  // decisions.md #5) at the cost of Standard's own shanten (6 after
+  // discarding 2C, vs 5 if an isolated tile is discarded instead).
+  //
+  // Stage 1 (2026-08-03) added a regret-aware ranking that preferred an
+  // isolated discard here instead. That ranking was reverted on
+  // 2026-08-06 (decisions.md #18: three same-direction self-play runs,
+  // none individually significant but never once favoring it) — this
+  // fixture now documents the CURRENT, correct, greedy behavior: the bot
+  // and rankDiscards both go back to recommending the 2C, exactly like
+  // pre-Stage-1. What Stage 1 kept is the DISPLAY: the route table below
+  // still shows the player that Seven Pairs and Standard both stay
+  // structurally reachable, with real shanten numbers, whichever tile
+  // ends up recommended — the coach's job now is to show this, not to
+  // auto-avoid it on the player's behalf.
   function kickoffLiveHand(): TileInstanceId[] {
     return [
       ...idsFor('C1', 1), ...idsFor('C2', 3), ...idsFor('C6', 1), ...idsFor('C9', 1),
@@ -76,36 +87,36 @@ describe('computeBestMoveHint', () => {
     ]
   }
 
-  it('Stage 1 fixture: recommends an isolated tile, NOT a 2C, and shows both Standard and Seven Pairs alive', () => {
+  it('recommends the 2C (reverted to greedy, decisions.md #18) and still shows both Standard and Seven Pairs alive', () => {
     const hint = computeBestMoveHint(handWith(kickoffLiveHand()))!
 
-    expect(typeIdOfInstance(hint.recommendedDiscard)).not.toBe('C2')
+    // The greedy comparator picks whichever candidate has the most raw
+    // ukeire — three physical 2C tiles all tie for the max (27), so the
+    // recommendation is necessarily one of them.
+    expect(typeIdOfInstance(hint.recommendedDiscard)).toBe('C2')
 
     const standardRow = hint.routeTable.find((r) => r.shape === 'standard')!
     const sevenPairsRow = hint.routeTable.find((r) => r.shape === 'sevenPairs')!
-    expect(standardRow.shanten).toBe(5)
+    // These are the RECOMMENDED discard's (2C's) own per-shape numbers —
+    // discarding a copy of the triplet costs Standard a shanten (6, not
+    // the 5 an isolated discard would leave) in exchange for the extra
+    // outs. `viable` is still true because it's judged against the best
+    // ANY candidate discard could achieve for that shape (an isolated
+    // discard still reaches Standard 5), not the recommended one alone —
+    // that's the display-side flexibility signal Stage 1 kept.
+    expect(standardRow.shanten).toBe(6)
     expect(standardRow.viable).toBe(true)
     expect(sevenPairsRow.shanten).toBe(4)
     expect(sevenPairsRow.viable).toBe(true)
 
-    // The doc's own numeric claim: the recommended (regret-0) discard costs
-    // exactly 3 outs relative to 2C (24 vs 27) — the price of staying
-    // flexible, not a wash.
+    // The 2C is the highest-ukeire candidate by construction (that's why
+    // greedy picks it) — 27 outs, 3 more than the best isolated
+    // alternative (24). Same numeric gap the doc originally cited, just
+    // now describing why greedy prefers 2C instead of why it costs.
     const evaluations = evaluateDiscards(handWith(kickoffLiveHand()))
-    const c2 = evaluations.find((e) => typeIdOfInstance(e.tile) === 'C2')!
+    const c1 = evaluations.find((e) => typeIdOfInstance(e.tile) === 'C1')!
     const top = evaluations.find((e) => e.tile === hint.recommendedDiscard)!
-    expect(c2.ukeire.totalCount - top.ukeire.totalCount).toBe(3)
-  })
-
-  it('Stage 1 fixture: the recommended discard is one of the tied, genuinely isolated candidates (not just "any non-2C")', () => {
-    // legacyDiscardCompare's own tie-break (kept exactly per KICKOFF §1b:
-    // "keep the determinism") settles the final pick among every candidate
-    // tied on regret+ukeire — several isolated tiles qualify here, not one
-    // uniquely "correct" tile, so this checks the recommendation is a member
-    // of that tied set rather than pinning one arbitrary winner.
-    const hint = computeBestMoveHint(handWith(kickoffLiveHand()))!
-    const recommendedType = typeIdOfInstance(hint.recommendedDiscard)
-    expect(['C1', 'C9', 'WE', 'WS', 'WN']).toContain(recommendedType)
+    expect(top.ukeire.totalCount - c1.ukeire.totalCount).toBe(3)
   })
 
   it('still names the Seven Pairs route (the old shapeNote\'s job) on the live hand, now via features/routeTable', () => {
@@ -114,13 +125,14 @@ describe('computeBestMoveHint', () => {
     expect(hint.features.some((f) => `${f.title} ${f.detail}`.match(/dead weight/))).toBe(true)
   })
 
-  // KICKOFF-phase10-strategy-coach.md §1e fixture 2: a pair-heavy hand at
-  // 2-shanten (< EARLY_GAME_MIN_SHANTEN) where committing IS correct — the
-  // late-game collapse (bots/policy.ts §1b) must produce exactly what the
-  // pre-Stage-1 greedy rule already did: most ukeire, then honor/terminal-
-  // first, then fixed type order, with no regret computation involved at
-  // all (four real pairs already formed; six singles left to trim).
-  it('Stage 1 fixture: a pair-heavy 2-shanten hand still commits exactly like the old greedy ranking (late-game collapse)', () => {
+  // A pair-heavy hand at 2-shanten. Was originally Stage 1's own §1e
+  // fixture 2, proving the (since-reverted, decisions.md #18) regret-aware
+  // ranking's "late game" branch collapsed to plain greedy near tenpai.
+  // rankDiscards is unconditionally greedy now (no early/late distinction
+  // left at all), so this is really just a general greedy-ranking check —
+  // kept as a fixture since it's still a real, useful case (four real
+  // pairs already formed; six singles left to trim).
+  it('a pair-heavy 2-shanten hand: most ukeire, then honor/terminal-first, then fixed type order', () => {
     const hand = handWith([
       ...idsFor('C1', 2), ...idsFor('C4', 2), ...idsFor('C7', 2), ...idsFor('D1', 2),
       ...idsFor('D4', 1), ...idsFor('D7', 1), ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1), ...idsFor('B2', 1),

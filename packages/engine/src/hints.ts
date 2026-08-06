@@ -1,4 +1,4 @@
-import { computeRouteRegret, rankDiscards, VIABLE_ROUTE_SHANTEN_MARGIN } from './bots/policy.js'
+import { rankDiscards } from './bots/policy.js'
 import { groupConcealedByType, ORDERED_STANDARD_TYPE_IDS } from './win-detection.js'
 import type { Hand } from './hand.js'
 import type { Meld } from './meld.js'
@@ -9,6 +9,73 @@ import { calculateShantenFromCounts, type ShantenResult } from './shanten.js'
 import { ALL_SHANTEN_SHAPES, evaluateDiscards, routeTableFor, type DiscardEvaluation, type RouteAssessment } from './tile-efficiency.js'
 import { typeIdOf, typeIdOfInstance, type TileInstanceId, type TileTypeId } from './tiles.js'
 import { computeWaits, type WaitOption, type WinCircumstanceContext } from './waits.js'
+
+// KICKOFF-phase10-strategy-coach.md §1b's two heuristic constants, MOVED
+// HERE from bots/policy.ts on 2026-08-06 when the Stage 1 regret-aware
+// RANKING was reverted (docs/rules/decisions.md #18: three same-direction
+// self-play runs never showed it helping) — but the DISPLAY these two
+// constants feed (this file's route-viability marking and
+// confidence/alternatives scoring) was explicitly kept, since it doesn't
+// depend on which comparator rankDiscards uses. Hand-tuned against the
+// fixture hands in this file's own test suite, not derived from theory;
+// still explicitly Stage-2-replaceable.
+//
+// EARLY_GAME_MIN_SHANTEN: below this many shanten from tenpai, regret isn't
+// a meaningful display signal either — committing to whichever route is
+// already closest is correct that close to tenpai, so confidence/
+// alternatives collapse to a plain ukeire comparison there too (see
+// computeRouteRegret below).
+const EARLY_GAME_MIN_SHANTEN = 3
+// VIABLE_ROUTE_SHANTEN_MARGIN: a shape is "in play" this turn if the best
+// any candidate discard can achieve for it is within this many shanten of
+// the overall best achievable shanten. 1 is the smallest margin that can
+// ever matter (0 would mean "only the single best shape counts"). Chosen
+// and verified against the live hand this phase's own KICKOFF doc cites (a
+// 2-Character triplet + 5-Bamboo pair hand where Standard sits exactly 1
+// shanten behind Seven Pairs and must stay "in play").
+const VIABLE_ROUTE_SHANTEN_MARGIN = 1
+
+// KICKOFF-phase10-strategy-coach.md §1b: for each candidate at the best
+// achievable resultingShanten, how much worse it makes its own worst VIABLE
+// route, relative to the best any candidate could do for that same route —
+// "worst-case regret across viable routes." A candidate that keeps every
+// viable route exactly at its own best-achievable shanten scores 0 regret;
+// one that lets a still-viable route slip scores > 0, in shanten units.
+// Feeds ONLY this file's display numbers now (confidence, alternatives'
+// relativeScore) — bots/policy.ts's rankDiscards no longer uses this at all
+// (reverted to plain ukeire-first ranking, see that file's own comment).
+//
+// Candidates below the best resultingShanten get Infinity — they were never
+// really in contention, so "regret" isn't a meaningful number for them;
+// callers should never rank by this value without also filtering to
+// resultingShanten === the best.
+function computeRouteRegret(evaluations: readonly DiscardEvaluation[]): Map<TileInstanceId, number> {
+  const minShanten = Math.min(...evaluations.map((e) => e.resultingShanten))
+  const regret = new Map<TileInstanceId, number>()
+
+  if (minShanten < EARLY_GAME_MIN_SHANTEN) {
+    for (const e of evaluations) regret.set(e.tile, e.resultingShanten === minShanten ? 0 : Infinity)
+    return regret
+  }
+
+  const atMin = evaluations.filter((e) => e.resultingShanten === minShanten)
+  const routeShantenFor = (e: DiscardEvaluation, shape: ShantenResult['shape']): number =>
+    e.routes.find((r) => r.shape === shape)!.shanten
+
+  const bestForShape = new Map<ShantenResult['shape'], number>(
+    ALL_SHANTEN_SHAPES.map((shape) => [shape, Math.min(...atMin.map((e) => routeShantenFor(e, shape)))]),
+  )
+  const viableShapes = ALL_SHANTEN_SHAPES.filter((shape) => bestForShape.get(shape)! <= minShanten + VIABLE_ROUTE_SHANTEN_MARGIN)
+
+  for (const e of evaluations) {
+    if (e.resultingShanten !== minShanten) {
+      regret.set(e.tile, Infinity)
+      continue
+    }
+    regret.set(e.tile, Math.max(...viableShapes.map((shape) => routeShantenFor(e, shape) - bestForShape.get(shape)!)))
+  }
+  return regret
+}
 
 // KICKOFF-phase10-strategy-coach.md §1c's numbered "why" list — each entry
 // maps to one bullet of that section (isolation, shape-lean, route
