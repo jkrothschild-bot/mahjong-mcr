@@ -62,31 +62,38 @@ function detectMixedShiftedChows(ctx: HandContext): FanMatch[] {
 
 // 52. All Types — 6 pts. §3.8.1 p.16 / App.1 p.38: "A hand in which each of
 // the five sets is composed of a different type of tile (Characters,
-// Bamboo, Dots, Winds, and Dragons)." The 4 real sets plus the pair count
-// as "five sets" here — each must be a different one of the 5 categories.
-// Since there are exactly 5 possible categories and 5 groups, "5 distinct
-// categories represented" is equivalent to every category appearing
-// exactly once.
-//
-// KNOWN BUG (fixtured in fans-6.test.ts, not fixed here): this detector
-// only ever considers ctx.decomposition (the standard 4-sets+pair shape),
-// so it can never fire for a Seven Pairs hand. But fan 19 Seven Pairs's
-// own Appendix 1 worked example is explicitly captioned "Combined with
-// All Types" — a rulebook-confirmed case this detector currently misses.
-// Needs a specialShape === 'sevenPairs' branch checking whether the 7
-// pairs' categories collectively cover all 5.
+// Bamboo, Dots, Winds, and Dragons)." The rulebook text names 5 categories
+// and doesn't restrict the shape to standard 4-sets+pair — confirmed via
+// rules-lawyer (docs/rules/decisions.md #30(e)) against fan 19 Seven
+// Pairs's own Appendix 1 worked example (24-Point Fan section, Example 1:
+// pairs of Dots/Bamboo/Characters/Red Dragon/East Wind/North Wind),
+// explicitly captioned "Combined with All Types." So this fires whenever
+// the hand's full set of groups (4 sets + pair for the standard shape, or
+// the 7 pairs for Seven Pairs/Seven Shifted Pairs) collectively covers all
+// 5 categories — the "exactly 5 groups in the standard shape" framing this
+// detector used to rely on was specific to that one shape, not a general
+// requirement of the fan itself.
+const categoryOf = (typeId: string): string | null => {
+  const parsed = parseSuited(typeId)
+  if (parsed) return parsed.suit
+  if (isWindTypeId(typeId)) return 'wind'
+  if (isDragonTypeId(typeId)) return 'dragon'
+  return null
+}
+
 function detectAllTypes(ctx: HandContext): FanMatch[] {
+  if (ctx.specialShape === 'sevenPairs') {
+    const categories = new Set<string>()
+    for (const tile of ctx.concealedTiles) {
+      const category = categoryOf(typeIdOfInstance(tile))
+      if (category) categories.add(category)
+    }
+    return categories.size === 5 ? [{ fanId: 52, count: 1 }] : []
+  }
+
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)
   if (sets.length !== 4) return []
-
-  const categoryOf = (typeId: string): string | null => {
-    const parsed = parseSuited(typeId)
-    if (parsed) return parsed.suit
-    if (isWindTypeId(typeId)) return 'wind'
-    if (isDragonTypeId(typeId)) return 'dragon'
-    return null
-  }
 
   const categories = new Set<string>()
   for (const s of sets) {

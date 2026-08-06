@@ -138,13 +138,6 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
         "'KNOWN REGRESSION' describe block).",
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),
     ),
-    (
-        "packages/engine/src/scoring/fans-6.test.ts — 'BUG: never fires for a Seven Pairs hand, even when its 7 pairs "
-        "span all 5 categories' (detectAllTypes bails out on ctx.decomposition === null instead of also checking "
-        "specialShape === 'sevenPairs') — rules-lawyer confirmed fan 19's own Appendix 1 worked example is captioned "
-        "'Combined with All Types'; found during Step 4/5 triage of the unclassified mismatches.",
-        frozenset({"All Types"}),
-    ),
 ]
 
 
