@@ -35,27 +35,23 @@ both before any work.
   validation/README.md for the exact command; validation/allowlist.py's module
   docstring for what `their_bug`/`ambiguity`/`our_bug`/UNCLASSIFIED mean). The
   harness exists and has been run for real, most recently 2026-08-06
-  (docs/rules/decisions.md #32, superseding #19/#31: 1200 hands, seed
-  20260805, 80/81 fans covered) — this rule is satisfiable now, but not
-  fully clean. **Current tally: their_bug 102 hands, ambiguity 204 hands,
-  our_bug 43 hands, unclassified 29 hands — read every one of those as a
-  HAND count, not a distinct-bug count.** The 43 `our_bug` hands trace to
-  just **6 distinct fixture-backed bugs**, all still unfixed (see
-  decisions.md #30(b)-(f) for the full citations): `detectTileHog`
-  undercounts multi-type hogs (item #27); `[21,76]`/`[31,76]` (All Even
-  Pungs/All Fives vs No Honors) missing; `[18,55]` (All Terminals and
-  Honors vs Outside Hand) missing; `detectFullyConcealedHand`/
-  `detectConcealedHand` wrongly reject a concealed kong; `detectTwoConcealed
-  Pungs` wrongly excludes kongs from its count; `detectAllTypes` never
-  checks the Seven Pairs shape (this one alone explained 20 of the ~55
-  hands that were unclassified before this session's triage). Of the 29
-  still-unclassified hands, **6 are NOT engine debt at all** — they trace to
-  a bug in the validation harness itself (`validation/src/win-circumstance.ts`'s
-  `otherCopiesInOwnHand`, decisions.md #30(h)), not `packages/engine`; ~14
-  more are benign equal-scoring decomposition ties (two valid decompositions
-  score the same total, no rulebook tiebreak exists, neither side is wrong);
-  leaving ~9 genuinely still open.
-  **A 7th, more severe class of defect was found and fixed this session
+  (docs/rules/decisions.md #33, superseding #19/#31/#32: 1200 hands, seed
+  20260805, 80/81 fans covered). **Current tally, read as HAND counts, not
+  distinct-cause counts: their_bug 110, ambiguity 194, our_bug 0,
+  unclassified 23.** `our_bug` is genuinely 0 — every distinct engine bug
+  found in the 2026-08-06 Step 4/5 triage (`detectTileHog` undercounting,
+  `[21,76]`/`[31,76]` and `[18,55]` missing exclusions,
+  `detectFullyConcealedHand`/`detectConcealedHand`/`detectTwoConcealedPungs`
+  mishandling concealed kongs, `detectAllTypes` never checking Seven Pairs)
+  is fixed, each its own commit, each re-verified against `mcr_EN.pdf`
+  before fixing — decisions.md #33 for the full list. Of the 23
+  `unclassified` hands, ~14 are believed to be benign equal-scoring
+  decomposition ties (two valid decompositions score the same total, no
+  rulebook tiebreak exists, neither side is wrong) but this should be
+  reconfirmed against the current run, not assumed from an earlier
+  snapshot — see decisions.md #33's own note and KICKOFF-validation-
+  harness.md's open-items list.
+  **A more severe class of defect was found and fixed on 2026-08-06
   (decisions.md #32): item #23, an already-SHIPPED commit, turned out to
   directly contradict `mcr_EN.pdf`'s own primary fan table** — it had
   "fixed" the engine to match PyMahjongGB's behavior with no independent
@@ -64,19 +60,22 @@ both before any work.
   change justified only by matching PyMahjongGB, with no independent
   citation, becomes invisible to this cross-check FOREVER once it ships** —
   both engines then agree, so no future run, however large, can ever flag
-  it again; only a human re-reading the primary source catches it. Item
-  #32(c) audited every other exclusion/detector change in items #19-#31 for
-  the same defect and found exactly one instance (item #23 itself); a test
-  enforcing that every `exclusions.ts` entry carries a rulebook citation is
-  queued in `KICKOFF-validation-harness.md`'s next-steps list specifically
-  so this can't recur silently. Don't cite "PyMahjongGB cross-check passes"
-  for the WHOLE engine without qualification — it means clean *for the fans
+  it again; only a human re-reading the primary source catches it. An audit
+  of every other exclusion/detector change in items #19-#31 found exactly
+  one instance (item #23 itself) — but auditing once by hand doesn't
+  prevent a repeat, so **a citation guard now exists and is load-bearing**:
+  `packages/engine/src/scoring/exclusion-citations.ts` grandfathers every
+  exclusion pair that existed before the guard, and requires a real,
+  non-empty rulebook citation (not a bare PyMahjongGB source reference) for
+  any pair added or changed after — `exclusions.test.ts`'s guard test fails
+  otherwise. When touching `exclusions.ts`, add the citation to that file,
+  not just a code comment. Don't cite "PyMahjongGB cross-check passes" for
+  the WHOLE engine without qualification — it means clean *for the fans
   your change touches*, checked against the current baseline in
-  decisions.md #32, not zero mismatches system-wide (some are expected
+  decisions.md #33, not zero mismatches system-wide (some are expected
   forever: PyMahjongGB's own house-rule extensions, and one still-
-  provisional rulebook ambiguity, #11 — which item #30(c) found may also be
-  masking an additional, distinct, as-yet-unquantified our_bug). Stage 2 (CI
-  integration, gating every push) is separate follow-up work, not started.
+  provisional rulebook ambiguity, #11). Stage 2 (CI integration, gating
+  every push) is separate follow-up work, not started.
 - Run typecheck + full test suite before every commit. Never commit red.
 - Every scoring bug found becomes a permanent test fixture before it is fixed.
 - Record any rulebook-ambiguity ruling in docs/rules/decisions.md.

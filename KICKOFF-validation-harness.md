@@ -261,89 +261,60 @@ shifted 126 hands out of unclassified without changing engine behavior —
 don't assume the residual count is stable, re-run after each fix per
 CLAUDE.md's standing rule.
 
-## Steps 4/5 complete (2026-08-06) — see decisions.md #30/#31/#32 for the full record
+## Steps 4/5 complete (2026-08-06), all resulting bugs fixed (2026-08-06) — see decisions.md #30-#33
 
 Step 3's six original bugs are fixed. Step 4 (triage the unclassified
-residual) and Step 5 (record a final baseline) are also done: the harness
-was re-run fresh, every `our_bug` hand was individually inspected (not just
-counted — `compare.py` now emits an `ourBugDetail` array alongside
-`unclassifiedDetail`), and the allowlist was re-validated against the
-current run rather than trusted as-is. **This surfaced five more confirmed
-bugs, plus one already-shipped commit that turned out to be a regression —
-do not defer these the way item #6's knitted-shape gap was deferred (that
-deferral used the exact words "out of scope" and went on to become the most
-severe bug in the engine, per `decisions.md` #19).**
+residual) and Step 5 (record a final baseline) are also done, and — in a
+follow-up pass the same day — every bug those steps found is now ALSO
+fixed, not left deferred the way item #6's knitted-shape gap once was:
 
-~~1. Revert `exclusions.ts`'s `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
-   (decisions.md #23, corrected by #30(a)).~~ **DONE, decisions.md #32(a)
-   (2026-08-06).** This was a live scoring regression in already-shipped
-   code — `mcr_EN.pdf`'s own primary fan table explicitly said the opposite
-   of what these five exclusion-table entries encoded. Reverting it
-   surfaced a real, newly-confirmed `their_bug` in the other direction
-   (PyMahjongGB itself doesn't implement what the rulebook states) — see
-   #32(a) for the harness delta.
+- ~~Revert `exclusions.ts`'s `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`~~
+  — **done, decisions.md #32(a).**
+- ~~Add a citation guard (test + `exclusion-citations.ts`) so an uncited
+  exclusion can't land silently again~~ — **done, decisions.md #33(a), done
+  FIRST per instruction, before any exclusion edit.** Existing entries were
+  grandfathered, not backfilled with real citations — that backfill is the
+  one piece of this list still open, see below.
+- ~~Fix `detectFullyConcealedHand`/`detectConcealedHand` rejecting a
+  concealed kong~~ — **done, decisions.md #33(b)**, re-verified via a FRESH
+  independent `rules-lawyer` pass first (not reusing #30(b)'s own citation),
+  since this is the same rulebook territory item #23 got wrong.
+- ~~Fix `detectTwoConcealedPungs` excluding kongs from its count~~ —
+  **done, decisions.md #33(b)**, same fresh-re-verification treatment.
+- ~~Add `exclusions.ts`'s `[18, 55]`~~ — **done, decisions.md #33(b).**
+- ~~Add a `specialShape === 'sevenPairs'` branch to `detectAllTypes`~~ —
+  **done, decisions.md #33(b).**
+- ~~Fix `detectTileHog`'s multi-type undercount~~ — **done, decisions.md
+  #33(b).**
+- ~~Add `exclusions.ts`'s `[21,76]`/`[31,76]`~~ — **done, decisions.md
+  #33(b).**
+- ~~Fix `validation/src/win-circumstance.ts`'s `otherCopiesInOwnHand`~~ —
+  **done, decisions.md #33(c)** — the first fix attempt broke a different,
+  previously-working case by over-narrowing a function two different
+  callers needed different scopes from; caught by re-running the harness
+  and investigating the one new mismatch, not assumed clean. Corrected to
+  two separately-scoped functions. Also fixed a related bug in
+  `generators/targeted.ts`'s `targeted-58-last-tile` case in the same pass.
 
-**New top priority, found by #32(c)'s audit of items #19-#31 for the same
-defect (only item #23 itself turned out to be affected, but nothing
-currently prevents a repeat):**
+**Final baseline (decisions.md #33): 1200 hands, `their_bug` 110,
+`ambiguity` 194, `our_bug` 0, `unclassified` 23, coverage 80/81 fans.**
 
-1. **Add a test asserting every `exclusions.ts` `RAW_EXCLUSION_PAIRS` entry
-   carries a rulebook citation** in its comment (a section/page + quote, or
-   an explicit "derived from fan N's own already-quoted text" — never a
-   PyMahjongGB source citation alone, with nothing else). decisions.md
-   #32(c)'s "Open follow-up work" entry. Design the enforcement mechanism
-   first (parsed comments? a structured citation map alongside the pairs?
-   a lint rule?) — `RAW_EXCLUSION_PAIRS`'s comments aren't currently
-   structured data, so this needs a real design decision, not just a test.
+**What's actually still open:**
 
-**The rest, in priority order (each already has a fixture; none fixed yet):**
-
-2. **Fix `detectFullyConcealedHand` (fan 56, fans-4.ts) and
-   `detectConcealedHand` (fan 62, fans-2.ts)** — both check
-   `ctx.melds.length === 0` where they should check "no EXPOSED meld",
-   wrongly rejecting any hand containing a concealed kong. decisions.md
-   #30(b).
-3. **Fix `detectTwoConcealedPungs` (fan 66, fans-2.ts)** — wrongly excludes
-   concealed kongs from its count (`s.kind === 'pung'` should be
-   `s.kind !== 'chow'`, matching every sibling detector in the codebase).
-   decisions.md #30(c). Note: fixing this will also shrink the item #11
-   `ambiguity` bucket, which this bug has been hiding inside — re-run the
-   harness after this fix specifically to see how much.
-4. **Add `exclusions.ts`'s `[18, 55]`** (All Terminals and Honors excludes
-   Outside Hand, same shape as the existing `[8,55]`/`[11,55]`).
-   decisions.md #30(d).
-5. **Add a `specialShape === 'sevenPairs'` branch to `detectAllTypes`**
-   (fan 52, fans-6.ts) — currently can never fire for Seven Pairs at all,
-   contradicting fan 19's own Appendix 1 worked example. This was the
-   single largest bug by hand-count found this session (20 of ~55
-   unclassified hands). decisions.md #30(e).
-6. **Fix `detectTileHog`'s multi-type undercount** (fan 64, fans-2.ts) —
-   the original item #27 finding, still unfixed after two full triage
-   passes. Only returns count 1 even when two separate tile types are each
-   hogged.
-7. **Add `exclusions.ts`'s `[21,76]`/`[31,76]`** (All Even Pungs / All
-   Fives exclude No Honors, same shape as the 8 other `[X,76]` entries) —
-   the original item #26 finding, fixtured but still unfixed.
-8. **Investigate `validation/src/win-circumstance.ts`'s
-   `otherCopiesInOwnHand`** — a bug in the harness itself, not the engine,
-   but it's actively disguising ~6 real hands as "unclassified" (looking
-   like an open rules question) when they're really a harness-generator
-   defect. decisions.md #30(h).
-
-Per CLAUDE.md's standing rule, the fix for each of 2-7 is a separate commit
-from a fresh session pass, not bundled together, and each needs its own
-harness re-run afterward to confirm the delta (same protocol Step 3 used
-for every one of its six fixes — see decisions.md #22/#23/#25/#26/#28/#29
-for the exact "before/after" reporting format to match, and #32(a) for how
-that delta can surface a NEW their_bug rather than just shrinking our_bug,
-as it did for item #23's own revert). After fixing 2-3 specifically,
-re-triage decisions.md #30(h)'s ~9-hand "genuinely still open" residual
-too — some of those may turn out to be downstream symptoms of the same
-root causes, the same way item #30(d)'s `[18,55]` finding turned out to be
-hiding behind item #11's diff in 6 hands
-that looked unrelated at first glance.
-
-Still parked, not part of this list: Phase 10's 2000-seed self-play
-regression question (`KICKOFF-phase10-strategy-coach.md`'s "State of play"
-section) — unrelated to scoring validation, not touched by any of Steps
-1-5.
+1. **Backfill real citations for the ~91 grandfathered exclusion pairs**
+   in `exclusion-citations.ts` — deliberately deferred when the guard was
+   built (decisions.md #33(a)), now lower-priority than before since the
+   guard already prevents a NEW uncited entry, but the existing table is
+   still formally unverified pair-by-pair.
+2. **Re-triage the 23-hand unclassified residual against the CURRENT
+   run** — decisions.md #30(h)'s "~9 genuinely open" characterization was
+   written against a pre-fix snapshot; `ambiguity` alone moved by 25 hands
+   in one fix and 6 in another since then, so re-derive which hands are
+   actually still unexplained rather than trusting the old list. ~14 of
+   the 23 are very likely still the benign equal-scoring decomposition
+   ties from #30(h)'s first bullet (no rulebook tiebreak exists, neither
+   engine is wrong), but confirm rather than assume.
+3. Phase 10's 2000-seed self-play regression question
+   (`KICKOFF-phase10-strategy-coach.md`'s "State of play" section) —
+   unrelated to scoring validation; still parked unless picked up as
+   explicitly-authorized time-permitting work in a given session.
