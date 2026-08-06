@@ -71,12 +71,22 @@ function detectAllChows(ctx: HandContext): FanMatch[] {
   return [{ fanId: 63, count: 1 }]
 }
 
-// 64. Tile Hog — 2 pts. §3.8.1 p.16 / App.1 p.40: "Using all four copies of
-// one tile type in the hand, without those four being declared as a Kong."
-// Whole-hand tile-count check (concealed tiles + meld tiles combined,
-// tracking whether a kong was ever declared for that type) rather than a
-// decomposition-based one — the 4 copies can be split across e.g. a pung
-// plus an adjacent chow.
+// 64. Tile Hog — 2 pts, PER QUALIFYING TILE TYPE. §3.8.1 p.16 / App.1 p.40:
+// "Using all four copies of one tile type in the hand, without those four
+// being declared as a Kong." Whole-hand tile-count check (concealed tiles +
+// meld tiles combined, tracking whether a kong was ever declared for that
+// type) rather than a decomposition-based one — the 4 copies can be split
+// across e.g. a pung plus an adjacent chow.
+//
+// FIXED (docs/rules/decisions.md #27): this used to `return` on the FIRST
+// qualifying type found, undercounting any hand that hogs two separate
+// types at once. Confirmed countable (not flat, count-always-1) directly
+// against PyMahjongGB's own per-type scoring (e.g. seed 1823602851 in the
+// 1200-hand harness sample scores 'Tile Hog': 2) — every other generic,
+// per-unit fan in this file (Dragon Pung 59, Double Pung 65, Concealed Kong
+// 67) is likewise countable, and fan 64's own definition names a single
+// TILE TYPE as the qualifying unit, so two independently-hogged types are
+// two separate instances of the same named condition, not one.
 function detectTileHog(ctx: HandContext): FanMatch[] {
   const counts = new Map<TileTypeId, number>()
   const kongTypes = new Set<TileTypeId>()
@@ -94,10 +104,11 @@ function detectTileHog(ctx: HandContext): FanMatch[] {
     }
     if (meld.kind === 'kong') kongTypes.add(meldTileTypeId(meld))
   }
+  let hoggedTypes = 0
   for (const [id, count] of counts) {
-    if (count === 4 && !kongTypes.has(id)) return [{ fanId: 64, count: 1 }]
+    if (count === 4 && !kongTypes.has(id)) hoggedTypes++
   }
-  return []
+  return hoggedTypes > 0 ? [{ fanId: 64, count: hoggedTypes }] : []
 }
 
 // 65. Double Pung — 2 pts, PER QUALIFYING RANK. §3.8.1 p.16 / App.1 p.40:

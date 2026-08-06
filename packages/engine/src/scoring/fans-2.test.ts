@@ -255,25 +255,16 @@ describe('Tile Hog (fan 64)', () => {
     expect(FANS_2_DETECTORS[64]!(ctx)).toEqual([{ fanId: 64, count: 1 }])
   })
 
-  // NEW KNOWN BUG, found while verifying the chow-counting fix above (NOT
-  // one of Step 3's original 6 bugs — docs/rules/decisions.md's newest
-  // entry). detectTileHog's loop does `return [{ fanId: 64, count: 1 }]` on
-  // the FIRST qualifying type it finds, instead of continuing to count
-  // every qualifying type — so a hand with TWO separate tile-hogged types
-  // (e.g. four C1s AND four D9s, neither declared as a kong) reports
-  // count:1 instead of count:2. PyMahjongGB scores this fan per qualifying
-  // type (confirmed via cross-check: several hands score 'Tile Hog': 2 on
-  // PyMahjongGB's side against our count:1). This asserts ACTUAL (wrong)
-  // behavior; do not "fix" it to pass differently — fix detectTileHog in a
-  // separate commit, then flip toEqual([{ fanId: 64, count: 1 }]) below to
-  // toEqual([{ fanId: 64, count: 2 }]).
-  it('BUG: only counts the first tile-hogged type, not every qualifying type', () => {
+  // FIXED (docs/rules/decisions.md #27, then #33): detectTileHog used to
+  // `return` on the FIRST qualifying type it found, undercounting a hand
+  // with two separately-hogged types. Confirmed countable, not flat,
+  // directly against PyMahjongGB's own per-type scoring (cross-check:
+  // several hands score 'Tile Hog': 2 on PyMahjongGB's side).
+  it('counts every independently tile-hogged type, not just the first', () => {
     const concealedTiles = [...idsFor('C1', 4), ...idsFor('D9', 4), ...idsFor('B2', 3), ...idsFor('B3', 2)]
     const ctx = ctxWith({ concealedTiles })
-    // This SHOULD be [{ fanId: 64, count: 2 }] — both C1 and D9 have all 4
-    // copies used with no kong declared. It's count:1 only because of the
-    // early `return` inside detectTileHog's loop.
-    expect(FANS_2_DETECTORS[64]!(ctx)).toEqual([{ fanId: 64, count: 1 }])
+    // Both C1 and D9 have all 4 copies used with no kong declared.
+    expect(FANS_2_DETECTORS[64]!(ctx)).toEqual([{ fanId: 64, count: 2 }])
   })
 })
 

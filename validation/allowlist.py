@@ -139,12 +139,6 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),
     ),
     (
-        "packages/engine/src/scoring/fans-2.test.ts — 'BUG: only counts the first tile-hogged type, not every qualifying "
-        "type' (detectTileHog returns on the first match instead of counting all) — docs/rules/decisions.md #27. NOT the "
-        "same bug as the now-fixed chow-meld-counting one (item #25); found while verifying that fix.",
-        frozenset({"Tile Hog"}),
-    ),
-    (
         "packages/engine/src/scoring/exclusions.test.ts — 'All Even Pungs / All Fives should exclude No Honors' (missing "
         "[21,76]/[31,76]) — found via allowlist cleanup, docs/rules/decisions.md #26; fixtured during Step 4/5 triage.",
         frozenset({"No Honors"}),
