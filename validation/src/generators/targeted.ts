@@ -23,6 +23,7 @@
 import {
   isWinningHand,
   mulberry32,
+  typeIdOfInstance,
   type Meld,
   type TileInstanceId,
   type TileTypeId,
@@ -342,7 +343,32 @@ export function runTargetedGenerators(masterSeed: number): GeneratedCase[] {
   add(fromSpec(masterSeed, 'targeted-56-fully-concealed-hand', { pair: 'D8', sets: [chow('C2', 'C3', 'C4'), pung('D6'), chow('B3', 'B4', 'B5'), chow('C1', 'C2', 'C3')] }, { winMethod: 'selfDraw' }))
   // 58. Last Tile — forced isLastCopyOfItsKind with a plain discard win (not
   // robKong, which would exclude fan 58 via [47,58] — see exclusions.ts).
-  add(fromSpec(masterSeed, 'targeted-58-last-tile', { pair: 'D8', sets: [chow('C2', 'C3', 'C4'), pung('D6'), chow('B3', 'B4', 'B5'), pung('C9')] }, { winMethod: 'discard', isLastCopyOfItsKind: true }))
+  //
+  // FIXED (docs/rules/decisions.md #30(h), then #33): the winning tile MUST
+  // be one with zero other same-type copies anywhere else in the hand — the
+  // forced isLastCopyOfItsKind: true override is only structurally valid
+  // when PyMahjongGB's own is4thTile correction (win-circumstance.ts's
+  // forcedLastCopy) wouldn't independently force FALSE, which it does
+  // whenever the winner's own remaining concealed tiles hold another copy
+  // of the winning tile's type. This used to let pickWinningTile choose
+  // freely via fromSpec, which could (and did) land on one of the D8 pair
+  // tiles — completing a pair always leaves the OTHER pair tile as a
+  // same-type spare, guaranteeing PyMahjongGB's override would force FALSE
+  // regardless of the flag we send, a guaranteed mismatch. Forced instead
+  // to B5, the high tile of the second chow — unique in this hand (no
+  // other B5 anywhere), so neither of PyMahjongGB's override conditions
+  // apply and it trusts the given flag exactly like our own engine does.
+  add(
+    (() => {
+      const allocator = new TileAllocator()
+      const concealedTiles = allocateDecomp(allocator, {
+        pair: 'D8',
+        sets: [chow('C2', 'C3', 'C4'), pung('D6'), chow('B3', 'B4', 'B5'), pung('C9')],
+      })
+      const b5 = concealedTiles.find((t) => typeIdOfInstance(t) === 'B5')!
+      return finalize(masterSeed, 'targeted-58-last-tile', concealedTiles, [], { winMethod: 'discard', isLastCopyOfItsKind: true }, b5)
+    })(),
+  )
 
   // 20. Greater Honors and Knitted Tiles — 24 pts (docs/rules/decisions.md
   // #12/#20). 7 honors + 7 suit singles split 3+3+1 across the 3 different
