@@ -262,6 +262,10 @@ validation harness, not the self-play one.
 is estimated, agreed BEFORE writing any estimator ("see the shape before the
 volume")
 
+**Revised 2026-08-07 per owner review, before any estimator was written —
+three changes from the first draft, recorded here in place (not as a diff)
+so this section stays the single current source of truth:**
+
 **Data shape** (`packages/engine/src/fan-targets.ts`, new file — mirrors
 `hints.ts`'s `computeHandPlan` in spirit: pure, takes a `Hand` +
 `WinCircumstanceContext`, returns a plain data structure, no UI):
@@ -281,6 +285,18 @@ export interface FanTargetEstimate {
   status: 'locked' | 'inProgress'
   tilesNeeded: TileTypeId[]        // distinct types that would help, deduped
   completionProbability: number    // 0-1, see "How probability is estimated" below
+  // CHANGE 2 (owner review, 2026-08-07): the two probability mechanisms
+  // below are NOT commensurable — a shanten-derived number and a rough
+  // tile-counting heuristic must never render as if they were equally
+  // precise percentages. This field is what lets a future UI branch on
+  // that (different vocabulary, different visual weight, whatever the
+  // panel design calls for) instead of quietly flattening the distinction
+  // away. 'shanten' families reuse the project's own validated
+  // shanten/ukeire machinery; 'heuristic' families are a teaching estimate
+  // only, same posture as defense.ts (decisions.md #16, and this file's
+  // own #35 for the specific formula) — NOT a rulebook-derived probability
+  // and never claimed to be one.
+  probabilityBasis: 'shanten' | 'heuristic'
   value: number                    // completionProbability * points, for ranking/selection
 }
 
@@ -294,7 +310,7 @@ Each family gets its OWN private matcher (`estimateSevenPairs`,
 `estimateAllPungs`, etc.), all called from `estimateFanTargets` and merged.
 This mirrors `scoring/fans-*.ts`'s own per-fan-function convention
 deliberately — Stage 3 is not a generic pattern-matching framework, it's a
-dozen bespoke, individually-citable estimators, same posture as the real
+set of bespoke, individually-citable estimators, same posture as the real
 detectors.
 
 **Not solving in the engine layer**: which SUBSET of `FanTargetEstimate`s to
@@ -307,40 +323,63 @@ analogous to how Stage 1's own `computeBestMoveHint` sat one layer above
 a pre-composed "plan") is what lets it be independently fixtured and cited
 per family, same as the real detectors.
 
-**The dozen families** (mapping the KICKOFF's 6 named groups onto concrete
-fan ids from `registry.ts`):
+**CHANGE 3 (owner review, 2026-08-07) — the orchestration layer's contract
+now includes an explicit "no route reaches the minimum" signal, specified
+here even though the orchestration function itself is later work.** SPEC §6
+names this exact trap ("whether the hand can reach the 8-point minimum — a
+critical MCR-specific trap for learners") as the single most valuable thing
+this panel can say, so silence (an empty candidates array with no further
+comment) is not an acceptable outcome for it — the future
+`computeRouteToPoints`-style function must return a THIRD, explicit state
+alongside its candidate list: whether the best achievable combination
+(locked-in fans + the best `FanTargetEstimate`s, greedily summed by value)
+clears `MINIMUM_POINTS_TO_WIN`, and if not, a dedicated
+`warning: true` (or equivalent tri-state, not a boolean default-false that
+reads the same as "not checked yet") the UI is required to render, not
+merely permitted to. Deferred to the same later orchestration step as the
+rest of the panel-composition logic, but the CONTRACT is fixed now so the
+eventual implementation isn't tempted to treat an empty list as
+self-explanatory.
 
-1. Seven Pairs (fan 19, 24pts)
-2. All Pungs (fan 49, 6pts)
-3. Half Flush (fan 50, 6pts) / 4. Full Flush (fan 22, 24pts) — one shared
-   suit-concentration metric, two point tiers depending on whether honors
-   remain
-5. Pure Straight (fan 28, 16pts) / 6. Mixed Straight (fan 39, 8pts) — "the
-   straight family"
-7. Dragon Pung (fan 59, 2pts/unit) / 8. Prevalent Wind (fan 60, 2pts) /
-   9. Seat Wind (fan 61, 2pts) — "wind/dragon pungs"; Big Three Dragons
-   (fan 2, 88pts) deliberately excluded from v1 (needs all 3 dragon pungs
-   simultaneously — a narrow, late-game-only target not worth a partial
-   estimator; players heading there will see it via the 3 individual Dragon
-   Pung estimates already climbing)
-10. All Simples (fan 68, 2pts) / 11. No Honors (fan 76, 1pt) — closely
-    related (All Simples is strictly narrower — no honors AND no terminals),
-    kept as two estimators since they're two different fans a hand can be
-    working toward independently
+**The families — CHANGE 1 (owner review, 2026-08-07): Big Three Dragons
+added; Pure Straight and Mixed Straight dropped to make room (a player can
+see a straight forming unaided more easily than a lot of these other
+targets — the panel earns its keep more on the harder-to-eyeball ones).**
+10 total, not 11 — "a dozen" was always approximate and exhaustiveness was
+never the bar; getting the right ones in v1 matters more than hitting a
+specific count.
 
-11 total, matching "a dozen." Not exhaustive by design (per the doc's own
-text) — e.g. Big Four Winds, knitted shapes, and the shifted-pung/chow
-families are all real but rarer, later-addition candidates, not v1.
+1. Seven Pairs (fan 19, 24pts) — `shanten` basis
+2. All Pungs (fan 49, 6pts) — `shanten` basis
+3. Half Flush (fan 50, 6pts) / 4. Full Flush (fan 22, 24pts) — `heuristic`
+   basis; one shared suit-concentration metric, two point tiers depending
+   on whether honors remain
+5. Dragon Pung (fan 59, 2pts/unit) — `shanten`-ADJACENT basis (see below);
+   6. Big Three Dragons (fan 2, 88pts) — same basis, nearly free given
+   Dragon Pung's own machinery already exists (a player holding two dragon
+   pungs — exactly the beginner this panel serves — is one pung-completion
+   away, a trivial extension of the Dragon Pung estimator's own per-dragon
+   tracking); 7. Prevalent Wind (fan 60, 2pts) / 8. Seat Wind (fan 61,
+   2pts) — `heuristic` basis (a single named wind, not a multi-unit count
+   like Dragon Pung/Big Three Dragons, so it's simpler to fold into the
+   tile-membership-style formula than to special-case)
+9. All Simples (fan 68, 2pts) / 10. No Honors (fan 76, 1pt) — `heuristic`
+   basis; closely related (All Simples is strictly narrower — no honors
+   AND no terminals), kept as two estimators since they're two different
+   fans a hand can be working toward independently
 
-**How probability is estimated.** Explicitly a TEACHING heuristic, not a
-rigorously-derived statistical model — same posture as `defense.ts`'s own
-danger-tile signals (decisions.md #16: "a teaching heuristic... not a rules
-mechanic"). Two different mechanisms depending on what "completing" the
-family structurally means:
+Not exhaustive by design (per the doc's own text) — e.g. Pure/Mixed
+Straight (dropped above, but a legitimate later addition), Big Four Winds,
+knitted shapes, and the shifted-pung/chow families are all real but rarer
+or easier-to-eyeball, not v1.
 
-- **Shape families (Seven Pairs, All Pungs)** — completion means reaching a
-  specific STRUCTURE. Reuse the project's own already-validated shanten
-  machinery directly rather than inventing a parallel one:
+**How probability is estimated.** Two mechanisms, matching the new
+`probabilityBasis` field exactly — see that field's own comment for why
+they must never be presented as equivalent:
+
+- **`shanten` families (Seven Pairs, All Pungs)** — completion means
+  reaching a specific STRUCTURE. Reuse the project's own already-validated
+  shanten machinery directly rather than inventing a parallel one:
   - Seven Pairs: `sevenPairsShantenFromCounts` already exists
     (`shanten.ts`) and is exactly this family's own distance metric —
     `tilesNeeded` = the types with count 1 (need a second copy);
@@ -354,44 +393,48 @@ family structurally means:
     tiles that would complete a pung for each such group (reuses
     `tile-efficiency.ts`'s existing per-candidate ukeire machinery rather
     than a new tile-counting pass).
-- **Tile-membership families (Half/Full Flush, All Simples/No Honors,
-  wind/dragon pungs)** — completion means "every remaining/kept tile
+  - Dragon Pung / Big Three Dragons: structurally counted (how many of the
+    3 dragon types are already a pung, a pair, or absent), not a shanten-
+    formula reuse in the literal sense, but still a discrete, exact
+    "N of 3 already complete" count rather than a rough formula — closer
+    in spirit to `shanten`'s precision than to the tile-membership
+    heuristic below, so tagged `shanten` basis too (see the estimator's
+    own comment for the exact justification once written).
+- **`heuristic` families (Half/Full Flush, All Simples/No Honors,
+  Prevalent/Seat Wind)** — completion means "every remaining/kept tile
   satisfies some predicate" (single suit; no terminal/honor; a specific
-  wind/dragon reaches pung count). `tilesNeeded` = the OFFENDING tiles that
-  would need to go (for suit/simples families) or the exact tile(s) that
-  would complete the pung (for wind/dragon). `completionProbability` from a
-  simple, explicitly-labeled-as-rough formula: something monotonic in
-  "how many offending tiles remain, relative to the concealed hand's own
-  size" (exact formula to be pinned down per-family against fixture hands
-  when writing each estimator, same "pick constants against fixtures, not
-  by feel" discipline as Stage 1's `EARLY_GAME_MIN_SHANTEN`/
-  `VIABLE_ROUTE_SHANTEN_MARGIN` were).
-- **Straight family (Pure/Mixed Straight)** — a presence-based check, same
-  pattern `detectPureStraight`'s own comment already uses ("chow-starts at
-  1/4/7 present among the sets, not exact counts"): count how many of the
-  3 needed chow-starts already exist among the hand's chow-type groups (as
-  sets, or as ukeire-reachable partials), `tilesNeeded` = tiles completing
-  the missing start(s).
+  wind reaches pung count). `tilesNeeded` = the OFFENDING tiles that would
+  need to go (for suit/simples families) or the exact tile(s) that would
+  complete the pung (for wind). `completionProbability` from a simple,
+  explicitly-labeled-as-rough formula: something monotonic in "how many
+  offending tiles remain, relative to the concealed hand's own size"
+  (exact formula to be pinned down per-family against fixture hands when
+  writing each estimator, same "pick constants against fixtures, not by
+  feel" discipline as Stage 1's `EARLY_GAME_MIN_SHANTEN`/
+  `VIABLE_ROUTE_SHANTEN_MARGIN` were) — recorded in decisions.md as
+  explicitly non-rulebook-sourced (item #35), same treatment as
+  `defense.ts` (#16).
 
 **`MINIMUM_POINTS_TO_WIN` as a hard constraint**: not enforced inside
 `estimateFanTargets` itself (a single family's own points are usually well
-under 8 alone) — enforced at the future orchestration layer, by requiring
-the FEATURED combination (locked-in fans, from the already-existing
-`computeHandPlan`/`lockedInFansFromMelds`, plus the top candidate(s)) to sum
-to >= `MINIMUM_POINTS_TO_WIN` before it's presented as a real plan, same
-"hard constraint, not a suggestion" bar `computeHandPlan`'s own
-`bestCaseReachesMinimum`/`worstCaseReachesMinimum` already apply at tenpai.
+under 8 alone) — enforced at the future orchestration layer per CHANGE 3
+above.
 
 **Citations and fixtures**: every estimator's own comment cites its fan's
 `mcr_EN.pdf` section, matching the real detectors' own convention exactly
 (no exception for being "just an estimator") — verified fresh via
 `rules-lawyer` where the estimator's own structural reading isn't already
 settled by an existing, already-cited detector for the SAME fan (most of
-these 11 already have a real detector in `scoring/fans-*.ts` with its own
+these already have a real detector in `scoring/fans-*.ts` with its own
 citation — the estimator's job is "how close," not "is it true," so it can
 often cite the SAME already-verified passage rather than needing a fresh
 rules-lawyer pass per family). Each family gets its own fixtures in a new
 `fan-targets.test.ts`, same discipline as every `fans-N.test.ts` file.
+
+**First 3 families to implement, per explicit instruction, before the
+remaining 7**: Seven Pairs (`shanten` basis), Half/Full Flush (`heuristic`
+basis), and Dragon Pung/Big Three Dragons together (the `shanten`-adjacent
+basis) — one of each mechanism, working end to end, before the rest.
 
 ## Explicitly NOT in this phase (any stage)
 

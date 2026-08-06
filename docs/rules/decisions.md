@@ -1310,6 +1310,26 @@ corrected to match. See each item's status.
     backfill remains open but correctly deprioritized, not forgotten (see
     `KICKOFF-validation-harness.md`'s own updated list).
 
+35. **Fan-target completion probability, `heuristic`-basis families (Phase 10 Stage 3,
+    `packages/engine/src/fan-targets.ts`) — deliberately NOT sourced from `mcr_EN.pdf`, same
+    posture as item #16's `defense.ts`.** `mcr_EN.pdf` defines what each fan IS, never how
+    likely a partial hand is to complete one — there is no rulebook passage to cite for "how
+    close" the way every other entry in this file cites one for "is it true." The `fanId`,
+    `points`, and structural completion CONDITION each `heuristic`-basis estimator checks are
+    all real, cited fan definitions (same as every detector in `scoring/fans-*.ts`); only the
+    numeric `completionProbability` formula itself — a monotonic function of how many
+    "offending" tiles remain relative to hand size, with constants picked against fixture hands
+    the same way Stage 1's `EARLY_GAME_MIN_SHANTEN`/`VIABLE_ROUTE_SHANTEN_MARGIN` were — is
+    non-rulebook. `FanTargetEstimate.probabilityBasis` marks each estimate `'shanten'` (reuses
+    this project's own already-validated shanten/ukeire machinery — Seven Pairs, All Pungs,
+    Dragon Pung/Big Three Dragons) or `'heuristic'` (this item — Half/Full Flush, All Simples/
+    No Honors, Prevalent/Seat Wind) specifically so a future UI never presents the two as
+    equivalently-precise percentages (owner review, `KICKOFF-phase10-strategy-coach.md`'s Stage
+    3 design, CHANGE 2, 2026-08-07). Exact per-family formulas and constants are recorded in
+    each estimator's own code comment in `fan-targets.ts`, not duplicated here — this entry is
+    the umbrella citation for the CLASS of non-rulebook reasoning, matching how item #16 covers
+    `defense.ts`'s three signals under one entry rather than three.
+
 ## Open follow-up work
 
 - ~~**Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/
