@@ -32,10 +32,24 @@ function detectOutsideHand(ctx: HandContext): FanMatch[] {
 // 56. Fully Concealed Hand — 4 pts. §3.8.1 p.16 / App.1 p.38: "A hand that
 // is completed by Self-Drawing the winning tile, with no melded (exposed)
 // sets at all." Naturally mutually exclusive with Concealed Hand (fan 62,
-// same "zero melds" shape but a discard win) by winMethod alone — no
-// exclusion-table entry needed, matching Half Flush/Full Flush's pattern.
+// same "zero EXPOSED melds" shape but a discard win) by winMethod alone —
+// no exclusion-table entry needed, matching Half Flush/Full Flush's pattern.
+//
+// FIXED (docs/rules/decisions.md #30(b), then #33): used to check
+// `ctx.melds.length === 0` — literally zero sets of any kind — but a
+// concealed kong doesn't break concealment. §3.6.8 "How to Kong" is
+// direct and unambiguous: "(2) Concealed Kong: ... four identical tiles
+// concealed within the hand ... With a Concealed Kong, the hand can be
+// considered to be Concealed (if nothing else is melded)" — contrasted
+// with "(1) Melded Kong: ... the hand is no longer concealed (even if
+// there are no other melds in your hand)." Fan 12 Four Concealed Pungs's
+// own table text corroborates: "...(achieved without melding – Fully
+// Concealed may be combined if Self-Drawn)". Fixed to check that no meld
+// is EXPOSED, not that there are no melds at all — a self-drawn win with
+// only concealed kong(s) still qualifies.
 function detectFullyConcealedHand(ctx: HandContext): FanMatch[] {
-  return ctx.melds.length === 0 && ctx.winMethod === 'selfDraw' ? [{ fanId: 56, count: 1 }] : []
+  const noExposedMelds = ctx.melds.every((m) => m.exposure === 'concealed')
+  return noExposedMelds && ctx.winMethod === 'selfDraw' ? [{ fanId: 56, count: 1 }] : []
 }
 
 // 57. Two Melded Kongs — 4 pts. §3.8.1 p.16 / App.1 p.38: "A hand that

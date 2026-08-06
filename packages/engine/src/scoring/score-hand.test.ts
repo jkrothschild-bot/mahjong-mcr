@@ -221,15 +221,17 @@ describe('scoreHand', () => {
       winMethod: 'selfDraw',
       wonOnKongReplacement: true,
     })
-    // Concealed Kong (67, 2pts) and Pung of Terminals or Honors (73, 1pt —
-    // the East wind kong, with no prevailingWind/seatWind set here to
-    // exclude it) are unavoidable structural freebies of using a wind kong
-    // at all, same "verify the correct combined total" approach as the All
-    // Honors/Quadruple Chow tests above — not part of what this test is
-    // isolating. What matters: fan 46 present, fan 80 (Self-Drawn) absent,
-    // even though winMethod really is 'selfDraw'.
+    // Concealed Kong (67, 2pts), Pung of Terminals or Honors (73, 1pt — the
+    // East wind kong, with no prevailingWind/seatWind set here to exclude
+    // it), and Fully Concealed Hand (56, 4pts — the hand is fully concealed
+    // aside from the concealed kong, which per §3.6.8 doesn't break
+    // concealment; docs/rules/decisions.md #30(b)/#33) are unavoidable
+    // structural freebies of this hand shape, not part of what this test is
+    // isolating. What matters: fan 46 present, fan 80 (Self-Drawn) absent
+    // even though winMethod really is 'selfDraw' — suppressed by the
+    // pre-existing [56,80] exclusion once fan 56 correctly fires.
     const fanIds = result.fanMatches.map((m) => m.fanId).sort()
-    expect(fanIds).toEqual([46, 67, 73])
+    expect(fanIds).toEqual([46, 56, 67, 73])
     expect(fanIds).not.toContain(80)
   })
 })

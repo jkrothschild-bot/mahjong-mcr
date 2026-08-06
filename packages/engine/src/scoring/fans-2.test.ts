@@ -147,16 +147,14 @@ describe('Concealed Hand (fan 62)', () => {
     expect(FANS_2_DETECTORS[62]!(ctx)).toEqual([])
   })
 
-  // KNOWN BUG, not fixed here (fixture only) — same root cause as fan 56's
-  // sibling bug in fans-4.test.ts: this fan's own rulebook text (§3.8.1
-  // p.16, App.1 p.39) says "no melded (exposed) sets", but the detector
-  // checks `ctx.melds.length === 0` (any set at all, including a concealed
-  // kong the player declared themselves). A concealed kong should not
-  // disqualify a discard win from Concealed Hand.
-  it('BUG: incorrectly rejects a discard win that includes only a CONCEALED kong (should still qualify)', () => {
+  // FIXED (docs/rules/decisions.md #30(b), then #33) — same root cause and
+  // fix as fan 56's sibling in fans-4.test.ts: §3.6.8 "How to Kong" states
+  // a concealed kong does not break concealment ("the hand can be
+  // considered to be Concealed (if nothing else is melded)").
+  it('matches a discard win that includes only a CONCEALED kong', () => {
     const melds = [kongMeld('0-0', idsFor('WE', 4), 'concealed')]
     const ctx = ctxWith({ melds, winMethod: 'discard' })
-    expect(FANS_2_DETECTORS[62]!(ctx)).toEqual([]) // WRONG, should be [{ fanId: 62, count: 1 }]
+    expect(FANS_2_DETECTORS[62]!(ctx)).toEqual([{ fanId: 62, count: 1 }])
   })
 })
 

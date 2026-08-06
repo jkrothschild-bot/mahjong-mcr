@@ -97,24 +97,16 @@ describe('Fully Concealed Hand (fan 56)', () => {
     expect(FANS_4_DETECTORS[56]!(ctx)).toEqual([])
   })
 
-  // KNOWN BUG, not fixed here (fixture only) — docs/rules/mcr_EN.pdf §3.8.1
-  // p.16/p.14: fan 56's own text says "without any melds", and the same
-  // table's fan 5 (Four Kongs, "may be concealed or melded"), fan 57 (Two
-  // Melded Kongs, "One Melded Kong and one Concealed Kong are 6 points"),
-  // and fans 67/74 (Concealed Kong vs Melded Kong) all consistently use
-  // "meld"/"melded" to mean claimed-from-another-player, never a concealed
-  // kong the player declared themselves. A concealed kong should NOT
-  // disqualify a self-drawn win from Fully Concealed Hand — but
-  // detectFullyConcealedHand checks `ctx.melds.length === 0` (any set at
-  // all), not exposure, so it wrongly rejects this case. Found via the
-  // validation harness (1200-hand cross-check, seed 20260805): every hand
-  // with a concealed kong plus a self-drawn win under-scores by missing fan
-  // 56 (and, downstream, keeps Self-Drawn (80) instead of the [56,80]
-  // exclusion suppressing it — see score-hand.test.ts).
-  it('BUG: incorrectly rejects a self-drawn win that includes only a CONCEALED kong (should still qualify)', () => {
+  // FIXED (docs/rules/decisions.md #30(b), then #33, re-confirmed fresh via
+  // a second independent rules-lawyer pass before fixing — see #33).
+  // §3.6.8 "How to Kong" is direct: "With a Concealed Kong, the hand can
+  // be considered to be Concealed (if nothing else is melded)." A
+  // concealed kong does NOT disqualify a self-drawn win from Fully
+  // Concealed Hand.
+  it('matches a self-drawn win that includes only a CONCEALED kong', () => {
     const melds = [kongMeld('0-0', idsFor('WE', 4), 'concealed')]
     const ctx = ctxWith({ melds, winMethod: 'selfDraw' })
-    expect(FANS_4_DETECTORS[56]!(ctx)).toEqual([]) // WRONG, should be [{ fanId: 56, count: 1 }]
+    expect(FANS_4_DETECTORS[56]!(ctx)).toEqual([{ fanId: 56, count: 1 }])
   })
 })
 

@@ -48,9 +48,15 @@ function detectSeatWind(ctx: HandContext): FanMatch[] {
 // 62. Concealed Hand — 2 pts. §3.8.1 p.16 / App.1 p.39: "A hand with no
 // melded (exposed) sets, completed by winning off another player's
 // discard." Naturally mutually exclusive with Fully Concealed Hand (fan 56,
-// same zero-meld shape but a self-drawn win) by winMethod alone.
+// same zero-EXPOSED-meld shape but a self-drawn win) by winMethod alone.
+//
+// FIXED (docs/rules/decisions.md #30(b), then #33): same bug and same fix
+// as fan 56's sibling detector in fans-4.ts — see that function's comment
+// for the full §3.6.8 citation. A concealed kong doesn't disqualify a
+// discard win from Concealed Hand either.
 function detectConcealedHand(ctx: HandContext): FanMatch[] {
-  return ctx.melds.length === 0 && ctx.winMethod === 'discard' ? [{ fanId: 62, count: 1 }] : []
+  const noExposedMelds = ctx.melds.every((m) => m.exposure === 'concealed')
+  return noExposedMelds && ctx.winMethod === 'discard' ? [{ fanId: 62, count: 1 }] : []
 }
 
 // 63. All Chows — 2 pts. §3.8.1 p.16 / App.1 p.39: "A hand composed
