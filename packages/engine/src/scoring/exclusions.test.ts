@@ -178,19 +178,18 @@ describe('Fully Concealed Hand should NOT be excluded by these five fans', () =>
   })
 })
 
-// NEW bug, found during Step 4/5 triage (docs/rules/decisions.md, item
-// logged alongside the #23 regression above) — NOT fixed here, fixture only.
-// All Even Pungs (21: pungs/kongs of 2/4/6/8 only) and All Fives (31: every
-// set includes a 5) each structurally can never include an honor tile, same
-// shape as the 8 other [X,76] entries already in this table (8, 13, 22, 25,
-// 26, 27, 29, 36, 37, 63, 68) — simply missed when those two fans were
-// transcribed. Found via validation/allowlist.py cleanup (decisions.md #26).
-describe('KNOWN BUG: All Even Pungs / All Fives should exclude No Honors', () => {
-  it('All Even Pungs (21) should exclude No Honors (76) but does not yet', () => {
-    expect(areExclusive(21, 76)).toBe(false) // WRONG, should be true
+// FIXED (docs/rules/decisions.md #26, then #33). All Even Pungs (21:
+// pungs/kongs of 2/4/6/8 only) and All Fives (31: every set includes a 5)
+// each structurally can never include an honor tile, same shape as the 8
+// other [X,76] entries already in this table (8, 13, 22, 25, 26, 27, 29,
+// 36, 37, 63, 68) — simply missed when those two fans were transcribed.
+// Found via validation/allowlist.py cleanup (decisions.md #26).
+describe('All Even Pungs / All Fives exclude No Honors', () => {
+  it('All Even Pungs (21) excludes No Honors (76)', () => {
+    expect(areExclusive(21, 76)).toBe(true)
   })
-  it('All Fives (31) should exclude No Honors (76) but does not yet', () => {
-    expect(areExclusive(31, 76)).toBe(false) // WRONG, should be true
+  it('All Fives (31) excludes No Honors (76)', () => {
+    expect(areExclusive(31, 76)).toBe(true)
   })
 })
 

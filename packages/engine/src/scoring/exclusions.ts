@@ -225,6 +225,14 @@ export const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // 21. All Even Pungs
   [21, 49], // All Pungs
   [21, 68], // All Simples
+  // 21 -> 76: derived, same "X structurally has no honors" pattern as the
+  // other [X,76] entries in this table. All Even Pungs's own §3.8.1 text:
+  // "A hand formed with Pungs or Kongs of 2, 4, 6, and 8 tiles, with a pair
+  // of the same" — every set AND the pair is restricted to even-numbered
+  // SUIT ranks, which structurally excludes honor tiles (they have no
+  // numeric rank at all). Simply missed when this fan's own section was
+  // transcribed. docs/rules/decisions.md #26/#33.
+  [21, 76], // No Honors
   // 22. Full Flush
   [22, 76], // No Honors
   // 23. Pure Triple Chow
@@ -244,6 +252,13 @@ export const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   [29, 63], // All Chows
   // 31. All Fives
   [31, 68], // All Simples
+  // 31 -> 76: derived, same pattern as [21,76] just above. All Fives's own
+  // §3.8.1 text: "A hand in which every set (chow, pung, kong, pair)
+  // includes the number '5'" — every group must contain a suited rank-5
+  // tile, which structurally excludes honor tiles (no numeric rank at all).
+  // Simply missed when this fan's own section was transcribed.
+  // docs/rules/decisions.md #26/#33.
+  [31, 76], // No Honors
   // 34. Lesser Honors and Knitted Tiles
   [34, 52], // All Types
   [34, 62], // Concealed Hand

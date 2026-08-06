@@ -42,8 +42,19 @@ export const GRANDFATHERED_PAIRS: readonly [number, number][] = [
 // item #23 had, and exactly what this map exists to prevent from
 // recurring). Keyed by pairKey(a, b) below.
 export const CITATIONS: ReadonlyMap<string, string> = new Map([
-  // Seeded empty — no exclusion pair has been added or changed since this
-  // guard landed. The next one added must come with a real entry here.
+  [
+    pairKey(21, 76),
+    'docs/rules/mcr_EN.pdf §3.8.1 p.15: All Even Pungs (21) — "A hand formed with Pungs or Kongs of 2, 4, 6, and 8 ' +
+      'tiles, with a pair of the same" — every set AND the pair is restricted to even-numbered suit ranks, which ' +
+      'structurally excludes honor tiles (no numeric rank at all), trivially satisfying No Honors (76: "formed ' +
+      'entirely of suit tiles, without Winds or Dragons"). docs/rules/decisions.md #26/#33.',
+  ],
+  [
+    pairKey(31, 76),
+    'docs/rules/mcr_EN.pdf §3.8.1 p.16: All Fives (31) — "A hand in which every set (chow, pung, kong, pair) ' +
+      'includes the number \'5\'" — every group must contain a suited rank-5 tile, structurally excluding honor ' +
+      'tiles, trivially satisfying No Honors (76). docs/rules/decisions.md #26/#33.',
+  ],
 ])
 
 export function pairKey(a: number, b: number): string {

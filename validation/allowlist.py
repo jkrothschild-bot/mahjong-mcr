@@ -139,11 +139,6 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),
     ),
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'All Even Pungs / All Fives should exclude No Honors' (missing "
-        "[21,76]/[31,76]) — found via allowlist cleanup, docs/rules/decisions.md #26; fixtured during Step 4/5 triage.",
-        frozenset({"No Honors"}),
-    ),
-    (
         "packages/engine/src/scoring/exclusions.test.ts — 'All Terminals and Honors should exclude Outside Hand' (missing "
         "[18,55]) — same 'narrower named fan implies a broader one' shape as the existing [8,55]/[11,55] entries (18 is "
         "the union of 8 and 11); found during Step 4/5 triage of the unclassified mismatches.",
