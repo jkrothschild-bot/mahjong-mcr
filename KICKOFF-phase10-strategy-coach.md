@@ -7,56 +7,76 @@ session's deliverable.** Stages 2 and 3 are specified so the Stage 1 data
 shapes don't have to be reworked to accommodate them, but do NOT start them
 until Stage 1 is merged, validated, and reviewed by the owner.
 
-## State of play / resume here (2026-08-03)
+## State of play / resume here (2026-08-06)
 
-**Stage 1 (1a-1f) is complete**, including the Hand Plan tab's route table
-(`computeHandPlan`'s `routes`/`primaryRoute`, `HandPlanTab.tsx`) — a gap this
-doc's original 1a-1f list didn't call out explicitly (it only named the Best
-Move tab) but which had the identical bug: `HandPlanTab.tsx` was rendering a
-single crowned-min shape from `calculateShanten`, the same collapse Stage 1a
-undid for discard ranking. Fixed the same way: both routes shown when they're
-within `VIABLE_ROUTE_SHANTEN_MARGIN` of each other, a primary route named only
-when one is clearly ahead. Full suite + typecheck green throughout.
+**Stage 1 (1a-1f) is complete, INCLUDING the decision tree's negative branch
+— the ranking is reverted, the display is kept.** This also includes the
+Hand Plan tab's route table (`computeHandPlan`'s `routes`/`primaryRoute`,
+`HandPlanTab.tsx`) — a gap this doc's original 1a-1f list didn't call out
+explicitly (it only named the Best Move tab) but which had the identical bug:
+`HandPlanTab.tsx` was rendering a single crowned-min shape from
+`calculateShanten`, the same collapse Stage 1a undid for discard ranking.
+Fixed the same way: both routes shown when they're within
+`VIABLE_ROUTE_SHANTEN_MARGIN` of each other, a primary route named only when
+one is clearly ahead.
 
-**One open question, unresolved: does the regret-aware `rankDiscards` cost
-winrate?** A 300-seed self-play A/B (the doc's own §1e gate) came back
-`newWins=122 oldWins=142 draws=36` — read honestly this is *inconclusive*
-(≈1.2 sd from a null of no difference, p≈0.22 — see decisions.md #18), not a
-confirmed regression, but it's also nowhere near a confirmed pass. Two
-under-powered runs at this same seed count (this one and the pre-cap
-diagnostic already in `policy.ts`'s comments) don't compound into stronger
-evidence either, since they share the same seed range and engine. Resolving
-it needs roughly 2000 seeds, not yet run (§6 below covers whether/when this
-session ran that).
+**The winrate question this doc originally left open is now resolved,
+negative, and acted on (2026-08-06 — decisions.md #18).** Three 300-seed
+self-play A/B runs exist (the doc's own §1e gate, run three separate times
+under three different engine states): `oldWins=145 newWins=119`,
+`oldWins=142 newWins=122`, `oldWins=132 newWins=117`. None individually
+significant, but the regret-aware ranking has never once cleared this doc's
+own stated bar (newWins >= oldWins) in any of the three tries. Per this doc's
+own decision tree below (unchanged from when it was written, and followed
+exactly): **that's the negative branch.**
 
-**Decision tree once a real number exists:**
-- **Negative at 2000 seeds** (regret-aware ranking genuinely costs winrate):
-  revert `rankDiscards` in `policy.ts` to the pre-Stage-1 greedy comparator
-  (`legacyDiscardCompare` alone, no regret/threshold logic), but KEEP
-  everything display-side — the route table (1a), `BestMoveHint`'s structured
-  output (1c), confidence/alternatives, and both rebuilt tabs. Those are what
-  actually fixed the reported problem (the coach now SHOWS both routes and
-  their real cost, e.g. "3 fewer outs to stay flexible" — a human player can
-  read that and choose; the bot doesn't need to auto-commit to the flexible
-  choice for the fix to have worked). `computeRouteRegret` and the two
-  Stage-1b constants would go with the revert; `hints.ts`'s features/routeTable
-  computation doesn't depend on `rankDiscards`' comparator logic itself, only
-  on `evaluateDiscards`' per-candidate routes, so this split is clean.
-- **Neutral at 2000 seeds:** keep the ranking as-is, and record "no measurable
-  effect on winrate" in decisions.md #18 rather than leaving it unresolved.
-- Either way, this result also directly informs Stage 2's premise (depth-2
-  evaluation "so flexibility falls out of the arithmetic instead of a penalty
-  constant") — a confirmed-neutral Stage 1 makes Stage 2 a pure quality
-  improvement; a confirmed-negative Stage 1 makes Stage 2's depth-2 approach
-  the thing actually being bet on to make route-awareness pay for itself.
+**What was done about it:** `rankDiscards` (`packages/engine/src/bots/policy.ts`)
+reverted to the pre-Stage-1 greedy comparator (`legacyDiscardCompare` alone).
+`computeRouteRegret` and its two ranking-side constants
+(`EARLY_GAME_MIN_SHANTEN`, `MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY`) removed
+from `policy.ts` entirely. Display-side Stage 1 work KEPT exactly as this
+doc's decision tree specified: `evaluateDiscards`' per-candidate routes,
+`BestMoveHint`'s structured output, confidence, alternatives, and both
+rebuilt tabs all still work. This needed `computeRouteRegret` and
+`VIABLE_ROUTE_SHANTEN_MARGIN` relocated (not deleted) from `policy.ts` into
+`hints.ts` — this doc's own claim below that "`hints.ts`'s features/routeTable
+computation doesn't depend on `rankDiscards`' comparator logic itself" was
+right in spirit but understated in practice: `hints.ts` imported both symbols
+from `policy.ts` directly for confidence/alternatives/route-viability, not
+merely `evaluateDiscards`' routes — a real dependency the split had to
+account for. `hints.test.ts`'s live-hand fixture (the 2C-triplet hand this
+whole phase was built around) now correctly asserts the reverted (2C)
+recommendation instead of the Stage-1 (isolated-tile) one — see
+decisions.md #18 for the full before/after numbers. Full engine + UI suites
+green, typecheck clean, both packages.
 
-**Stages 2 and 3 remain gated** — do not start either until the above is
-resolved and the owner has reviewed Stage 1.
+**Stage 2's premise has changed as a direct result.** This doc's own text
+below already said as much would happen: "a confirmed-negative Stage 1 makes
+Stage 2's depth-2 approach the thing actually being bet on to make
+route-awareness pay for itself" — that is now the situation, not a
+hypothetical. Stage 2's depth-2 evaluation (replacing the now-removed
+Stage-1b constants with "flexibility falls out of the arithmetic instead of
+a penalty constant") is the next real chance for route-awareness to help bot
+play, not just hint display. **Stage 2 was NOT started this session** — the
+instruction that produced this revert was explicit: do not start it.
 
-**Next session should start with the `validation/` PyMahjongGB harness**, not
-Stage 2 — it's been outstanding since PLAN.md's original scope and CLAUDE.md's
-scoring-validation rule is currently unsatisfiable without it (see CLAUDE.md).
-That's unrelated to this phase's ranking question but is a bigger, older gap.
+**Stage 3 is unchanged** — still gated, still not started, still the same
+scope (fan-distance partial matchers for the "Route to eight points" panel).
+
+A properly-powered re-test (2000 seeds, a FRESH seed range — not another
+`0..1999` sweep from the same generator, which would just repeat seeds
+0-299 as a prefix — and a raised test timeout, since the current hardcoded
+20 minutes only fits ~300 seeds) remains available if this specific
+ranking question is ever reopened, e.g. if Stage 2 wants a clean
+pre-depth-2 baseline to compare against. Not done this session; see
+decisions.md #18 for exactly why (time-boxed to a "report honestly, change
+no code" request, and raising the timeout would have meant editing the
+test file being measured).
+
+**Next session should still consider the `validation/` PyMahjongGB
+harness's own remaining follow-up work** (see CLAUDE.md and
+`KICKOFF-validation-harness.md`) before Stage 2 — unrelated to this phase's
+ranking question, but was the older, bigger gap and has its own open items.
 
 ## The problem, from a live hand
 

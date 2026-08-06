@@ -378,9 +378,61 @@ corrected to match. See each item's status.
     fully hold (same seed range every time, two of three runs sharing one engine state), so this
     pooled figure is illustrative of "the direction keeps repeating," not a valid combined test —
     treat it as a reason to actually run the real 2000-fresh-seed test, not as a substitute for
-    it. **Still no code changed based on any of this** — the merge gate remains unresolved, and
-    the ranking change from earlier in this item stays in place pending a properly-powered,
-    genuinely-independent-seed run.
+    it. **Still no code changed based on any of this** at the time it was written — see the
+    revert below, decided the same day on the strength of these three runs together.
+
+    **REVERTED, 2026-08-06 — the negative branch of this item's own decision tree
+    (`KICKOFF-phase10-strategy-coach.md`).** Three self-play runs now exist, all 300 seeds:
+    `oldWins=145 newWins=119` (pre-cap diagnostic), `oldWins=142 newWins=122` (the doc's own
+    merge gate, actually run), `oldWins=132 newWins=117` (the third run above). **Every run lands
+    on the same side — the regret-aware ranking has never once shown newWins >= oldWins, the
+    doc's own stated bar for keeping it — and none individually reaches significance.** Per the
+    reasoning above, the three are not independent samples (shared seed range 0-299 throughout;
+    runs 2 and 3 additionally share engine state with each other more than with run 1), so this
+    is NOT "three failed attempts to prove a regression" — it's better read as "the ranking has
+    had three chances, under three different conditions, to show a real benefit, and has not
+    shown one in any of them." That is the basis for reverting: not a confirmed-significant
+    regression, but an unvalidated constant with zero supporting evidence across every
+    opportunity it's had to produce any, kept in production code making real bot/hint decisions.
+    Reverted `rankDiscards` (`bots/policy.ts`) to the pre-Stage-1 greedy comparator
+    (`legacyDiscardCompare` alone) — removed `computeRouteRegret` and its two ranking-side
+    constants (`EARLY_GAME_MIN_SHANTEN`, `MAX_UKEIRE_SACRIFICE_FOR_FLEXIBILITY`) from that file
+    entirely. **Display-side Stage 1 work is explicitly KEPT, per the doc's own reasoning that
+    it — not the ranking — is what actually fixed the reported problem**: `evaluateDiscards`'
+    per-candidate routes, `BestMoveHint`'s structured output, confidence, alternatives, and both
+    rebuilt tabs all still work exactly as before. This required relocating (not deleting)
+    `computeRouteRegret` and `VIABLE_ROUTE_SHANTEN_MARGIN` from `policy.ts` into `hints.ts` —
+    the KICKOFF doc's own claim that "`hints.ts`'s features/routeTable computation doesn't
+    depend on `rankDiscards`' comparator logic itself" was correct in spirit but understated in
+    practice: `hints.ts` imported `computeRouteRegret`/`VIABLE_ROUTE_SHANTEN_MARGIN` from
+    `policy.ts` directly, for confidence/alternatives/route-viability, not merely
+    `evaluateDiscards`' routes — a real code dependency the split had to account for, found by
+    attempting the revert and reading the actual import graph, not by re-trusting the doc's own
+    prediction. Both fixture tests asserting the old regret-aware recommendation (`kickoffLiveHand`
+    in `hints.test.ts`) were updated to the new, correct, greedy recommendation (a 2C, exactly the
+    pre-Stage-1 answer) rather than deleted — the route table still correctly shows Standard and
+    Seven Pairs both structurally alive regardless of which tile is recommended, since viability is
+    judged against the best any candidate could achieve, not the recommended candidate alone; this
+    is the concrete case for "the coach shows the flexibility, the bot doesn't need to enforce it."
+    Full engine + UI suites green (packages/engine 445 passed/1 skipped; packages/ui 395 passed),
+    typecheck clean, both packages.
+
+    **A properly-powered run remains available if this question is ever reopened**: 2000 seeds, a
+    FRESH seed range (not `0..1999` from the same generator, which would just re-run seeds 0-299
+    yet again as a prefix — pick a disjoint range or add a seed-offset parameter to
+    `selfplay-compare.test.ts`), and a raised test timeout (the current hardcoded 20 minutes fits
+    ~300 seeds at ~1.5s/seed; 2000 needs roughly 50 minutes). None of that was done here — this
+    session's third run stayed at 300 seeds specifically because the timeout couldn't be changed
+    without editing the test file, which was out of scope for a "report honestly, change no code"
+    request.
+
+    **Downstream effect on Stage 2's own premise** (this item's original text, still accurate):
+    with Stage 1's ranking now confirmed-negative-in-direction (not confirmed-significant, but
+    never once positive either) rather than merely unresolved, Stage 2's depth-2 evaluation
+    ("flexibility falls out of the arithmetic instead of a penalty constant") is now THE thing
+    being bet on to make route-awareness pay for itself in bot play — see
+    `KICKOFF-phase10-strategy-coach.md`'s updated state-of-play. Stage 2 itself was not started
+    this session.
 
 19. **Validation harness Stage 1 (`KICKOFF-validation-harness.md`) — the PyMahjongGB cross-check
     now exists and has been run for real (2026-08-05).** 1200 hands generated (seed range: run
