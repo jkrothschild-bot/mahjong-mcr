@@ -260,3 +260,72 @@ shift again once Step 3's fixes land, the same way item #20's own fix
 shifted 126 hands out of unclassified without changing engine behavior —
 don't assume the residual count is stable, re-run after each fix per
 CLAUDE.md's standing rule.
+
+## Steps 4/5 complete (2026-08-06) — see decisions.md #30/#31 for the full record
+
+Step 3's six original bugs are fixed. Step 4 (triage the unclassified
+residual) and Step 5 (record a final baseline) are also done: the harness
+was re-run fresh, every `our_bug` hand was individually inspected (not just
+counted — `compare.py` now emits an `ourBugDetail` array alongside
+`unclassifiedDetail`), and the allowlist was re-validated against the
+current run rather than trusted as-is. **This surfaced four more confirmed
+bugs, plus one already-shipped commit that turned out to be a regression —
+do not defer these the way item #6's knitted-shape gap was deferred (that
+deferral used the exact words "out of scope" and went on to become the most
+severe bug in the engine, per `decisions.md` #19). Each has a fixture
+already committed; none has been fixed yet. In priority order:**
+
+1. **Revert `exclusions.ts`'s `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
+   (decisions.md #23, corrected by #30(a)).** This is a live scoring
+   regression in already-shipped code, not a gap — `mcr_EN.pdf`'s own
+   primary fan table explicitly says the opposite of what these five
+   exclusion-table entries encode. Highest priority of everything on this
+   list: it's actively wrong today, in a shipped commit, for real players.
+2. **Fix `detectFullyConcealedHand` (fan 56, fans-4.ts) and
+   `detectConcealedHand` (fan 62, fans-2.ts)** — both check
+   `ctx.melds.length === 0` where they should check "no EXPOSED meld",
+   wrongly rejecting any hand containing a concealed kong. decisions.md
+   #30(b).
+3. **Fix `detectTwoConcealedPungs` (fan 66, fans-2.ts)** — wrongly excludes
+   concealed kongs from its count (`s.kind === 'pung'` should be
+   `s.kind !== 'chow'`, matching every sibling detector in the codebase).
+   decisions.md #30(c). Note: fixing this will also shrink the item #11
+   `ambiguity` bucket, which this bug has been hiding inside — re-run the
+   harness after this fix specifically to see how much.
+4. **Add `exclusions.ts`'s `[18, 55]`** (All Terminals and Honors excludes
+   Outside Hand, same shape as the existing `[8,55]`/`[11,55]`).
+   decisions.md #30(d).
+5. **Add a `specialShape === 'sevenPairs'` branch to `detectAllTypes`**
+   (fan 52, fans-6.ts) — currently can never fire for Seven Pairs at all,
+   contradicting fan 19's own Appendix 1 worked example. This was the
+   single largest bug by hand-count found this session (20 of ~55
+   unclassified hands). decisions.md #30(e).
+6. **Fix `detectTileHog`'s multi-type undercount** (fan 64, fans-2.ts) —
+   the original item #27 finding, still unfixed after two full triage
+   passes. Only returns count 1 even when two separate tile types are each
+   hogged.
+7. **Add `exclusions.ts`'s `[21,76]`/`[31,76]`** (All Even Pungs / All
+   Fives exclude No Honors, same shape as the 8 other `[X,76]` entries) —
+   the original item #26 finding, fixtured but still unfixed.
+8. **Investigate `validation/src/win-circumstance.ts`'s
+   `otherCopiesInOwnHand`** — a bug in the harness itself, not the engine,
+   but it's actively disguising ~6 real hands as "unclassified" (looking
+   like an open rules question) when they're really a harness-generator
+   defect. decisions.md #30(h).
+
+Each of 1-7 already has a fixture (a failing-by-design `it` documenting the
+current wrong behavior) — per CLAUDE.md's standing rule, the fix for each
+is a separate commit from a fresh session pass, not bundled together, and
+each needs its own harness re-run afterward to confirm the delta (same
+protocol Step 3 used for every one of its six fixes — see decisions.md
+#22/#23/#25/#26/#28/#29 for the exact "before/after" reporting format to
+match). After fixing 1-3 specifically, re-triage decisions.md #30(h)'s
+~9-hand "genuinely still open" residual too — some of those may turn out to
+be downstream symptoms of the same root causes, the same way item #30(d)'s
+`[18,55]` finding turned out to be hiding behind item #11's diff in 6 hands
+that looked unrelated at first glance.
+
+Still parked, not part of this list: Phase 10's 2000-seed self-play
+regression question (`KICKOFF-phase10-strategy-coach.md`'s "State of play"
+section) — unrelated to scoring validation, not touched by any of Steps
+1-5.

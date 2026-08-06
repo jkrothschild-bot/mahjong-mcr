@@ -34,23 +34,41 @@ both before any work.
   introducing no NEW `our_bug`/UNCLASSIFIED mismatches (see
   validation/README.md for the exact command; validation/allowlist.py's module
   docstring for what `their_bug`/`ambiguity`/`our_bug`/UNCLASSIFIED mean). The
-  harness exists and has been run for real (docs/rules/decisions.md #19,
-  2026-08-05: 1200 hands, 77/81 fans covered) — this rule is satisfiable now,
-  but not fully clean: that run found **7 pre-existing engine bugs**, not 6 —
-  six missing-exclusion/detector bugs in `exclusions.ts`/`fans-2.ts` PLUS one
-  more severe than either: `decomposeHand` has no notion of a "knitted" set,
-  so `isWinningHand` returns `false` for every hand fans 20/34/35 (Greater/
-  Lesser Honors and Knitted Tiles, Knitted Straight) require — a player
-  cannot even declare these hands won, and they're 3 of the harness's 4
-  uncovered fans. Each bug (all 7) has a permanent failing-by-design fixture
-  already committed, per the rule below — see decisions.md #19 for the full
-  list. Also ~180 hands still genuinely unclassified. Don't cite "PyMahjongGB
-  cross-check passes" for the WHOLE engine without qualification — it means
-  clean *for the fans your change touches*, checked against the current
-  baseline in decisions.md #19, not zero mismatches system-wide (some are
-  expected forever: PyMahjongGB's own house-rule extensions, and one
-  still-provisional rulebook ambiguity, #11). Stage 2 (CI integration, gating
-  every push) is separate follow-up work, not started.
+  harness exists and has been run for real, most recently 2026-08-06
+  (docs/rules/decisions.md #31, superseding #19: 1200 hands, seed 20260805,
+  80/81 fans covered) — this rule is satisfiable now, but not fully clean:
+  that run found **9 confirmed engine bugs total**, not 7 — the 6 exclusion/
+  detector bugs from the original #19 run (all fixed, Step 3), the
+  `decomposeHand`-has-no-"knitted"-set gap (also fixed, item #20), PLUS
+  **3 more found in the Step 4/5 pass (decisions.md #30)**: `detectTileHog`
+  still undercounts multi-type hogs (item #27, unfixed), All Even Pungs/All
+  Fives are missing their `[21,76]`/`[31,76]` No-Honors exclusions (unfixed),
+  and — the highest-priority one — **a REGRESSION in an already-shipped
+  commit**: item #23's `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`
+  exclusions directly contradict `mcr_EN.pdf`'s own primary fan table
+  ("Fully Concealed may be combined if Self-Drawn" is stated explicitly for
+  all five) and must be reverted. Two further NEW bugs (not counted in the
+  "9" above since they weren't in the original 6/7-bug framing at all) were
+  also found and fixtured in the same pass: `detectFullyConcealedHand`/
+  `detectConcealedHand` wrongly reject a concealed kong, and
+  `detectTwoConcealedPungs` wrongly excludes kongs from its count, and
+  `detectAllTypes` never checks the Seven Pairs shape (this last one alone
+  explained 20 of the ~55 unclassified hands). Every one of these has a
+  permanent failing-by-design fixture already committed — see
+  decisions.md #30 for the full list and #31's "Open follow-up work" for
+  what's next. **29 hands remain genuinely unclassified** (down from ~180
+  after item #20's classifier fix, then 55 after item #29's Step-3 tally) —
+  of those, ~14 are benign equal-scoring decomposition ties (not a bug on
+  either side) and 6 trace to a bug in the validation harness itself
+  (`validation/src/win-circumstance.ts`, not `packages/engine`), leaving
+  ~9 genuinely still open. Don't cite "PyMahjongGB cross-check passes" for
+  the WHOLE engine without qualification — it means clean *for the fans your
+  change touches*, checked against the current baseline in decisions.md #31,
+  not zero mismatches system-wide (some are expected forever: PyMahjongGB's
+  own house-rule extensions, and one still-provisional rulebook ambiguity,
+  #11 — which item #30(c) found may also be masking an additional, distinct,
+  as-yet-unquantified our_bug). Stage 2 (CI integration, gating every push)
+  is separate follow-up work, not started.
 - Run typecheck + full test suite before every commit. Never commit red.
 - Every scoring bug found becomes a permanent test fixture before it is fixed.
 - Record any rulebook-ambiguity ruling in docs/rules/decisions.md.

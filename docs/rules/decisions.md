@@ -748,27 +748,248 @@ corrected to match. See each item's status.
     Concealed Hand family (item #23), Tile Hog chow-counting (item #25), All Simples/Pure
     Terminal Chows vs No Honors (item #26), Out with Replacement Tile vs Self-Drawn (item #28),
     All Green family (this item). `our_bug` fell from 449 (item #19's original count, now
-    understood as 7 bugs not 6 per CLAUDE.md's Step 0 correction) to 15 — the residual 15 splits
-    between the pre-existing item #11 concealment ambiguity (8 hands, unrelated to Step 3) and
-    the newly-found item #27 Tile Hog multi-type gap (7 hands, discovered but deliberately not
-    fixed — out of the original 6-bug scope). Two more new, unfixed gaps surfaced along the way
-    and are tracked below: item #27 itself, and the `[21,76]`/`[31,76]` All Even Pungs/All Fives
-    finding from item #26's allowlist cleanup.
+    understood as 7 bugs not 6 per CLAUDE.md's Step 0 correction) to 15.
+    **Correction (see item #30): the "residual 15 splits between item #11 and item #27" claim
+    two sentences above this note originally made is WRONG** — item #11 is classified
+    `ambiguity`, not `our_bug`, and cannot be part of an `our_bug` count by construction. The
+    true breakdown, re-derived in item #30, is 7 hands (item #27, Tile Hog) + 8 hands (a
+    previously-unnamed eighth bug, also found in item #30). Left the original wrong sentence
+    text just above unedited (rather than silently rewritten) so the correction is visible
+    in-place; do not trust it, trust item #30 instead.
+
+30. **Step 4/5 (2026-08-06): the ~55-57 unclassified mismatches triaged, the allowlist
+    re-validated end-to-end, and FOUR new confirmed engine bugs found — one of them a
+    regression in an already-shipped commit (item #23).** Full methodology: re-ran the harness
+    fresh (`npm run generate -- 1200 20260805` against the current engine, then
+    `compare.py --json-report`) rather than trusting item #29's stored numbers, added an
+    `ourBugDetail` array to `compare.py`'s JSON report (mirroring the existing
+    `unclassifiedDetail`) so every `our_bug` hand's seed/diff/citation is inspectable, not just
+    aggregate counts — this is what surfaced the item #29 misattribution above. Every finding
+    below follows the same triage protocol as Step 3: reproduce from the seed, consult
+    `mcr_EN.pdf` directly (via `rules-lawyer` for the ones needing a fresh citation, or direct
+    `Read` of the PDF pages myself for the highest-stakes one), classify, fixture-first for any
+    `our_bug`, never fix engine logic to match PyMahjongGB without a citation.
+
+    **(a) REGRESSION, not a fix — item #23 is WRONG and must be reverted.** Investigating why
+    the "Fully Concealed Hand" `our_bug` citation was still catching 8 hands after item #23
+    supposedly fixed exactly this family led to re-reading `mcr_EN.pdf`'s primary fan table
+    (§3.8.1, p.14-15) directly. It explicitly annotates fans 4 (Nine Gates), 6 (Seven Shifted
+    Pairs), 7 (Thirteen Orphans), 12 (Four Concealed Pungs), and 19 (Seven Pairs) with **"(Fully
+    Concealed may be combined if Self-Drawn)"** — the literal opposite of what item #23 encoded
+    into `exclusions.ts` as `[4,56]`/`[6,56]`/`[7,56]`/`[12,56]`/`[19,56]`. Item #23 was based on
+    PyMahjongGB's `adjust_fan_table` behavior (`"把不求人修正为自摸"`) without the direct rulebook
+    citation `KICKOFF-validation-harness.md` 1e requires before changing engine behavior to
+    match PyMahjongGB — precisely the failure mode that document's own text warns is "the one
+    failure mode that makes this phase actively harmful." **This is invisible to the harness
+    cross-check by construction**: PyMahjongGB and our (post-#23) engine now share the SAME
+    wrong answer for these five fans, so no mismatch is ever generated to catch it — only a
+    direct rulebook re-read surfaced it. Fixture-first, not yet reverted:
+    `exclusions.test.ts`'s "KNOWN REGRESSION" describe block still asserts the current (wrong)
+    `areExclusive(...) === true` for all five pairs, annotated `// WRONG, should be false`, with
+    the five exact rulebook quotes. **Reverting `exclusions.ts` itself is the highest-priority
+    follow-up from this session — see the KICKOFF scheduling note below.**
+
+    **(b) NEW bug: `detectFullyConcealedHand` (fan 56) and its sibling `detectConcealedHand`
+    (fan 62) wrongly disqualify a hand containing a CONCEALED kong.** Both check
+    `ctx.melds.length === 0` (fans-4.ts / fans-2.ts) — literally zero sets of any kind — but
+    each fan's own rulebook text says "without any melds" specifically, and the same §3.8.1
+    table consistently uses "meld"/"melded" to mean claimed-from-another-player throughout (fan
+    5 "Four Kongs...may be concealed or melded"; fan 57 "One Melded Kong and one Concealed Kong
+    are 6 points"; fans 67/74's Concealed-vs-Melded-Kong split) — a concealed kong a player
+    declares themselves is definitionally not a "meld" under this vocabulary. Confirmed via
+    `rules-lawyer` against the primary table AND Appendix 1 (p.16, p.39). This is the bug that
+    was hiding behind item #23's now-stale citation — it produces the exact same
+    `{"Fully Concealed Hand", "Self-Drawn"}` name-diff signature the old (fixed) missing-
+    exclusion bug used to, so the allowlist kept crediting a closed bug for a live one until
+    this session's `ourBugDetail` breakdown forced a look at the actual hands. Fixture-first, not
+    fixed: two new `it`s in `fans-4.test.ts`/`fans-2.test.ts` (fan 56 and 62 respectively).
+    `validation/allowlist.py`'s `OUR_BUG_FAMILIES` citation for this family repointed to the new
+    fixtures (same name-frozenset, corrected root cause). 8 hands in the current 1200-hand run.
+
+    **(c) NEW bug: `detectTwoConcealedPungs` (fan 66) wrongly excludes concealed kongs from its
+    count.** The detector's own comment claimed fan 66's rulebook wording is deliberately
+    "Pungs" only (no kongs), unlike fan 12/33's "Pungs or Kongs" — this distinction does not
+    exist in the actual PDF text (confirmed via `rules-lawyer` AND independently by reading
+    Appendix 1 p.40 myself): fan 66's own worked example is **"Concealed Pung; Concealed Kong,
+    won with a discarded 3 Character... Combined with Double Pung, Concealed Kong..."** — the
+    example itself composes "Two [Concealed Pungs]" from one concealed pung PLUS one concealed
+    kong. Every sibling detector in this codebase (fans-16.ts's Three Concealed Pungs,
+    fans-64.ts's Four Concealed Pungs) correctly filters `s.kind !== 'chow'` (pung-or-kong);
+    `detectTwoConcealedPungs` filtering `s.kind === 'pung'` is the sole exception in the whole
+    `scoring/` directory (checked via `grep -n "kind === 'pung'"` across every `fans-*.ts`) — an
+    outlier against the codebase's own established convention, and apparently never
+    independently re-verified against the PDF (violating CLAUDE.md's "never implement a scoring
+    rule from memory" rule — the wrong claim had stood, uncited-to-the-actual-PDF, since this
+    detector was first written). Fixture-first, not fixed: new `it` in `fans-2.test.ts`.
+    **Known limitation, not resolved**: this bug produces the identical `{"Two Concealed
+    Pungs"}` name-diff signature as the pre-existing item #11 concealment-completion ambiguity,
+    and `classify_mismatch` cannot distinguish the two causes from fan names alone (no access to
+    whether a hand actually contains a concealed kong) — flagged directly in
+    `allowlist.py`'s `CONCEALMENT_FAMILY` comment. Some unknown fraction of the "148 hands"
+    filed under item #11 below are actually this bug, not the concealment ambiguity; the item
+    #11 count should no longer be read as clean.
+
+    **(d) NEW bug: `exclusions.ts` is missing `[18, 55]`.** All Terminals and Honors (18: the
+    pair/pungs/kongs are all 1/9/honor tiles) trivially implies Outside Hand's (55: every set,
+    including the pair, includes a terminal or honor) weaker condition — the exact same
+    "narrower named fan implies a broader one" shape already correctly transcribed for All
+    Terminals (`[8,55]`) and All Honors (`[11,55]`) individually. Fan 18 is the union of 8 and
+    11 (any hand satisfying either structurally satisfies 18's own condition too) and was simply
+    missed. Confirmed directly against 6 real hands in the current run, every one showing fan 18
+    present in `ourFans` alongside `Outside Hand`. Fixture-first, not fixed: new `it` in
+    `exclusions.test.ts`. This was masquerading as an unexplained residue on top of item #11's
+    concealment-family diff in 6 of the ~55 unclassified hands (Big Four Winds / All Terminals
+    and Honors shapes where item #11 already explains 3 of the 4 diff names, leaving "Outside
+    Hand" unexplained until this fix).
+
+    **(e) NEW bug: `detectAllTypes` (fan 52) never fires for a Seven Pairs hand.** The detector
+    bails out via `if (!ctx.decomposition) return []` before ever inspecting
+    `ctx.specialShape`, so a Seven Pairs candidate (`decomposition: null, specialShape:
+    'sevenPairs'`, per `score-hand.ts`'s candidate list) can never reach it. The detector's own
+    comment asserted fan 52 needs "the 4 real sets plus the pair" (i.e. the standard shape only)
+    — `rules-lawyer` confirmed this is a misreading: fan 52's own primary-table text ("each of
+    the five sets is composed of a different type of tile") has no structural pung/kong/chow/
+    pair requirement, and **fan 19 Seven Pairs's own Appendix 1 worked example (24-Point Fan
+    section, Example 1: pairs of Dots/Bamboo/Characters/Red Dragon/East Wind/North Wind) is
+    directly captioned "Combined with All Types."** This was the single largest unclassified
+    bucket in the harness — 20 of the ~55 hands, every Seven Pairs hand whose 7 pairs happened
+    to span all 5 categories. Fixture-first, not fixed: new `it` in `fans-6.test.ts`.
+
+    **(f) Two named-but-previously-unfixtured gaps, now fixtured per this session's Part A
+    instruction (still not fixed):** item #27 (`detectTileHog` undercounts when two separate
+    tile types are each hogged — already fixtured in Step 3, unchanged) and the All Even
+    Pungs (21) / All Fives (31) vs No Honors (76) missing exclusions first noted in item #26's
+    allowlist cleanup but never fixtured until now — `exclusions.test.ts`'s new
+    `[21,76]`/`[31,76]` block. Confirms all 15 of item #29's original `our_bug` hands: 7 explained
+    by item #27 (Tile Hog), 8 by finding (b) above (NOT item #11 as item #29 wrongly claimed —
+    see the correction appended to that item). Zero hands were left unexplained by these two
+    named causes plus the new finding — i.e. Part A's "unnamed third bug" turned out to BE
+    finding (b), not a separate fifth thing.
+
+    **(g) Allowlist re-validated (`validation/allowlist.py`) — two entries were stale (matched
+    zero hands, their underlying bugs already fixed by Step 3 but never removed from
+    `OUR_BUG_FAMILIES`), removed:** the `"Out with Replacement Tile"/"Self-Drawn"` family
+    (bug fixed in item #28) and the `"Half Flush"/"One Voided Suit"` All Green family (bug
+    fixed in item #29) — both confirmed via direct citation-frequency query against the current
+    run before removal, not assumed. The `"Fully Concealed Hand"/"Self-Drawn"` family's citation
+    was corrected per (b) above rather than removed, since it still matches real hands, just for
+    a different reason than its old text claimed. `KNITTED_STRAIGHT_BONUS_STACK_NAMES` (item
+    #20's `their_bug`) was checked and confirmed NOT stale — it still matches 1 hand
+    (`targeted-34`), combined with item #13's ambiguity in the same diff; earlier apparent
+    "0 occurrences" was an artifact of grouping by final category bucket instead of citation
+    string. `CONCEALMENT_FAMILY`'s overbreadth re (c) above is flagged in its own module comment
+    rather than mechanically resolved (would need `classify_mismatch` to see raw hand data, not
+    just fan-name diffs — out of scope for this pass).
+
+    **(h) Residual ~29 unclassified, characterized but not all individually resolved:**
+    - **~14 hands: benign decomposition ties, not a bug on either side.** A "Single Wait"
+      (ours) vs "Closed Wait"/"Edge Wait" (PyMahjongGB) 1-for-1 swap (fans 77/78/79 are all
+      worth exactly 1 point) where the hand's TOTAL points match exactly between engines in 12
+      of these cases (the 2 remaining also combine with item #13's already-known ambiguity).
+      §3.9.1's "Freedom to Choose the Highest Points" principle doesn't resolve which of two
+      EQUALLY-scoring decompositions gets reported when a hand has more than one valid
+      decomposition and the wait-shape differs between them — there is no rulebook-stated
+      tiebreak, so two independent implementations can legitimately disagree on which 1-point
+      wait-fan to report without either being wrong. Deliberately NOT added to `allowlist.py`
+      as a blind name-based family (unlike the confirmed bugs above) — doing so would also
+      swallow seed `4009266348`'s single non-tied case below, which is NOT a benign tie and
+      needs to stay visible.
+    - **6 hands: a harness (not engine) bug in `validation/src/win-circumstance.ts`.**
+      `otherCopiesInOwnHand` sums matching-type tiles across ALL of a player's own melds,
+      including the SAME exposed pung that `forcedLastCopy`'s very next check exists to detect
+      (an exposed pung of exactly 3 matching the winning tile's type, which should force
+      `isLastCopyOfItsKind = true`). Since an exposed pung's own 3 tiles always make
+      `otherCopiesInOwnHand > 0`, `forcedLastCopy` returns `false` at its first line before ever
+      reaching the `inAnyPack` check that was supposed to catch exactly this case — confirmed
+      directly against 5 real hands, every one showing `is4thTile: false` recorded despite an
+      exposed pung of the winning tile's own type sitting in `pack`. PyMahjongGB's own
+      structural override (independent of the flag it's given, per this file's existing
+      comment) correctly detects the real last-tile condition anyway, which is why these show
+      up as PyMahjongGB-only "Last Tile" mismatches. A 6th hand (`targeted-58-last-tile`,
+      generators/targeted.ts's hardcoded case) shows the same family from the other direction:
+      it force-sets `isLastCopyOfItsKind: true` for a hand whose winning tile completes a PAIR
+      (i.e. the winner's own remaining tiles DO hold another copy — the pair partner), which
+      per this same file's documented PyMahjongGB-override logic should force FALSE, not TRUE.
+      Not fixed here — this is validation-harness code, not `packages/engine`, and out of this
+      session's authorized scope, but flagged clearly since it makes 6 of the ~55 unclassified
+      hands look like open rules questions when they're actually a harness modeling bug.
+    - **~9 hands: genuinely still open, individually under-investigated this session.**
+      `targeted-4-nine-gates` (a `No Honors`/`Pung of Terminals or Honors` swap at equal total
+      points — likely another benign multi-decomposition tie given Nine Gates' famous 9-way
+      wait, not yet confirmed the way the fans-77/78/79 pattern above was);
+      `targeted-8-all-terminals` (`Double Pung` ×2 on our side only, PyMahjongGB scores neither
+      — plausibly another missing exclusion, e.g. `[8,65]`, unverified); `targeted-29-three-
+      suited-terminal-chows` (`Mixed Double Chow` ×2 ours-only — plausibly `[29,70]`,
+      unverified); `targeted-25-upper-tiles`/`targeted-27-lower-tiles` (an Upper/Lower Four vs
+      Concealed Hand cascade resembling item #11's pattern but for fans not yet checked against
+      `CONCEALMENT_FAMILY`'s exclusion partners); three `standard` hands showing PyMahjongGB
+      scoring `Pure Shifted Pungs` or `Pure Shifted Chows` that our engine misses entirely
+      (seeds `1613793028`, `3097971845`, `3563778031` — possibly a real detector gap, not just
+      an exclusion, unverified); and seed `4009266348`, the one wait-type hand that is NOT a
+      benign tie (PyMahjongGB scores 1 more point via `Single Wait` that we don't, on a hand
+      structurally identical to a clean "waiting to pair a lone tile after 4 pungs" shape) —
+      manually reconstructing this exact tile composition against the live engine
+      (`scoreHandDetailed`) produces the CORRECT answer (matches PyMahjongGB's 75, with fan 79
+      present), so this is most likely a second, distinct harness-generator artifact (the
+      stored case's `ours: 74` doesn't reproduce from its own recorded tile composition) rather
+      than a real `scoreHandDetailed` bug — inconclusive, not confirmed either way.
+    None of these 9 have a fixture yet; do not assume they're `our_bug` vs `their_bug` vs
+    harness-artifact without doing the same reproduce-then-cite work the confirmed items above
+    got.
+
+    **Harness re-run, final numbers for this session (1200 hands, seed 20260805, engine as of
+    this session's fixture commits — see item #31):** `their_bug` 7 (unchanged), `ambiguity` 204
+    (unchanged), `our_bug` 15 → 43 (+28: 8 finding-(b) + 6 finding-(d) + 20 finding-(e), net of
+    the 2 already-counted-elsewhere items in (f) which were already in the 15), `unclassified`
+    57 → 29. Full engine test suite green throughout (442 passed, 1 skipped — 7 new fixtures:
+    fans-4.test.ts ×1, fans-2.test.ts ×2, fans-6.test.ts ×1, exclusions.test.ts ×3 new describe
+    blocks covering 8 new `it`s total across the regression-confirmation and the two newly-cited
+    missing exclusions). No engine logic changed — every finding above is fixture-only, per Part
+    A/B's explicit instruction and CLAUDE.md's standing fixture-first rule.
+
+31. **Step 5: final validated baseline, 2026-08-06.** 1200 hands, seed 20260805 (52 targeted +
+    1148 random across standard/seven-pairs/thirteen-orphans), scored by this engine's
+    `scoreHand` and PyMahjongGB 1.3.0, compared at both the points and exact-fan-multiset level.
+    **their_bug: 7. ambiguity: 204. our_bug: 43 (across 6 distinct fixture-backed bug families —
+    see item #30 (b)-(f) plus the still-open item #23 regression). unclassified: 29 (14 benign
+    decomposition ties + 6 harness-side Last-Tile modeling bug + 9 genuinely still open — see
+    item #30 (h)). Coverage: 80/81 fans (only fan 81, Flower Tiles, out of scope by design).**
+    This is the number CLAUDE.md's scoring-validation rule now points to, superseding item #19's
+    original run and item #29's Step-3-only snapshot. Re-run command: `npm run generate
+    --workspace=@mahjong-mcr/validation -- 1200 20260805 && python validation/compare.py
+    --json-report validation/.report.json` from the repo root (requires the PyMahjongGB Python
+    environment — see `validation/README.md`).
 
 ## Open follow-up work
 
-- New, found while fixing Step 3's six bugs (not part of the original scope): `detectTileHog`
-  only reports count 1 even when two separate tile types are each hogged in the same hand (item
-  #27, fixture added, not fixed); All Even Pungs (21) and All Fives (31) also structurally
-  exclude No Honors (76) but have no `[21,76]`/`[31,76]` entries (found via allowlist cleanup,
-  item #26, no fixture yet).
+- **Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/
+  `[7,56]`/`[12,56]`/`[19,56]` (item #23 — item #30(a) confirms these directly contradict
+  `mcr_EN.pdf`'s own primary fan table). Fixture already flipped to document the current wrong
+  `true`; the fix is removing those 5 lines and flipping the fixture assertions to `false`.
+- Fix `detectFullyConcealedHand`/`detectConcealedHand` (fans-4.ts/fans-2.ts, item #30(b)): check
+  meld exposure, not `ctx.melds.length === 0`.
+- Fix `detectTwoConcealedPungs` (fans-2.ts, item #30(c)): include concealed kongs
+  (`s.kind !== 'chow'`, matching every sibling detector), not just `s.kind === 'pung'`.
+- Add `exclusions.ts`'s `[18, 55]` (item #30(d)).
+- Add a `specialShape === 'sevenPairs'` branch to `detectAllTypes` (fans-6.ts, item #30(e)).
+- `detectTileHog` only reports count 1 even when two separate tile types are each hogged in the
+  same hand (item #27, fixtured in Step 3, re-fixtured/confirmed in Step 4/5 — still the single
+  largest unfixed bug by hand count after the Seven-Pairs/All-Types gap).
+- Add `exclusions.ts`'s `[21,76]`/`[31,76]` (All Even Pungs / All Fives vs No Honors — item #26's
+  finding, fixtured in Step 4/5).
+- Investigate and likely fix `validation/src/win-circumstance.ts`'s `otherCopiesInOwnHand`
+  (item #30(h)) — a harness bug, not an engine bug, but it's actively hiding the true
+  unclassified count behind a false "genuine rules question" appearance for ~6 hands.
+- The ~9 hands in item #30(h)'s third bullet are genuinely open — each needs the same
+  reproduce/cite/classify treatment the other findings in item #30 got, not yet done.
 - ~~Implement the "knitted" set concept~~ — **done, item #20.**
 - ~~Get a `rules-lawyer` ruling on fan 48's point value~~ — **done, item #21 (no change needed).**
-- Triage the remaining ~55 unclassified mismatches from item #20's run (rerun
-  `validation/compare.py --json-report` for the current list — down from ~180 after item #20's
-  fix plus the classifier's new pattern-composition logic).
+- ~~Triage the remaining ~55 unclassified mismatches~~ — **done, item #30 (29 residual, see
+  above for what's still open within that 29).**
 - Appendix 4 (seat/table rotation detail) is missing from the available PDF — if a more
   complete copy ever turns up, re-verify item #4 (dealer rotation) against it specifically.
 - Fan encyclopedia (M5, `scoring/encyclopedia.ts`) example hands: v1 ships id/name/points/rule
   text only, no worked example hands per fan — constructing 81 valid, correctly-scored
   examples is a substantially larger task, tracked here rather than folded into M5.
+- Phase 10's 2000-seed self-play regression question (item #18's "State of play" note) — still
+  parked, not touched this session.
