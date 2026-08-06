@@ -193,18 +193,17 @@ describe('All Even Pungs / All Fives exclude No Honors', () => {
   })
 })
 
-// NEW bug, found during Step 4/5 triage's unclassified-mismatch pass — NOT
-// fixed here, fixture only. All Terminals and Honors (18: pair/pungs/kongs
-// made up of 1/9/honor tiles) trivially implies Outside Hand's (55: every
-// set — including the pair — includes a terminal or honor) weaker
-// condition, same "narrower named fan implies a broader one" shape already
-// present for All Terminals ([8,55]) and All Honors ([11,55]) just above —
-// 18 is the union of 8 and 11 and was simply missed. Found via the
-// validation harness (1200-hand cross-check, seed 20260805): every hand
-// that fires fan 18 also fires our fan 55, but PyMahjongGB never scores
-// Outside Hand alongside All Terminals and Honors.
-describe('KNOWN BUG: All Terminals and Honors should exclude Outside Hand', () => {
-  it('All Terminals and Honors (18) should exclude Outside Hand (55) but does not yet', () => {
-    expect(areExclusive(18, 55)).toBe(false) // WRONG, should be true
+// FIXED (docs/rules/decisions.md #30(d), then #33). All Terminals and
+// Honors (18: pair/pungs/kongs made up of 1/9/honor tiles) trivially
+// implies Outside Hand's (55: every set — including the pair — includes a
+// terminal or honor) weaker condition, same "narrower named fan implies a
+// broader one" shape already present for All Terminals ([8,55]) and All
+// Honors ([11,55]) just above — 18 is the union of 8 and 11 and was simply
+// missed. Found via the validation harness (1200-hand cross-check, seed
+// 20260805): every hand that fires fan 18 also fires our fan 55, but
+// PyMahjongGB never scores Outside Hand alongside All Terminals and Honors.
+describe('All Terminals and Honors excludes Outside Hand', () => {
+  it('All Terminals and Honors (18) excludes Outside Hand (55)', () => {
+    expect(areExclusive(18, 55)).toBe(true)
   })
 })

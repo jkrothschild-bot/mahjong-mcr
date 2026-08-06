@@ -139,12 +139,6 @@ OUR_BUG_FAMILIES: list[tuple[str, frozenset[str]]] = [
         frozenset({"Fully Concealed Hand", "Self-Drawn"}),
     ),
     (
-        "packages/engine/src/scoring/exclusions.test.ts — 'All Terminals and Honors should exclude Outside Hand' (missing "
-        "[18,55]) — same 'narrower named fan implies a broader one' shape as the existing [8,55]/[11,55] entries (18 is "
-        "the union of 8 and 11); found during Step 4/5 triage of the unclassified mismatches.",
-        frozenset({"Outside Hand"}),
-    ),
-    (
         "packages/engine/src/scoring/fans-6.test.ts — 'BUG: never fires for a Seven Pairs hand, even when its 7 pairs "
         "span all 5 categories' (detectAllTypes bails out on ctx.decomposition === null instead of also checking "
         "specialShape === 'sevenPairs') — rules-lawyer confirmed fan 19's own Appendix 1 worked example is captioned "

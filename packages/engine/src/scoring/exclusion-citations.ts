@@ -55,6 +55,13 @@ export const CITATIONS: ReadonlyMap<string, string> = new Map([
       'includes the number \'5\'" — every group must contain a suited rank-5 tile, structurally excluding honor ' +
       'tiles, trivially satisfying No Honors (76). docs/rules/decisions.md #26/#33.',
   ],
+  [
+    pairKey(18, 55),
+    'docs/rules/mcr_EN.pdf §3.8.1 p.15: All Terminals and Honors (18) — "The pair(s), Pungs or Kongs is all made up ' +
+      'of 1 or 9 Number Tiles and Honor Tiles" — a strictly narrower condition than Outside Hand (55: "Hand includes ' +
+      'Terminals and Honors in each element or set, including the Pair"), same shape as this table\'s existing ' +
+      '[8,55]/[11,55] (18 is the union of 8 and 11). docs/rules/decisions.md #30(d)/#33.',
+  ],
 ])
 
 export function pairKey(a: number, b: number): string {

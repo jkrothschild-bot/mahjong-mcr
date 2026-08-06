@@ -216,6 +216,15 @@ export const RAW_EXCLUSION_PAIRS: readonly [number, number][] = [
   // 18. All Terminals and Honors
   [18, 49], // All Pungs
   [18, 73], // Pung of Terminals or Honors
+  // 18 -> 55: derived, same "narrower named fan implies a broader one" shape
+  // as this table's existing [8,55] (All Terminals) and [11,55] (All
+  // Honors) — fan 18 is the union of 8 and 11 (its own §3.8.1 text: "The
+  // pair(s), Pungs or Kongs is all made up of 1 or 9 Number Tiles and Honor
+  // Tiles"), which trivially satisfies Outside Hand's (55) weaker "includes
+  // Terminals and Honors in each element or set, including the Pair"
+  // condition. Simply missed alongside 8/11 when this fan's own section was
+  // transcribed. docs/rules/decisions.md #30(d)/#33.
+  [18, 55], // Outside Hand
   // 19. Seven Pairs
   [19, 62], // Concealed Hand
   [19, 79], // Single Wait
