@@ -350,6 +350,38 @@ corrected to match. See each item's status.
     order of 2000 seeds — not yet run. See KICKOFF-phase10-strategy-coach.md's "State of play"
     section for the decision this blocks and what to do once a real number exists.
 
+    **Third data point, 300 seeds, 2026-08-06 — still not the 2000-seed run this needs, reported
+    honestly as a third underpowered sample, not a resolution.** Run at the tail end of an
+    unrelated scoring-validation session (time-permitting work, explicitly no code changes made
+    based on the result): `newWins=117 oldWins=132 draws=51 mixedWins=0`. 249 decisive games,
+    expected split 124.5/124.5 under the null, sd ≈ √(249 × 0.25) ≈ 7.9. 117 is
+    (124.5 − 117) / 7.9 ≈ 0.95 sd below expectation, two-tailed p ≈ 0.34 — the *weakest* signal
+    of the three runs, individually. **Important caveat this run adds, not just repeats**: this
+    test always sweeps seeds `0..SEED_COUNT-1` from zero, so all three 300-seed runs used the
+    *exact same seed range* — this run is not a fresh independent sample of NEW seeds, it's a
+    re-measurement of the same 300 hands under whatever `packages/engine` looked like at the
+    time. Between the second run (2026-08-03) and this one, substantial unrelated scoring-engine
+    work landed (this session's own Step 4/5 fixes, plus everything since) — `legalMoves`'s win
+    detection and the shanten/route computations `rankDiscards` depends on both consume
+    `scoreHand`'s output, so a changed engine can genuinely change how these exact same seeds
+    play out, which is presumably why the tally differs from run 2 rather than reproducing it
+    bit-for-bit. So this is a third measurement under a third distinct condition, not a third
+    independent sample in the statistical sense — pooling it with the first two for a combined
+    significance test would be invalid without accounting for that.
+
+    **Honest read of all three together: neutral to slightly negative, not "no consistent
+    signal."** All three runs land on the SAME side (`newWins < oldWins`) by a comparable
+    magnitude (≈1.6, ≈1.2, ≈0.95 sd), and none individually clears conventional significance. A
+    naive pool (treating all three as independent, which per the caveat above they are not) gives
+    `newWins=358 oldWins=419` across 777 decisive games — (388.5 − 358) / √(777 × 0.25) ≈ 2.19 sd,
+    two-tailed p ≈ 0.03, which WOULD cross p<0.05 if the independence assumption held. It doesn't
+    fully hold (same seed range every time, two of three runs sharing one engine state), so this
+    pooled figure is illustrative of "the direction keeps repeating," not a valid combined test —
+    treat it as a reason to actually run the real 2000-fresh-seed test, not as a substitute for
+    it. **Still no code changed based on any of this** — the merge gate remains unresolved, and
+    the ranking change from earlier in this item stays in place pending a properly-powered,
+    genuinely-independent-seed run.
+
 19. **Validation harness Stage 1 (`KICKOFF-validation-harness.md`) — the PyMahjongGB cross-check
     now exists and has been run for real (2026-08-05).** 1200 hands generated (seed range: run
     seed `20260805`, per-hand seeds derived from it via the engine's own `mulberry32`/`nextSeed`;
