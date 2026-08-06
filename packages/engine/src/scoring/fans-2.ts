@@ -125,9 +125,19 @@ function detectDoublePung(ctx: HandContext): FanMatch[] {
 }
 
 // 66. Two Concealed Pungs — 2 pts. §3.8.1 p.16 / App.1 p.40: "Two Pungs
-// achieved without melding." Deliberately PUNGS only (not kongs, unlike
-// Three/Four Concealed Pungs' "Pungs or Kongs" wording) and an exact count
-// of 2 — naturally distinct from any 3-or-4-count sibling fan by construction.
+// achieved without melding."
+//
+// KNOWN BUG (fixtured in fans-2.test.ts, not fixed here): this detector
+// only counts s.kind === 'pung', excluding concealed kongs. That was
+// believed to be a deliberate rulebook distinction from Three/Four
+// Concealed Pungs' "Pungs or Kongs" wording, but a direct re-read of
+// App.1 p.40's own worked example for fan 66 ("Concealed Pung; Concealed
+// Kong... Combined with Double Pung, Concealed Kong...") shows the example
+// itself composes "Two" from one concealed pung PLUS one concealed kong —
+// contradicting the "pungs only" reading. Should filter on
+// `s.kind !== 'chow'`, matching every sibling concealed-pung-count
+// detector (fans-16.ts's Three Concealed Pungs, fans-64.ts's Four
+// Concealed Pungs).
 function detectTwoConcealedPungs(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)

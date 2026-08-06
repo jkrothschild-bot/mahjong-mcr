@@ -108,33 +108,80 @@ describe('All Green excludes Half Flush and One Voided Suit', () => {
   })
 })
 
-// A SIXTH, related bug: PyMahjongGB never awards Fully Concealed Hand (56)
-// alongside a fan that already structurally guarantees the entire hand is
-// concealed — it downgrades to plain Self-Drawn (80) instead (still worth
-// crediting the self-draw, just not double-crediting the concealment).
-// Confirmed by direct source read: fan_calculator.cpp explicitly does this
-// for Nine Gates (4) and Four Concealed Pungs (12) ("把不求人修正为自摸" —
-// "correct Fully Concealed Hand to Self-Drawn" — in adjust_fan_table), and
-// implicitly for all four special shapes (Seven Pairs family, Thirteen
-// Orphans, Honors-and-Knitted) because calculate_special_form_fan never
-// calls adjust_by_self_drawn at all — the only place Fully Concealed Hand
-// is ever set — so it can never fire for those shapes in the first place.
-// Confirmed empirically against every one of these labels in Stage 1's
-// 1200-hand run.
-describe('Fully Concealed Hand should be excluded by fans that already require full concealment', () => {
-  it('Nine Gates (4) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(4, 56)).toBe(true)
+// REGRESSION, not a fixed bug — docs/rules/decisions.md #23 was WRONG and is
+// pending revert (see the new item logged during Step 4/5 triage). #23 added
+// these five pairs on PyMahjongGB-only evidence (fan_calculator.cpp's
+// "把不求人修正为自摸" downgrade for Nine Gates/Four Concealed Pungs, plus the
+// special-shape path never setting Fully Concealed Hand at all), WITHOUT the
+// direct rulebook citation KICKOFF-validation-harness.md 1e requires before
+// changing engine behavior to match PyMahjongGB. Direct re-read of
+// docs/rules/mcr_EN.pdf's §3.8.1 fan table (p.14-15) shows the rulebook says
+// the opposite for every one of these five fans — each entry ends with the
+// table's own explicit parenthetical:
+//   - Fan 4 (Nine Gates): "...creating the nine-sided wait of
+//     1,2,3,4,5,6,7,8,9. (Fully Concealed may be combined if Self-Drawn)."
+//   - Fan 6 (Seven Shifted Pairs): "...(Fully Concealed may be combined if
+//     Self-Drawn)."
+//   - Fan 7 (Thirteen Orphans): "...along with a pair of the 13th. (Fully
+//     Concealed may be combined if Self-Drawn)."
+//   - Fan 12 (Four Concealed Pungs): "...(achieved without melding – Fully
+//     Concealed may be combined if Self-Drawn)."
+//   - Fan 19 (Seven Pairs): "A hand formed by seven pairs. (Fully Concealed
+//     may be combined if Self-Drawn)."
+// This is a case KICKOFF-validation-harness.md 1e warned about directly:
+// "quietly replace our misreadings with theirs" — our engine and
+// PyMahjongGB apparently share the SAME wrong answer here (both suppress
+// fan 56 for these shapes), which is exactly why the 1200-hand cross-check
+// never flagged it as a mismatch; only a direct rulebook re-read caught it.
+// These `it`s below still assert the CURRENT (buggy) `true` — matching
+// exclusions.ts's still-present [4,56]/[6,56]/[7,56]/[12,56]/[19,56] entries
+// — pending the revert; flip to `false` once exclusions.ts is corrected.
+describe('KNOWN REGRESSION (decisions.md #23 was wrong): Fully Concealed Hand should NOT be excluded by these five fans', () => {
+  it('Nine Gates (4) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(4, 56)).toBe(true) // WRONG, should be false — see comment above
   })
-  it('Four Concealed Pungs (12) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(12, 56)).toBe(true)
+  it('Four Concealed Pungs (12) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(12, 56)).toBe(true) // WRONG, should be false
   })
-  it('Seven Shifted Pairs (6) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(6, 56)).toBe(true)
+  it('Seven Shifted Pairs (6) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(6, 56)).toBe(true) // WRONG, should be false
   })
-  it('Seven Pairs (19) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(19, 56)).toBe(true)
+  it('Seven Pairs (19) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(19, 56)).toBe(true) // WRONG, should be false
   })
-  it('Thirteen Orphans (7) should exclude Fully Concealed Hand (56)', () => {
-    expect(areExclusive(7, 56)).toBe(true)
+  it('Thirteen Orphans (7) incorrectly excludes Fully Concealed Hand (56) — rulebook says they combine', () => {
+    expect(areExclusive(7, 56)).toBe(true) // WRONG, should be false
+  })
+})
+
+// NEW bug, found during Step 4/5 triage (docs/rules/decisions.md, item
+// logged alongside the #23 regression above) — NOT fixed here, fixture only.
+// All Even Pungs (21: pungs/kongs of 2/4/6/8 only) and All Fives (31: every
+// set includes a 5) each structurally can never include an honor tile, same
+// shape as the 8 other [X,76] entries already in this table (8, 13, 22, 25,
+// 26, 27, 29, 36, 37, 63, 68) — simply missed when those two fans were
+// transcribed. Found via validation/allowlist.py cleanup (decisions.md #26).
+describe('KNOWN BUG: All Even Pungs / All Fives should exclude No Honors', () => {
+  it('All Even Pungs (21) should exclude No Honors (76) but does not yet', () => {
+    expect(areExclusive(21, 76)).toBe(false) // WRONG, should be true
+  })
+  it('All Fives (31) should exclude No Honors (76) but does not yet', () => {
+    expect(areExclusive(31, 76)).toBe(false) // WRONG, should be true
+  })
+})
+
+// NEW bug, found during Step 4/5 triage's unclassified-mismatch pass — NOT
+// fixed here, fixture only. All Terminals and Honors (18: pair/pungs/kongs
+// made up of 1/9/honor tiles) trivially implies Outside Hand's (55: every
+// set — including the pair — includes a terminal or honor) weaker
+// condition, same "narrower named fan implies a broader one" shape already
+// present for All Terminals ([8,55]) and All Honors ([11,55]) just above —
+// 18 is the union of 8 and 11 and was simply missed. Found via the
+// validation harness (1200-hand cross-check, seed 20260805): every hand
+// that fires fan 18 also fires our fan 55, but PyMahjongGB never scores
+// Outside Hand alongside All Terminals and Honors.
+describe('KNOWN BUG: All Terminals and Honors should exclude Outside Hand', () => {
+  it('All Terminals and Honors (18) should exclude Outside Hand (55) but does not yet', () => {
+    expect(areExclusive(18, 55)).toBe(false) // WRONG, should be true
   })
 })

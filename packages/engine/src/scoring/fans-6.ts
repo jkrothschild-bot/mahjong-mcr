@@ -67,6 +67,14 @@ function detectMixedShiftedChows(ctx: HandContext): FanMatch[] {
 // Since there are exactly 5 possible categories and 5 groups, "5 distinct
 // categories represented" is equivalent to every category appearing
 // exactly once.
+//
+// KNOWN BUG (fixtured in fans-6.test.ts, not fixed here): this detector
+// only ever considers ctx.decomposition (the standard 4-sets+pair shape),
+// so it can never fire for a Seven Pairs hand. But fan 19 Seven Pairs's
+// own Appendix 1 worked example is explicitly captioned "Combined with
+// All Types" — a rulebook-confirmed case this detector currently misses.
+// Needs a specialShape === 'sevenPairs' branch checking whether the 7
+// pairs' categories collectively cover all 5.
 function detectAllTypes(ctx: HandContext): FanMatch[] {
   if (!ctx.decomposition) return []
   const sets = allSets(ctx.melds, ctx.decomposition)

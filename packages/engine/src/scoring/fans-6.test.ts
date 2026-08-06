@@ -130,6 +130,26 @@ describe('All Types (fan 52)', () => {
     const ctx = ctxWith({ decomposition })
     expect(FANS_6_DETECTORS[52]!(ctx)).toEqual([])
   })
+
+  // KNOWN BUG, not fixed here (fixture only) — found during Step 4/5 triage
+  // of the validation harness's unclassified mismatches. This detector
+  // bails out via `if (!ctx.decomposition) return []` before ever looking
+  // at ctx.specialShape, so it can never fire for a Seven Pairs candidate
+  // (score-hand.ts's candidate list gives Seven Pairs `decomposition: null,
+  // specialShape: 'sevenPairs'`). But a direct rulebook check
+  // (rules-lawyer, verified against docs/rules/mcr_EN.pdf) confirms fan 19
+  // Seven Pairs's OWN Appendix 1 worked example (24-Point Fan section,
+  // Example 1: pairs of Dots/Bamboo/Characters/Red Dragon/East Wind/North
+  // Wind) is captioned "Combined with All Types" — i.e. the rulebook
+  // itself directly shows a Seven Pairs hand scoring fan 52 when its 7
+  // pairs collectively span all 5 categories (Characters/Bamboo/Dots/
+  // Winds/Dragons). Confirmed via the validation harness (1200-hand
+  // cross-check, seed 20260805): ~19 Seven Pairs hands score 'All Types'
+  // on PyMahjongGB's side that we miss entirely.
+  it('BUG: never fires for a Seven Pairs hand, even when its 7 pairs span all 5 categories', () => {
+    const ctx = ctxWith({ specialShape: 'sevenPairs', decomposition: null })
+    expect(FANS_6_DETECTORS[52]!(ctx)).toEqual([]) // WRONG, should be [{ fanId: 52, count: 1 }] when all 5 categories are represented
+  })
 })
 
 describe('Melded Hand (fan 53)', () => {

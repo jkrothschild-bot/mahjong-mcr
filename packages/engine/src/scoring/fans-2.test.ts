@@ -141,10 +141,22 @@ describe('Concealed Hand (fan 62)', () => {
     expect(FANS_2_DETECTORS[62]!(ctx)).toEqual([])
   })
 
-  it('rejects a hand with any meld', () => {
+  it('rejects a hand with any exposed meld', () => {
     const melds = [pungMeld('0-0', idsFor('C5', 3))]
     const ctx = ctxWith({ melds, winMethod: 'discard' })
     expect(FANS_2_DETECTORS[62]!(ctx)).toEqual([])
+  })
+
+  // KNOWN BUG, not fixed here (fixture only) — same root cause as fan 56's
+  // sibling bug in fans-4.test.ts: this fan's own rulebook text (§3.8.1
+  // p.16, App.1 p.39) says "no melded (exposed) sets", but the detector
+  // checks `ctx.melds.length === 0` (any set at all, including a concealed
+  // kong the player declared themselves). A concealed kong should not
+  // disqualify a discard win from Concealed Hand.
+  it('BUG: incorrectly rejects a discard win that includes only a CONCEALED kong (should still qualify)', () => {
+    const melds = [kongMeld('0-0', idsFor('WE', 4), 'concealed')]
+    const ctx = ctxWith({ melds, winMethod: 'discard' })
+    expect(FANS_2_DETECTORS[62]!(ctx)).toEqual([]) // WRONG, should be [{ fanId: 62, count: 1 }]
   })
 })
 
@@ -336,6 +348,39 @@ describe('Two Concealed Pungs (fan 66)', () => {
     }
     const ctx = ctxWith({ decomposition })
     expect(FANS_2_DETECTORS[66]!(ctx)).toEqual([])
+  })
+
+  // KNOWN BUG, not fixed here (fixture only). This detector's own comment
+  // claims fan 66's rulebook wording is deliberately "Pungs" only, unlike
+  // fan 12/33's "Pungs or Kongs" — but a direct re-read of
+  // docs/rules/mcr_EN.pdf's App.1 p.40 worked example for fan 66 itself
+  // contradicts that: "Concealed Pung; Concealed Kong, won with a discarded
+  // 3 Character. Combined with Double Pung, Concealed Kong, ..." — the
+  // fan's own example composes "Two [Concealed Pungs]" from ONE concealed
+  // pung PLUS ONE concealed kong. §3.8.1 p.16's summary-table text for 66,
+  // 33, and 12 is in fact identically worded ("achieved without melding"),
+  // with no "Pungs or Kongs" vs "Pungs" distinction anywhere in the primary
+  // table either. Every other detector in this codebase that counts
+  // concealed pung-type sets uses `s.kind !== 'chow'` (pung-or-kong,
+  // e.g. fans-16.ts's Three Concealed Pungs, fans-64.ts's Four Concealed
+  // Pungs) — this detector's `s.kind === 'pung'` filter is the sole
+  // exception, and was apparently never independently verified against the
+  // PDF (in violation of CLAUDE.md's "never implement from memory" rule).
+  // Found via the validation harness (1200-hand cross-check, seed
+  // 20260805): several hands with 1 concealed pung + 1 concealed kong
+  // score 'Two Concealed Pungs' on PyMahjongGB's side but not ours.
+  it('BUG: a concealed kong should count toward the pair, but the detector only counts pungs (kind === "pung")', () => {
+    const melds = [kongMeld('0-0', idsFor('WE', 4), 'concealed')]
+    const decomposition: Decomposition = {
+      pair: 'C1',
+      sets: [
+        { type: 'pung', tiles: ['C5', 'C5', 'C5'] },
+        { type: 'chow', tiles: ['B2', 'B3', 'B4'] },
+        { type: 'chow', tiles: ['B5', 'B6', 'B7'] },
+      ],
+    }
+    const ctx = ctxWith({ melds, decomposition })
+    expect(FANS_2_DETECTORS[66]!(ctx)).toEqual([]) // WRONG, should be [{ fanId: 66, count: 1 }]
   })
 })
 
