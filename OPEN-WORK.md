@@ -31,7 +31,7 @@ nothing pointed at any more.
 | Product-level deferrals | `SPEC.md §11` | Live, coarse |
 | Milestones | `PLAN.md §2` | M0–M6 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
-| **Cleanup sequence & lanes** | **§E below** | **Active — start at Phase 0** |
+| **Cleanup sequence & lanes** | **§E below** | **Active — Phase 0 done 2026-08-07, start Phase 1** |
 | **Found mid-cleanup, not worked** | **§F below** | **Empty — keep it that way** |
 
 ---
@@ -201,12 +201,13 @@ git add --renormalize .
 git commit -m "Normalise line endings via .gitattributes"
 ```
 
-### D2. 23 commits on `main` are unpushed ⚠
-`origin/main` is at `6df4c2b`; local `main` is at `8e75552`, 23 commits ahead. That gap
-contains the entire validation-triage body of work — 11 engine bug fixes, the citation guard,
-the Stage 3 fan-target estimators — and it exists on one machine only. No other branch, no
-stash. This is the largest single risk in the repo right now and it is not a code-quality
-issue. Push.
+### ~~D2. 23 commits on `main` are unpushed~~ ✅ fixed 2026-08-07
+~~`origin/main` is at `6df4c2b`; local `main` is at `8e75552`, 23 commits ahead.~~ Pushed:
+`origin/main` now at `7680161` (25 commits — the original 23, plus the `.gitattributes` and
+`OPEN-WORK.md`/`CLAUDE.md` commits that landed alongside it). Also folded in while pushing:
+the landing-page spec is now tracked (owner confirmed it's the sole authoritative version —
+the "two specs" concern below turned out to reference a file outside the repo, in a local
+agent-session output directory, not a second in-repo spec).
 
 ### D3. Mockup baseline may be stale
 `docs/Mockups/` contains `mahjong-seated-table-prototype-v6.html`, `-v7.html` and `-v8.html`
@@ -248,15 +249,19 @@ Lanes exist to keep two agents out of the same files. **Both lanes touch `SPEC.m
 `PLAN.md` and this file** — that is where collisions will happen, so Phase 1 below gets them
 correct *before* either agent starts.
 
-### Phase 0 — unblock (K, minutes)
+### ~~Phase 0 — unblock~~ ✅ done 2026-08-07
 
-1. **Push the 23 commits** (§D2). Nothing else should start until there is a shared base.
-2. **Commit `.gitattributes`**, then `git add --renormalize . && git commit`.
-3. **Reconcile the two landing-page specs** (see "Explicitly not tracked here" below). Pick
-   one, `git add` it, delete or archive the other. **This blocks Codex** — it cannot build
-   against two specs, and one of them is untracked.
-4. **Decide the branch discipline.** Two agents on `main` will collide. Suggest
-   `feat/landing-page` for C and `feat/phase10-stage3` for A, merged separately.
+1. ~~**Push the 23 commits** (§D2).~~ Done — see §D2.
+2. ~~**Commit `.gitattributes`**, then renormalize.~~ Done. `git add --renormalize .` found
+   nothing to renormalize (a prior session's fix already covered it, per the original §D1);
+   the command's only effect was to catch a real, unrelated modified `CLAUDE.md`, which was
+   committed separately on its own merits (the capture-rule addition, alongside adding
+   `OPEN-WORK.md` itself).
+3. ~~**Reconcile the two landing-page specs.**~~ Done — see §D2. Only one spec ever existed
+   in-repo; it is now tracked (commit `7680161`).
+4. ~~**Decide the branch discipline.**~~ Decided: `feat/phase10-stage3` created and pushed
+   for lane A's next chunk (the remaining 5 Stage 3 families). `feat/landing-page` for lane C
+   is Codex's to create when that work starts.
 
 ### Phase 1 — record corrections (A, one session, documents only, no code)
 
