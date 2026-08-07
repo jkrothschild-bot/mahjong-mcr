@@ -116,6 +116,22 @@ been resolved via the vendored FluffyStuff set plus original flower artwork
 screenshots at 200% zoom." Ties to `SPEC.md §10`'s accessibility scaling and `PLAN.md` M7.
 Verify whether that re-assessment ever happened.
 
+### A10. Human's own wall→hand draw has no travel animation  `[code-verified 2026-08-07]`
+The player's own draw pops in at rest instead of animating from the wall; every other
+draw/discard/meld pairing animates correctly. Investigated during M8 and left unresolved on
+explicit owner direction ("not critical") — a legitimate call, correctly recorded.
+
+**Surfaced during Phase 1, and it had no index entry.** It was written up only inside
+`PLAN.md §2`'s M8 narrative, which is exactly the burial pattern that stranded the
+edge-strip topology (§A1) for three phases: a real deferral, honestly described, inside prose
+nobody re-reads. Indexed here 2026-08-07. Still deliberately deferred — this entry changes
+its visibility, not its priority.
+
+*Process note: this is the first test of `CLAUDE.md`'s capture rule since it was added, and
+the rule half-worked. The limitation was written down, but into a milestone description
+rather than into this index or §F. "Written down somewhere" is not the bar; "linked from the
+index" is.*
+
 ### A9. `docs/playtest-notes.md` is empty  `[code-verified 2026-08-07]`
 `PLAN.md §4.5` names owner play-testing as "the one thing that can't be automated" and
 directs feedback into this file per session. The file contains only its header — it has never
