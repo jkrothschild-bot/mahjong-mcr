@@ -1,8 +1,11 @@
 import { rankDiscards } from './bots/policy.js'
+import { estimateFanTargets, type FanTargetEstimate } from './fan-targets.js'
 import { groupConcealedByType, ORDERED_STANDARD_TYPE_IDS } from './win-detection.js'
 import type { Hand } from './hand.js'
 import type { Meld } from './meld.js'
 import { MINIMUM_POINTS_TO_WIN } from './scoring/derive-context.js'
+import { areExclusive } from './scoring/exclusions.js'
+import { FAN_REGISTRY } from './scoring/registry.js'
 import { isDragonTypeId, isWindTypeId, parseSuited } from './scoring/set-helpers.js'
 import type { FanMatch } from './scoring/types.js'
 import { calculateShantenFromCounts, type ShantenResult } from './shanten.js'
@@ -460,4 +463,102 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
     bestCaseReachesMinimum: allBasicPoints.some((p) => p >= MINIMUM_POINTS_TO_WIN),
     worstCaseReachesMinimum: allBasicPoints.every((p) => p >= MINIMUM_POINTS_TO_WIN),
   }
+}
+
+// Phase 10 Stage 3 orchestration layer (KICKOFF-phase10-strategy-coach.md's
+// "Route to eight points" panel) — sits one layer above fan-targets.ts'
+// estimateFanTargets exactly the way computeBestMoveHint sits above
+// evaluateDiscards: fan-targets.ts stays a flat, per-family list (so each
+// family stays independently fixtured and cited, per that file's own
+// comment); composing "locked-in fans + best candidates, together" into one
+// picture is this file's job instead.
+export interface RouteToPointsResult {
+  // Every applicable Stage 3 target for this hand, unfiltered —
+  // estimateFanTargets(hand, context) verbatim, sorted by value descending.
+  candidates: FanTargetEstimate[]
+  // The pairwise-COMPATIBLE subset of `candidates` actually counted toward
+  // bestCaseTotal: walks `candidates` in value order (greedy), keeping a
+  // candidate only if scoring/exclusions.ts's real mutual-exclusion table
+  // says it can coexist with everything already kept AND with every already
+  // locked-in fan. Without this filter, a naive value-sum could recommend
+  // e.g. No Honors alongside Dragon Pung — completing one structurally
+  // destroys the other, so summing their points would suggest a route no
+  // real hand could ever actually score.
+  selected: FanTargetEstimate[]
+  // Sum of already-locked-in fans' points (computeHandPlan's own
+  // lockedInFans — melds-only pre-tenpai, the stricter real-waits
+  // intersection at tenpai, per that function's existing logic).
+  lockedInPoints: number
+  // lockedInPoints + sum(selected fans' points). A CEILING this hand could
+  // plausibly reach if every selected target lands — not a forecast; each
+  // target's own completionProbability (and probabilityBasis tier) still
+  // applies and is not folded into this number.
+  bestCaseTotal: number
+  reachesMinimum: boolean
+  // CHANGE 3 (KICKOFF-phase10-strategy-coach.md, owner review 2026-08-07):
+  // explicit, not left for a UI to infer from an empty candidates/selected
+  // array. SPEC §6 names "whether the hand can reach the 8-point minimum" as
+  // the single most valuable thing this panel can say, so silence here is
+  // not an acceptable outcome. Always the exact negation of reachesMinimum —
+  // kept as its own field so a consumer never has to derive it (and risk the
+  // polarity) from the rest of this shape; a UI is REQUIRED to render this,
+  // not merely permitted to, when true.
+  warning: boolean
+}
+
+// scoring/exclusions.ts's table only ever needs a pair when two fans COULD
+// naively co-fire on the same COMPLETE hand (the real detectors' own
+// domain) — it has no entry for e.g. [50,76] (Half Flush / No Honors)
+// because a complete hand can never satisfy both anyway (detectHalfFlush's
+// own `hasHonor` guard makes that structurally impossible), so the real
+// detectors just never co-fire and no rule is needed. fan-targets.ts's
+// estimators don't have that luxury: on an INCOMPLETE hand, "keep working
+// toward Half Flush" and "keep working toward No Honors" are two genuinely
+// contradictory FUTURE directions for the SAME current tiles (one wants to
+// keep the honor tile present, the other wants it gone), even though no
+// COMPLETE hand could ever be both. Caught this the hard way — an early
+// version of computeRouteToPoints let Half Flush (50) and All Simples (68)
+// sum together into a "reachable" 8-point total on a hand that could never
+// actually score both. Each set below is a direct, already-cited
+// consequence of its members' own fan definitions (fan-targets.ts /
+// scoring/fans-*.ts), not an independent claim: fans requiring at least one
+// dragon/wind/honor tile in the final hand vs. fans forbidding one
+// entirely. Full Flush (22) isn't listed on either side — it's already
+// covered by exclusions.ts's own [22,76] "implies No Honors" entry.
+const REQUIRES_HONOR_TILE = new Set([2, 59, 60, 61, 50]) // Big Three Dragons, Dragon Pung, Prevalent Wind, Seat Wind, Half Flush
+const FORBIDS_HONOR_TILE = new Set([68, 76]) // All Simples, No Honors
+
+function directionallyIncompatible(fanIdA: number, fanIdB: number): boolean {
+  return (
+    (REQUIRES_HONOR_TILE.has(fanIdA) && FORBIDS_HONOR_TILE.has(fanIdB)) ||
+    (REQUIRES_HONOR_TILE.has(fanIdB) && FORBIDS_HONOR_TILE.has(fanIdA))
+  )
+}
+
+export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext = {}): RouteToPointsResult {
+  const lockedInFans = computeHandPlan(hand, context).lockedInFans
+  const lockedInPoints = lockedInFans.reduce((sum, f) => sum + (FAN_REGISTRY[f.fanId]?.points ?? 0) * f.count, 0)
+
+  const candidates = estimateFanTargets(hand, context)
+  const selected: FanTargetEstimate[] = []
+  const chosenFanIds: number[] = lockedInFans.map((f) => f.fanId)
+
+  // A zero-probability candidate (this file's own linear shanten/heuristic
+  // scales bottom out at exactly 0, not just "small") contributes nothing
+  // real to a BEST case — counting its full raw points anyway would make
+  // "reaches the minimum" trivially true for nearly any hand with 3+
+  // compatible families in play, defeating the entire point of the CHANGE 3
+  // warning (SPEC §6's trap). Excluded from `selected`/`bestCaseTotal` only;
+  // still present in `candidates` verbatim.
+  for (const candidate of candidates) {
+    if (candidate.completionProbability <= 0) continue
+    if (chosenFanIds.includes(candidate.fanId)) continue
+    if (chosenFanIds.some((id) => areExclusive(id, candidate.fanId) || directionallyIncompatible(id, candidate.fanId))) continue
+    selected.push(candidate)
+    chosenFanIds.push(candidate.fanId)
+  }
+
+  const bestCaseTotal = lockedInPoints + selected.reduce((sum, c) => sum + c.points, 0)
+  const reachesMinimum = bestCaseTotal >= MINIMUM_POINTS_TO_WIN
+  return { candidates, selected, lockedInPoints, bestCaseTotal, reachesMinimum, warning: !reachesMinimum }
 }

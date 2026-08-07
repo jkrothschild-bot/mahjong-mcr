@@ -31,7 +31,7 @@ nothing pointed at any more.
 | Product-level deferrals | `SPEC.md §11` | Live, coarse |
 | Milestones | `PLAN.md §2` | M0–M6 and M8 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
-| **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done 2026-08-07, start Phase 2** |
+| **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done; Phase 2 (A lane) done 2026-08-07, C lane not started** |
 | **Found mid-cleanup, not worked** | **§F below** | **Empty — keep it that way** |
 
 ---
@@ -156,9 +156,14 @@ Do not restate these here; follow the link.
   not started** (`CLAUDE.md`).
 - **Phase 10 Strategy Coach** — `KICKOFF-phase10-strategy-coach.md § State of play`.
   Stage 2 (depth-2 evaluation) specified, not started, deprioritised behind Stage 3.
-  Stage 3 in progress: 5 of 10 families done, 5 remaining (All Pungs, Prevalent Wind, Seat
-  Wind, All Simples, No Honors), then the orchestration layer per that doc's CHANGE 3.
-  The 2000-seed self-play re-test remains parked.
+  ~~Stage 3 in progress: 5 of 10 families done, 5 remaining~~ **Stage 3's engine layer done,
+  2026-08-07 (§E Phase 2, `feat/phase10-stage3`):** all 10 families plus the
+  `computeRouteToPoints` orchestration layer (CHANGE 3's tri-state warning contract) shipped
+  and tested. A real bug (two estimators' points summing into a false "reaches 8" on a hand
+  that could never score both) was found and fixed during this work — see the KICKOFF doc's
+  own state-of-play note for the fix. Still open: the UI panel that renders
+  `computeRouteToPoints`'s output — engine-only so far. The 2000-seed self-play re-test
+  remains parked.
 - **M7 Polish (ongoing)** — `PLAN.md §2`: tile art finalisation, iPad touch tuning,
   accessibility scaling, colour-blind palette, save/resume.
 - **Product deferrals** — `SPEC.md §11`: multiplayer, accounts, other rulesets, app-store
@@ -315,10 +320,19 @@ start the moment this lands.
 
 ### Phase 2 — split the lanes
 
-**C:** landing page, against the single reconciled spec, on its own branch.
-**A:** Phase 10 Stage 3 — the 5 remaining families (All Pungs, Prevalent Wind, Seat Wind,
-All Simples, No Honors), then the orchestration layer per `KICKOFF-phase10`'s CHANGE 3, with
-pairwise compatibility filtering added to its greedy sum.
+**C:** landing page, against the single reconciled spec, on its own branch. Not started by
+this session — Codex's lane.
+**A:** ~~Phase 10 Stage 3 — the 5 remaining families... then the orchestration layer...~~
+**Done, 2026-08-07, on `feat/phase10-stage3` (not yet merged to `main`).** All 5 remaining
+families (All Pungs, Prevalent Wind, Seat Wind, All Simples, No Honors) plus
+`computeRouteToPoints` (the CHANGE 3 orchestration layer) shipped with pairwise compatibility
+filtering — see `KICKOFF-phase10-strategy-coach.md`'s own state-of-play note for a real bug
+this filtering caught (two estimators summed into a false "reaches 8-points" on a hand that
+could never score both; exclusions.ts's table alone didn't catch it, since it only covers
+pairs that could naively co-fire on a COMPLETE hand). Full engine suite green (483 tests),
+typecheck clean, zero files touched under `scoring/`/`win-detection.ts`/`exclusions.ts`.
+**Still open, not this phase:** merging `feat/phase10-stage3` to `main`, and the actual UI
+panel rendering `computeRouteToPoints`'s output (engine-only so far).
 
 ### Phase 3 — verification pass (A, small)
 

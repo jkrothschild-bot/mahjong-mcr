@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateDragonTargets, estimateFanTargets, estimateHalfFullFlush, estimateSevenPairs } from './fan-targets.js'
+import { estimateAllPungs, estimateDragonTargets, estimateFanTargets, estimateHalfFullFlush, estimateSevenPairs, estimateSimplesAndHonors, estimateWindTargets } from './fan-targets.js'
 import { emptyHand, type Hand } from './hand.js'
 import type { Meld } from './meld.js'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type TileInstanceId, type TileTypeId } from './tiles.js'
@@ -19,6 +19,10 @@ function handWith(concealedTiles: TileInstanceId[], melds: Meld[] = []): Hand {
 
 function pungMeld(id: string, typeId: TileTypeId): Meld {
   return { id, kind: 'pung', exposure: 'exposed', tiles: idsFor(typeId, 3), ownerSeat: 0 }
+}
+
+function chowMeld(id: string, typeIds: [TileTypeId, TileTypeId, TileTypeId]): Meld {
+  return { id, kind: 'chow', exposure: 'exposed', tiles: typeIds.map((t) => idsFor(t, 1)[0]!), ownerSeat: 0 }
 }
 
 describe('estimateSevenPairs', () => {
@@ -149,6 +153,133 @@ describe('estimateDragonTargets', () => {
     const hand = handWith([...idsFor('DR', 3), ...idsFor('C1', 1)])
     const results = estimateDragonTargets(hand)
     expect(results).toEqual([])
+  })
+})
+
+describe('estimateAllPungs', () => {
+  it('returns null when the hand has any chow meld (structurally impossible)', () => {
+    const hand = handWith([...idsFor('C1', 3), ...idsFor('C2', 2)], [chowMeld('0-0', ['D4', 'D5', 'D6'])])
+    expect(estimateAllPungs(hand)).toBeNull()
+  })
+
+  it('returns null when nothing is even a pair yet (too speculative for v1)', () => {
+    const hand = handWith([
+      ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+    ])
+    expect(estimateAllPungs(hand)).toBeNull()
+  })
+
+  it('reports inProgress with each pair-toward-pung as tilesNeeded, for one pung + five pairs', () => {
+    // 1 complete pung (C1) + 5 pairs; n=4, best found by reserving one pair
+    // as head: shanten = 8 - 2*(1) [C1 pung via value] ... see fan-targets.ts's
+    // own worked example in the estimator's comment for the by-hand trace.
+    const hand = handWith([
+      ...idsFor('C1', 3), ...idsFor('C2', 2), ...idsFor('C3', 2),
+      ...idsFor('C4', 2), ...idsFor('C5', 2), ...idsFor('C6', 2),
+    ])
+    const estimate = estimateAllPungs(hand)
+    expect(estimate).not.toBeNull()
+    expect(estimate!.fanId).toBe(49)
+    expect(estimate!.points).toBe(6)
+    expect(estimate!.probabilityBasis).toBe('shanten')
+    expect(estimate!.status).toBe('inProgress')
+    expect(estimate!.tilesNeeded.sort()).toEqual(['C2', 'C3', 'C4', 'C5', 'C6'])
+    expect(estimate!.completionProbability).toBeCloseTo((8 - 2) / 9)
+    expect(estimate!.value).toBeCloseTo(estimate!.completionProbability * 6)
+  })
+
+  it('reports locked with empty tilesNeeded for a complete all-pungs hand', () => {
+    const hand = handWith(
+      [...idsFor('C1', 3), ...idsFor('C9', 2)],
+      [pungMeld('0-0', 'WE'), pungMeld('0-1', 'WS'), pungMeld('0-2', 'DR')],
+    )
+    const estimate = estimateAllPungs(hand)
+    expect(estimate).not.toBeNull()
+    expect(estimate!.status).toBe('locked')
+    expect(estimate!.tilesNeeded).toEqual([])
+    expect(estimate!.completionProbability).toBe(1)
+  })
+})
+
+describe('estimateWindTargets', () => {
+  it('returns empty with no context supplied', () => {
+    const hand = handWith([...idsFor('WE', 2), ...idsFor('C1', 3)])
+    expect(estimateWindTargets(hand)).toEqual([])
+  })
+
+  it('reports inProgress for a partial prevailing-wind pung', () => {
+    const hand = handWith([...idsFor('WE', 2), ...idsFor('C1', 3)])
+    const results = estimateWindTargets(hand, { prevailingWind: 'east' })
+    expect(results).toHaveLength(1)
+    expect(results[0]!.fanId).toBe(60)
+    expect(results[0]!.points).toBe(2)
+    expect(results[0]!.probabilityBasis).toBe('heuristic')
+    expect(results[0]!.status).toBe('inProgress')
+    expect(results[0]!.tilesNeeded).toEqual(['WE'])
+    expect(results[0]!.completionProbability).toBeCloseTo(2 / 3)
+  })
+
+  it('reports locked for a melded seat-wind pung', () => {
+    const hand = handWith([...idsFor('C1', 1)], [pungMeld('0-0', 'WS')])
+    const results = estimateWindTargets(hand, { seatWind: 'south' })
+    expect(results).toHaveLength(1)
+    expect(results[0]!.fanId).toBe(61)
+    expect(results[0]!.status).toBe('locked')
+    expect(results[0]!.tilesNeeded).toEqual([])
+    expect(results[0]!.completionProbability).toBe(1)
+  })
+
+  it('emits both fan 60 and fan 61 when prevailing and seat wind coincide', () => {
+    const hand = handWith([...idsFor('WN', 3), ...idsFor('C1', 1)])
+    const results = estimateWindTargets(hand, { prevailingWind: 'north', seatWind: 'north' })
+    expect(results.map((r) => r.fanId).sort()).toEqual([60, 61])
+    for (const r of results) {
+      expect(r.status).toBe('locked')
+      expect(r.completionProbability).toBe(1)
+    }
+  })
+
+  it('returns nothing for a wind with zero copies (too speculative for v1)', () => {
+    const hand = handWith([...idsFor('C1', 3), ...idsFor('C2', 3)])
+    expect(estimateWindTargets(hand, { prevailingWind: 'west' })).toEqual([])
+  })
+})
+
+describe('estimateSimplesAndHonors', () => {
+  it('returns empty when a meld contains an honor tile', () => {
+    const hand = handWith([...idsFor('C1', 1)], [pungMeld('0-0', 'WE')])
+    expect(estimateSimplesAndHonors(hand)).toEqual([])
+  })
+
+  it('still reports No Honors but not All Simples when a meld has a terminal but no honor', () => {
+    const hand = handWith([...idsFor('C5', 1)], [pungMeld('0-0', 'C1')])
+    const results = estimateSimplesAndHonors(hand)
+    expect(results).toHaveLength(1)
+    expect(results[0]!.fanId).toBe(76)
+  })
+
+  it('reports both inProgress with offending tiles as tilesNeeded', () => {
+    const hand = handWith([...idsFor('C5', 4), ...idsFor('C6', 4), ...idsFor('C8', 3), ...idsFor('WE', 1), ...idsFor('C1', 1)])
+    const results = estimateSimplesAndHonors(hand)
+    const noHonors = results.find((r) => r.fanId === 76)!
+    const allSimples = results.find((r) => r.fanId === 68)!
+    expect(noHonors.status).toBe('inProgress')
+    expect(noHonors.tilesNeeded).toEqual(['WE'])
+    expect(allSimples.status).toBe('inProgress')
+    expect(allSimples.tilesNeeded.sort()).toEqual(['C1', 'WE'])
+  })
+
+  it('reports both locked for a hand with no terminal or honor tiles anywhere', () => {
+    const hand = handWith([...idsFor('C5', 4), ...idsFor('C6', 4), ...idsFor('D5', 4), ...idsFor('D6', 1)])
+    const results = estimateSimplesAndHonors(hand)
+    expect(results).toHaveLength(2)
+    for (const r of results) {
+      expect(r.status).toBe('locked')
+      expect(r.completionProbability).toBe(1)
+    }
   })
 })
 

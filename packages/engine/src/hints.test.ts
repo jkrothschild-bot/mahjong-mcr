@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chooseDiscard, rankDiscards } from './bots/policy.js'
-import { computeBestMoveHint, computeHandPlan, deriveOneLinerReason } from './hints.js'
+import { computeBestMoveHint, computeHandPlan, computeRouteToPoints, deriveOneLinerReason } from './hints.js'
 import { emptyHand, type Hand } from './hand.js'
 import type { Meld } from './meld.js'
 import { evaluateDiscards } from './tile-efficiency.js'
@@ -294,5 +294,70 @@ describe('computeHandPlan', () => {
     const plan = computeHandPlan(handWith(concealed), { prevailingWind: 'east', seatWind: 'north' })
     expect(plan.shanten.shanten).toBe(0)
     expect(plan.primaryRoute).toBe('standard')
+  })
+})
+
+describe('computeRouteToPoints', () => {
+  it('warns when nothing reaches the 8-point minimum', () => {
+    // Same "too speculative" scattered hand as fan-targets.test.ts's
+    // estimateAllPungs fixture — 13 distinct singles, nothing close to any target.
+    const hand = handWith([
+      ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    expect(result.reachesMinimum).toBe(false)
+    expect(result.warning).toBe(true)
+    expect(result.bestCaseTotal).toBeLessThan(8)
+  })
+
+  it('does not warn once a real candidate clears the minimum on its own', () => {
+    // Two dragon pungs sitting CONCEALED (never declared as melds), plus a
+    // partial third — lockedInFansFromMelds sees nothing (melds-only), but
+    // estimateDragonTargets recognizes the concealed pungs and offers Big
+    // Three Dragons (88pts) as a candidate, clearing 8 on its own.
+    const hand = handWith([
+      ...idsFor('DR', 3), ...idsFor('DG', 3), ...idsFor('DW', 2),
+      ...idsFor('C1', 1), ...idsFor('C2', 1), ...idsFor('C3', 1), ...idsFor('C4', 1), ...idsFor('C5', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    expect(result.reachesMinimum).toBe(true)
+    expect(result.warning).toBe(false)
+    expect(result.bestCaseTotal).toBeGreaterThanOrEqual(8)
+    expect(result.selected.some((c) => c.fanId === 2)).toBe(true)
+  })
+
+  it('filters directionally-incompatible candidates not covered by exclusions.ts (Half Flush vs All Simples/No Honors)', () => {
+    // Real bug found while writing this function: Half Flush (50) requires
+    // keeping a honor tile, All Simples (68)/No Honors (76) require
+    // discarding every honor tile — contradictory directions for the same
+    // hand, but not a scoring/exclusions.ts entry (a COMPLETE hand can never
+    // satisfy both anyway, so the real detectors never needed one). An
+    // earlier version of computeRouteToPoints summed 50+68's raw points
+    // (6+2=8) into a false "reaches minimum" on exactly this hand.
+    const hand = handWith([
+      ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    const selectedFanIds = result.selected.map((c) => c.fanId)
+    expect(selectedFanIds).toContain(50)
+    expect(selectedFanIds).not.toContain(68)
+    expect(selectedFanIds).not.toContain(76)
+    expect(result.reachesMinimum).toBe(false)
+  })
+
+  it('filters mutually-exclusive candidates out of the greedy sum (All Simples vs No Honors, exclusions.ts [68,76])', () => {
+    const hand = handWith([...idsFor('C5', 4), ...idsFor('C6', 4), ...idsFor('D5', 4), ...idsFor('D6', 1)])
+    const result = computeRouteToPoints(hand)
+    const candidateFanIds = result.candidates.map((c) => c.fanId)
+    expect(candidateFanIds).toContain(68)
+    expect(candidateFanIds).toContain(76)
+    const selectedFanIds = result.selected.map((c) => c.fanId)
+    expect(selectedFanIds.includes(68) && selectedFanIds.includes(76)).toBe(false)
   })
 })
