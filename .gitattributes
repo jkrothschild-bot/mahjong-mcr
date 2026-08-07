@@ -1,0 +1,42 @@
+# Normalise line endings so `git status` stays a usable verification signal.
+#
+# Without this, files written on Windows land as CRLF and show as fully
+# modified against an LF index (equal insertion/deletion counts, empty
+# `git diff --ignore-all-space`). That makes the "git status confirms only
+# the expected files were touched" stop-condition check useless — see
+# OPEN-WORK.md §D1.
+#
+# After adding this file, renormalise once:
+#   git add --renormalize .
+#   git commit -m "Normalise line endings via .gitattributes"
+
+# Default: normalise to LF in the repo, check out native on Windows.
+* text=auto
+
+# Explicit LF for everything text-like, so tooling agrees across platforms.
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.py    text eol=lf
+*.svg   text eol=lf
+*.sh    text eol=lf
+
+# Binary — never touch.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
