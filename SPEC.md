@@ -87,8 +87,14 @@ A design that requires hunting, hovering, or opening a menu to answer 1–7 does
      **Closed by owner decision — reduced to a single "Sort" button that always sorts by suit.** Shipped as 6 buttons, then a `<select>`, then this. Rationale: suit is the sort actually used in play, and a picker makes a one-step job into two steps. This *supersedes* the six-mode requirement in §5 and PLAN.md M3 — those still describe the reference screenshot's toolbar and should be read against this line. The other five comparators remain implemented and tested in `handOrder.ts`, so restoring a multi-mode control is a UI-only change with no logic to rewrite.
   2. Turn indicator for bot seats, not just the player's own turn (see §5 above).
   3. Touch-target size after v6's CSS-transform scale-down — verify ≥44px on a real iPad, not just assumed from the desktop layout.
-  4. Tile art asset licensing/origin for `docs/Mockups/assets` (§4).
-  5. Missing flower/season tile assets (§4).
+  4. ~~Tile art asset licensing/origin for `docs/Mockups/assets` (§4).~~ **Done —
+     struck through 2026-08-07 (OPEN-WORK.md §C2).** `THIRD_PARTY_LICENSES.md`
+     documents the vendored FluffyStuff/riichi-mahjong-tiles set (CC0) with a
+     commit pin.
+  5. ~~Missing flower/season tile assets (§4).~~ **Done — struck through
+     2026-08-07 (OPEN-WORK.md §C3).** Eight original flower/season faces
+     shipped, documented in `THIRD_PARTY_LICENSES.md`, with
+     `FlowerTileFace.tsx` retained only as a fallback.
   6. **Side seat label vs. side seat tiles at worst-case occupancy.** Every
      seat's identity band (wind letter, dealer/turn badge, match score) sits
      centred on that seat's own wood rail. On the left/right rails this
@@ -100,10 +106,16 @@ A design that requires hunting, hovering, or opening a menu to answer 1–7 does
      tiles from 49px to ~44px (undoing `SEAT_LINE_PX`'s deliberate ≥10%
      legibility bump), and widening the column to 170px starves the
      discard field's worst-case zone (352px → 345px, against 351px needed).
-     Pinned by `stageLayout.test.ts`'s `side rail label vs. side seat tiles`
+     ~~Pinned by `stageLayout.test.ts`'s `side rail label vs. side seat tiles`
      so a change that makes it reachable at a *common* tile count fails
-     loudly. Real fix would need the side column and the discard field
-     re-budgeted together.
+     loudly.~~ **Correction, 2026-08-07 (OPEN-WORK.md §A3): no test of that
+     name exists anywhere in `packages/`.** `stageLayout.test.ts`'s `seat
+     identity bands ride the table rail` block asserts band placement only
+     (rails, rotation, centring) — it asserts nothing about collision with
+     side seat tiles at occupancy. There is currently no guard against this
+     becoming reachable at a common tile count; writing one is tracked at
+     OPEN-WORK.md §A3/Phase 4 (C lane). Real fix would need the side column
+     and the discard field re-budgeted together.
 
 ### 5c. Visual fidelity bar ("feels like a real table," not just "shows the right information")
 
@@ -175,4 +187,4 @@ Features common to the stronger mahjong clients on the market, or general traine
 ## 12. Movements
 Hand ordering: The order of tiles in a player's hand is user-controlled. Players can rearrange their own tiles at any time (drag-and-drop or tap-to-swap). The game must never auto-sort a hand without the player's action; a "sort hand" button may be offered as an explicit action. Hand order is local presentation state only — it does not affect game logic and is not visible to other players.
 
-Tile transitions (deferred, architecture required now): Visual animations for tile movement (wall → hand on draw, hand → discard, claimed tile → meld) are a post-MVP feature. However, the rendering layer must represent tiles as persistent objects with positions, so transitions between zones can be animated later without rework.
+~~Tile transitions (deferred, architecture required now): Visual animations for tile movement (wall → hand on draw, hand → discard, claimed tile → meld) are a post-MVP feature.~~ **Shipped — corrected 2026-08-07 (OPEN-WORK.md §C4).** `motion` (`^12.43.0`) drives a `layoutId`-based settle animation across `HandTiles.tsx`, `DiscardField.tsx`, `SeatLine.tsx`, `Board.tsx` and `Positioned.tsx`; `App.tsx` honours `useReducedMotion`; `SettingsPanel.tsx` exposes a toggle. The rendering layer represents tiles as persistent objects with positions, per the original requirement below, which is exactly what made this addable without rework.

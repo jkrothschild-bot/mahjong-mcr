@@ -29,9 +29,9 @@ nothing pointed at any more.
 | Strategy Coach (Phase 10) | `KICKOFF-phase10-strategy-coach.md § State of play / resume here` | Live, current phase |
 | UI acceptance gaps | `SPEC.md §5b` | Live, but see §C — partly stale |
 | Product-level deferrals | `SPEC.md §11` | Live, coarse |
-| Milestones | `PLAN.md §2` | M0–M6 complete, M7 ongoing |
+| Milestones | `PLAN.md §2` | M0–M6 and M8 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
-| **Cleanup sequence & lanes** | **§E below** | **Active — Phase 0 done 2026-08-07, start Phase 1** |
+| **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done 2026-08-07, start Phase 2** |
 | **Found mid-cleanup, not worked** | **§F below** | **Empty — keep it that way** |
 
 ---
@@ -84,6 +84,11 @@ This is worse than an untracked item — it is a **claimed safety net that isn't
 the risk reads as contained when it isn't. Either write the test §5b describes, or correct
 §5b to stop claiming it. Do not close A3 on the strength of that sentence.
 
+**Partial progress, 2026-08-07 (Phase 1, §E):** `SPEC.md §5b` item 6 no longer claims the
+nonexistent test — corrected in place. **A3 itself stays open**: there is still no guard
+against the collision, and the underlying layout defect is unfixed. Writing the actual test
+is Phase 4 (C lane).
+
 ### A4. Touch-target verification on a real iPad  `[code-verified 2026-08-07]`
 `SPEC.md §5b` item 3. **Still genuinely open.** There is no `44px` constant, no test, and no
 recorded on-device check anywhere in the repo — only the requirement text in `SPEC.md:17`.
@@ -100,12 +105,11 @@ as the worked example.
 `KICKOFF-phase9-human-melds.md` line 87 — deliberately reported "as a follow-up rather than
 half-doing it." Scope not restated here; read that file's surrounding context.
 
-### A7. Base64-PNG tile-art re-assessment  `[code-verified 2026-08-07]`
-`KICKOFF-phase2-2-hand-fit.md` line 101 asked to "re-assess whether the deferred
-base64-PNG tile-art item is still worth a" pass. Likely obsolete — tile art has since been
-resolved via the vendored FluffyStuff set plus original flower artwork
-(`THIRD_PARTY_LICENSES.md`). Confirmed: no `base64` or `data:image` reference exists in `packages/ui/src`. **Closeable —
-confirm and strike through.**
+### ~~A7. Base64-PNG tile-art re-assessment~~ ✅ closed 2026-08-07
+~~`KICKOFF-phase2-2-hand-fit.md` line 101 asked to "re-assess whether the deferred
+base64-PNG tile-art item is still worth a" pass.~~ Confirmed obsolete: tile art has since
+been resolved via the vendored FluffyStuff set plus original flower artwork
+(`THIRD_PARTY_LICENSES.md`); no `base64` or `data:image` reference exists in `packages/ui/src`.
 
 ### A8. Tile legibility at 200% zoom  `[doc-only]`
 `KICKOFF-tile-legibility-phase2.md §2.4` deferred a re-assessment "after 2.1/2.2 with fresh
@@ -152,25 +156,27 @@ Found 2026-08-07 by checking `SPEC.md §5b` against the actual source tree. Thes
 *document* corrected, not new work. Verify each, then strike through in `SPEC.md §5b`
 directly with a date, the same way item 1 already was.
 
-- **§5b item 2 — bot-seat turn indicator.** Appears **done**: `Board.tsx:267` passes
+- **§C1 — §5b item 2, bot-seat turn indicator.** Appears **done**: `Board.tsx:267` passes
   `isCurrentTurn` for every seat, and `Seat.tsx:232` renders it. *However* it renders as a
   text-colour change (emerald vs. neutral) on a small identity band — worth confirming that
   clears `SPEC.md §5a` item 1's two-second bar before striking it through, since a colour
   shift on small text is exactly the kind of thing that passes in code review and fails on
-  a real screen. Also relevant to §5a's colour-blind requirement.
-- **§5b item 4 — tile art licensing.** **Done.** `THIRD_PARTY_LICENSES.md` documents the
-  vendored FluffyStuff/riichi-mahjong-tiles set (CC0) with a commit pin.
-- **§5b item 5 — missing flower/season assets.** **Done.** Eight original flower/season
-  faces shipped, documented in `THIRD_PARTY_LICENSES.md`, with
-  `FlowerTileFace.tsx` retained only as a fallback.
-- **§C4 — `SPEC.md §11` still lists tile movement animations as deferred. They are shipped.**
-  `motion@^12.43.0` is a dependency; `Positioned.tsx` wraps `motion/react`; `layoutId` is
-  threaded through `HandTiles.tsx`, `DiscardField.tsx`, `SeatLine.tsx` and `Board.tsx`;
-  `App.tsx` honours `useReducedMotion`; `SettingsPanel.tsx` exposes a tile-animation toggle;
-  and commit `6df4c2b` specifically disables shared-layout animation *in the preview*, which
-  only makes sense if it is live on the real board. `HandTiles.tsx:120` even names it
-  "the `layoutId`-based settle animation (M8 Step 3)" — an M8 that `PLAN.md §2` does not list.
-  **Correct `SPEC.md §11`, and check whether `PLAN.md §2` needs an M8 entry.**
+  a real screen. Also relevant to §5a's colour-blind requirement. **Owner judgment required
+  — not closed by Phase 1** (§E). Still open as of 2026-08-07.
+- **~~§C2 — §5b item 4, tile art licensing.~~ ✅ struck through in SPEC.md, 2026-08-07.**
+  `THIRD_PARTY_LICENSES.md` documents the vendored FluffyStuff/riichi-mahjong-tiles set (CC0)
+  with a commit pin.
+- **~~§C3 — §5b item 5, missing flower/season assets.~~ ✅ struck through in SPEC.md,
+  2026-08-07.** Eight original flower/season faces shipped, documented in
+  `THIRD_PARTY_LICENSES.md`, with `FlowerTileFace.tsx` retained only as a fallback.
+- **~~§C4 — tile movement animations.~~ ✅ corrected in SPEC.md, 2026-08-07.** The claim
+  actually lives in **`SPEC.md §12`** (Movements), not §11 as first written here — §11 is the
+  unrelated "Future (explicitly deferred)" product-scope list. `motion@^12.43.0` is a
+  dependency; `Positioned.tsx` wraps `motion/react`; `layoutId` is threaded through
+  `HandTiles.tsx`, `DiscardField.tsx`, `SeatLine.tsx` and `Board.tsx`; `App.tsx` honours
+  `useReducedMotion`; `SettingsPanel.tsx` exposes a tile-animation toggle. §12 now says so.
+  `PLAN.md §2` gained the M8 entry `HandTiles.tsx:120`'s comment referenced but that the
+  milestone list itself never had.
 
 Leaving these reading as open is not harmless — it is what makes a long-lived checklist stop
 being trusted, and it inflates the apparent size of the remaining work.
@@ -263,28 +269,33 @@ correct *before* either agent starts.
    for lane A's next chunk (the remaining 5 Stage 3 families). `feat/landing-page` for lane C
    is Codex's to create when that work starts.
 
-### Phase 1 — record corrections (A, one session, documents only, no code)
+### Phase 1 — record corrections (A, one session, documents only, no code) — 4/4 agent items done 2026-08-07
 
-Do this **before Codex starts**, because it edits `SPEC.md` and `PLAN.md` — the exact files
-Codex will read to build the landing page. Running it concurrently guarantees Codex builds
-against a spec being corrected underneath it.
+**Agent-closeable — done:**
 
-Highest ratio of items-closed to risk in the whole list. Every one of these closes by
-correcting a record:
+- ~~§C2, §C3 — strike through §5b items 4 and 5.~~ Done in `SPEC.md`.
+- ~~§C4 — correct `SPEC.md §11`.~~ Done — the claim actually lived in `SPEC.md §12`, not §11
+  (corrected in place, see §C4 above). `PLAN.md §2` gained the M8 entry.
+- ~~§A7 — strike through.~~ Done above.
+- ~~§A3 — correct `SPEC.md §5b` item 6's false guard-test claim.~~ Done — doc corrected;
+  **A3 itself is still open** (see A3 above), only the false claim is resolved. Writing the
+  actual test remains Phase 4, C lane.
 
-- §C1 — verify the bot turn indicator against `SPEC.md §5a` item 1's two-second bar and the
-  colour-blind requirement, then strike through §5b item 2 (or keep it open with the real
-  reason, which is legibility, not absence).
-- §C2, §C3 — strike through §5b items 4 and 5. Both confirmed done.
-- §C4 — correct `SPEC.md §11`: tile animations are shipped, not deferred. Check whether
-  `PLAN.md §2` needs the M8 entry that `HandTiles.tsx:120` references.
-- §A7 — strike through. Confirmed obsolete.
-- §A3 — **either** write the guard test `SPEC.md §5b` item 6 claims exists, **or** correct
-  §5b to stop claiming it. Writing it is the better outcome and is small; do not leave the
-  false claim standing either way.
-- §D3 — confirm v6 is still the baseline or point the three references at v7/v8.
+**Owner judgment required — NOT closed by this pass, still open:**
 
-Expected outcome: 5–6 items struck through, zero production code touched, zero merge risk.
+- §C1 — bot turn indicator. The code half is already verified: `Board.tsx:267` passes
+  `isCurrentTurn` for every seat and `Seat.tsx:232` renders it. But it renders as **text
+  colour alone** (emerald vs. neutral) on a small identity band. Whether that answers
+  `SPEC.md §5a` item 1 within two seconds is a judgment on a real screen, and colour-only
+  encoding is precisely what §5a's colour-blind requirement exists to catch. An agent
+  checking "is the prop passed?" will rubber-stamp this. **Kevin decides, on a device.**
+  Prior expectation: it probably fails both bars and needs a non-colour cue.
+- §D3 — v6 vs. v7/v8 mockup baseline. Kevin authored all three; only he knows whether v7/v8
+  were rejected explorations or an unrecorded supersession.
+
+Outcome: 4 items struck through (plus one, §5b item 1, already struck before Phase 1 started),
+2 reassigned to K with a reason, zero production code touched, zero merge risk. Codex can
+start the moment this lands.
 
 ### Phase 2 — split the lanes
 
@@ -334,8 +345,6 @@ triaged after §E completes. An empty section means the pass stayed in scope.
   before M6; M6 is now complete, so it is legitimately openable — but it should enter
   `PLAN.md §2` as a milestone before it enters this index, not the other way round.
 
-  Note: an untracked `Mahjong Learning Game — Landing Page, Accounts & Saved Games
-  Specification.md` already sits in the repo root, unversioned. It specifies **two** initial
-  modes (Learning Mode and Play Without Help). Decide whether it is the authority, `git add`
-  it if so, and reconcile it with any other landing-page planning before building anything —
-  two specs is worse than none.
+  ~~Note: an untracked `Mahjong Learning Game — Landing Page, Accounts & Saved Games
+  Specification.md` already sits in the repo root, unversioned.~~ **Resolved — see §D2.**
+  Now tracked as the sole authoritative spec (commit `7680161`); Codex builds against it.
