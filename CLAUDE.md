@@ -84,6 +84,26 @@ both before any work.
 - Run typecheck + full test suite before every commit. Never commit red.
 - Every scoring bug found becomes a permanent test fixture before it is fixed.
 - Record any rulebook-ambiguity ruling in docs/rules/decisions.md.
+- **Nothing is deferred until it is written down outside this session.** Any
+  time work is postponed, descoped, "left as a follow-up", or reported at a
+  stop condition as remaining — record it before the session ends. Rules and
+  scoring items go to docs/rules/decisions.md § Open follow-up work; UI and
+  layout items go to OPEN-WORK.md §A; everything else gets a link from
+  OPEN-WORK.md's map table. Reporting an item only in the chat transcript
+  does NOT count as recording it — that is exactly how the edge-strip
+  topology, the latest-discard overlay footprint, and the phase-9 bot-seat
+  follow-up went unowned for three phases each (see OPEN-WORK.md §A).
+  OPEN-WORK.md is an INDEX: link to the authoritative section, never copy its
+  contents, or the two copies will drift.
+- When a deferred item is CLOSED, strike it through where it was recorded with
+  a one-line reason and date — don't delete it, and don't leave it reading as
+  open. A checklist that still lists finished work stops being trusted and
+  inflates the apparent size of what's left (see OPEN-WORK.md §C for three
+  SPEC.md §5b items that were done in code but still read as open).
+- `git status` is a load-bearing part of the stop-condition report, so it must
+  stay clean of noise. .gitattributes normalises line endings for this reason
+  (OPEN-WORK.md §D1) — if `git status` ever shows unexplained modified files
+  again, say so plainly rather than reporting around them.
 - Overflow is additive, never rescaling: a region past its soft occupancy
   limit keeps its fixed tile size and extends along its long axis into
   adjacent neutral space. It never shrinks retroactively, and layout never
