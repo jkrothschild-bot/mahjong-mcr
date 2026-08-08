@@ -7,7 +7,12 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   webServer: {
-    command: 'npm run preview -- --port 4173',
+    // Builds before previewing so `test:e2e` is self-sufficient — it no
+    // longer depends on a separate `npm run build` having already been run
+    // first, in CI or locally (OPEN-WORK.md §D6: folding e2e into the
+    // standard `npm test` gate needs this to "just work" without every
+    // caller having to know to build first).
+    command: 'npm run build && npm run preview -- --port 4173',
     port: 4173,
     reuseExistingServer: !process.env.CI,
   },

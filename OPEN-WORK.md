@@ -281,23 +281,29 @@ milestone entry was even written up (§A11), then was removed entirely on
 `feat/landing-auth-persistence`. `PLAN.md` now says so in place, dated, not just struck
 through blind — see §A11 for the full two-cause account.
 
-### D6. `npm test` excludes Playwright e2e by construction — undecided
-`package.json`'s root `"test"` script is `npm run test --workspaces --if-present`, which for
+### ~~D6. `npm test` excludes Playwright e2e by construction~~ ✅ fixed 2026-08-08
+~~`package.json`'s root `"test"` script is `npm run test --workspaces --if-present`, which for
 `packages/ui` runs only its `"test"` script (`vitest run`). `"test:e2e"` (`playwright test`) is
-a separate script the root `npm test` never touches. Every "full suite green" report in this
-project's history has therefore excluded e2e by construction — this is exactly how
+a separate script the root `npm test` never touches.~~ Every "full suite green" report in this
+project's history up to this point had excluded e2e by construction — this is exactly how
 `board.spec.ts` stayed silently broken from the M8 testid rename (2026-07-29) until it was
 deleted (2026-08-08) without anyone's `npm test` ever flagging it (§A11/§D5).
 
-**Two ways to close this, not yet decided between:**
-1. Fold `test:e2e` into the standard/root check (`npm test` or a pre-commit gate), so `git
-   status`/"full suite green" reports actually mean what they imply. Costs real wall-clock time
-   on every run (Playwright spins up browsers) — currently paid only when someone remembers to
-   run it separately, which `board.spec.ts`'s own history shows doesn't reliably happen.
-2. Leave `npm test` vitest-only, but say so explicitly in `CLAUDE.md`'s "Run typecheck + full
-   test suite before every commit" line — so the exclusion is a stated scope decision, not an
-   invisible gap a future stale-claim can hide behind again.
-Owner decision needed; not implemented either way.
+**Owner chose option 1 (fold e2e into the standard check).** Root `"test"` is now
+`npm run test --workspaces --if-present && npm run test:e2e --workspace=@mahjong-mcr/ui
+--if-present`. Two supporting changes made this self-sufficient rather than order-dependent:
+`playwright.config.ts`'s `webServer.command` now chains `npm run build && npm run preview`
+(previously just `preview`, which silently served a stale/absent `dist/` if nothing had built
+it first) — so `test:e2e` no longer depends on a separate build step having already run, in CI
+or locally. `.github/workflows/ci.yml` gained a `playwright install --with-deps chromium` step
+(CI never needed browsers installed before, since it never ran e2e). Verified locally: full
+`npm test` from repo root — 466 engine + 448 ui vitest tests, then 9 e2e tests (3 tests × 3
+viewport projects) — all green, ~90s total added over the vitest-only baseline. `npm run
+typecheck` unaffected.
+
+This does not restore board-level e2e coverage itself — that remains open at §A11 — it only
+means the NEXT time something like `board.spec.ts`'s drift happens, `npm test` will now
+actually catch it instead of silently passing.
 
 ---
 
