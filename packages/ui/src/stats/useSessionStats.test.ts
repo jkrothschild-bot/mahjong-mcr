@@ -102,4 +102,15 @@ describe('useSessionStats', () => {
     expect(second.result.current.stats.handsPlayed).toBe(1)
     expect(second.result.current.stats.wins).toBe(1)
   })
+
+  it('does not count the same completed hand again after a reload/remount', () => {
+    const state = selfDrawWinState()
+    const first = renderHook(() => useSessionStats())
+    act(() => first.result.current.recordHandResult(state, 0))
+    first.unmount()
+    const restored = renderHook(() => useSessionStats())
+    act(() => restored.result.current.recordHandResult(state, 0))
+    expect(restored.result.current.stats.handsPlayed).toBe(1)
+    expect(restored.result.current.stats.wins).toBe(1)
+  })
 })

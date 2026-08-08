@@ -138,6 +138,30 @@ describe('useGameLoop', () => {
     expect(result.current.state).toBe(stateBefore)
   })
 
+  it('restores the exact reducer snapshot, including turn, wall, melds, discards, scores and replay logs', () => {
+    const initial = initLoopState(42)
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 999, botSpeedMs: 50, paused: true, initialSnapshot: initial }))
+    expect(result.current.state).toEqual(initial.gameState)
+    expect(result.current.matchState).toEqual(initial.matchState)
+    expect(result.current.matchScores).toEqual(initial.matchScores)
+    expect(result.current.matchMoveLogs).toEqual(initial.matchMoveLogs)
+    expect(result.current.isHumanTurn).toBe(true)
+  })
+
+  it('resumes bot continuation from a snapshot without replaying an already-recorded move', () => {
+    const first = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, paused: true }))
+    const [tile] = first.result.current.state.players[HUMAN_SEAT].hand.concealedTiles
+    act(() => first.result.current.submitHumanMove({ kind: 'discard', tile: tile! }))
+    const snapshot = { gameState: first.result.current.state, matchState: first.result.current.matchState, matchScores: first.result.current.matchScores, matchMoveLogs: first.result.current.matchMoveLogs }
+    const recordedBefore = snapshot.matchMoveLogs[0]!.moves.length
+    first.unmount()
+    const restored = renderHook(() => useGameLoop({ matchSeed: 999, botSpeedMs: 20, initialSnapshot: snapshot }))
+    expect(restored.result.current.matchMoveLogs[0]!.moves).toHaveLength(recordedBefore)
+    act(() => { vi.advanceTimersByTime(20) })
+    expect(restored.result.current.matchMoveLogs[0]!.moves.length).toBeGreaterThan(recordedBefore)
+    expect(restored.result.current.matchMoveLogs[0]!.moves.slice(0, recordedBefore)).toEqual(snapshot.matchMoveLogs[0]!.moves)
+  })
+
   it('paused: true holds the game state still, even across many timer ticks, and resumes once paused goes false', () => {
     // KICKOFF-phase4-discard-overlay.md: the discard overlay pauses the loop
     // so a player can't lose a claim window while looking at it.
@@ -284,6 +308,18 @@ describe('useGameLoop', () => {
     expect(result.current.matchState.matchHandNumber).toBe(2)
     expect(result.current.matchState.dealerSeat).toBe(1)
     expect(result.current.state.handNumber).toBe(2)
+  })
+
+  it('does not create a seventeenth hand from a completed restored match', () => {
+    const initial = initLoopState(42)
+    initial.matchState = { ...initial.matchState, matchHandNumber: 16, completed: true }
+    initial.gameState = { ...initial.gameState, handNumber: 16, phase: 'handEnded', result: { outcome: 'exhaustiveDraw' } }
+    const { result } = renderHook(() => useGameLoop({ matchSeed: 42, botSpeedMs: 20, initialSnapshot: initial }))
+    act(() => result.current.startNextHand())
+    expect(result.current.matchState.completed).toBe(true)
+    expect(result.current.matchState.matchHandNumber).toBe(16)
+    expect(result.current.state.phase).toBe('handEnded')
+    expect(result.current.matchMoveLogs).toHaveLength(1)
   })
 
   // Step mode's three tests were removed with the feature. What they were

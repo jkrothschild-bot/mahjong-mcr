@@ -1,10 +1,23 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { GameState, Seat } from '@mahjong-mcr/engine'
 import { SESSION_STATS_STORAGE_KEY, applyHandResult, loadStats, serializeStats, type SessionStats } from './sessionStats.js'
 
 export interface UseSessionStatsResult {
   stats: SessionStats
   recordHandResult: (endedState: GameState, humanSeat: Seat) => void
+}
+
+export const RECORDED_HANDS_STORAGE_KEY = 'mcr-mahjong:recorded-stat-hands:v1'
+
+function loadRecordedHands(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(RECORDED_HANDS_STORAGE_KEY)
+    if (!raw) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [])
+  } catch {
+    return new Set()
+  }
 }
 
 // localStorage-backed session stats, read once on mount, written on every
@@ -15,6 +28,7 @@ export interface UseSessionStatsResult {
 // ref-guarded effect keyed on (state.seed, state.handNumber) — this hook
 // itself has no notion of "already recorded this hand").
 export function useSessionStats(): UseSessionStatsResult {
+  const recordedHands = useRef<Set<string>>(loadRecordedHands())
   const [stats, setStats] = useState<SessionStats>(() => {
     try {
       return loadStats(window.localStorage.getItem(SESSION_STATS_STORAGE_KEY))
@@ -24,6 +38,15 @@ export function useSessionStats(): UseSessionStatsResult {
   })
 
   const recordHandResult = useCallback((endedState: GameState, humanSeat: Seat) => {
+    if (!endedState.result) return
+    const handKey = `${endedState.seed}-${endedState.handNumber}`
+    if (recordedHands.current.has(handKey)) return
+    recordedHands.current.add(handKey)
+    try {
+      window.localStorage.setItem(RECORDED_HANDS_STORAGE_KEY, JSON.stringify([...recordedHands.current]))
+    } catch {
+      // Stats persistence is best-effort, like the aggregate below.
+    }
     setStats((prev) => {
       const next = applyHandResult(prev, endedState, humanSeat)
       try {

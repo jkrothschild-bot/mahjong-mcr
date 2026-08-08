@@ -14,6 +14,8 @@ export interface ScoreScreenProps {
   // through it move by move." Optional for the same standalone-testing
   // reason as onFanClick above.
   onReviewHand?: () => void
+  matchCompleted?: boolean
+  onMatchComplete?: () => void
 }
 
 const ALL_SEATS: readonly Seat[] = [0, 1, 2, 3]
@@ -34,7 +36,7 @@ function formatSigned(amount: number): string {
 // flower points are winner.hand.flowers.length * FAN_REGISTRY[81].points —
 // both derived, not hardcoded — so this can never drift from the scoring
 // engine as new fans/rulings land.
-export function ScoreScreen({ state, matchScores, onNextHand, onFanClick, onReviewHand }: ScoreScreenProps) {
+export function ScoreScreen({ state, matchScores, onNextHand, onFanClick, onReviewHand, matchCompleted = false, onMatchComplete }: ScoreScreenProps) {
   if (state.phase !== 'handEnded' || !state.result) return null
   const { result } = state
 
@@ -76,10 +78,10 @@ export function ScoreScreen({ state, matchScores, onNextHand, onFanClick, onRevi
           )}
           <button
             type="button"
-            onClick={onNextHand}
+            onClick={matchCompleted ? onMatchComplete ?? onNextHand : onNextHand}
             className="min-h-11 flex-1 rounded-md border border-amber-400 bg-amber-500 px-4 text-sm font-semibold text-neutral-900 hover:bg-amber-400"
           >
-            Next hand
+            {matchCompleted ? 'Finish match' : 'Next hand'}
           </button>
         </div>
       </div>

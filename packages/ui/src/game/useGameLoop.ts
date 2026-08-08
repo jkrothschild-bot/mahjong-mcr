@@ -31,7 +31,7 @@ export interface HandMoveLog {
   moves: RecordedMove[]
 }
 
-interface LoopState {
+export interface LoopState {
   gameState: GameState
   matchState: MatchState
   // PlayerState.score is always 0 (the engine never updates it — see
@@ -100,9 +100,22 @@ function loopReducer(state: LoopState, action: LoopAction): LoopState {
       const logs = state.matchMoveLogs.slice()
       const current = logs[logs.length - 1]!
       logs[logs.length - 1] = { ...current, moves: [...current.moves, { seat: action.seat, move: action.move }] }
+      // Hand 16 ends the match immediately. Final settlement is folded once
+      // here because there is intentionally no next-hand transition/button
+      // after it; this also makes the persisted completed snapshot final.
+      if (nextGameState.phase === 'handEnded' && state.matchState.matchHandNumber === 16 && !state.matchState.completed) {
+        return {
+          ...state,
+          gameState: nextGameState,
+          matchState: advanceMatch(state.matchState),
+          matchScores: applySettlement(nextGameState, state.matchScores),
+          matchMoveLogs: logs,
+        }
+      }
       return { ...state, gameState: nextGameState, matchMoveLogs: logs }
     }
     case 'startNextHand': {
+      if (state.matchState.completed) return state
       const begun = beginHandFrom(advanceMatch(state.matchState))
       return {
         gameState: begun.gameState,
@@ -146,6 +159,12 @@ export interface UseGameLoopResult {
 
 export interface UseGameLoopParams {
   matchSeed: number
+  // A validated persistence snapshot. Reducer state is initialized from it
+  // exactly once; UI-only modal/selection state intentionally stays fresh.
+  initialSnapshot?: LoopState
+  // Called only when reducer-owned match state changes. Persistence remains
+  // an effect outside the pure reducer and ignores unrelated UI changes.
+  onSnapshotChange?: (snapshot: LoopState) => void
   // Delay before a bot's move is dispatched, per SPEC §7's speed presets
   // (Instant/Fast/Normal/Relaxed) — owned by the settings module (Phase 3).
   botSpeedMs: number
@@ -172,11 +191,17 @@ export interface UseGameLoopParams {
 // separate, purely client-side concern layered on top of whatever this
 // hook exposes as the human's hand.
 export function useGameLoop(params: UseGameLoopParams): UseGameLoopResult {
-  const [{ gameState, matchState, matchScores, matchMoveLogs }, dispatch] = useReducer(
+  const onSnapshotChange = params.onSnapshotChange
+  const [loopState, dispatch] = useReducer(
     loopReducer,
-    params.matchSeed,
-    initLoopState,
+    { matchSeed: params.matchSeed, initialSnapshot: params.initialSnapshot },
+    ({ matchSeed, initialSnapshot }) => initialSnapshot ?? initLoopState(matchSeed),
   )
+  const { gameState, matchState, matchScores, matchMoveLogs } = loopState
+
+  useEffect(() => {
+    onSnapshotChange?.(loopState)
+  }, [loopState, onSnapshotChange])
 
   useEffect(() => {
     if (gameState.phase === 'handEnded') return

@@ -151,4 +151,13 @@ describe('ScoreScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next hand' }))
     expect(onNextHand).toHaveBeenCalledTimes(1)
   })
+
+  it('offers Finish match instead of another hand when the match is complete', () => {
+    const onMatchComplete = vi.fn()
+    const state: GameState = { ...baseState([handWith([]), handWith([]), handWith([]), handWith([])]), phase: 'handEnded', result: { outcome: 'exhaustiveDraw' } }
+    render(<ScoreScreen state={state} matchScores={ZERO_SCORES} onNextHand={() => {}} matchCompleted onMatchComplete={onMatchComplete} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Finish match' }))
+    expect(onMatchComplete).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Next hand' })).not.toBeInTheDocument()
+  })
 })
