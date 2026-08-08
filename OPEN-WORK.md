@@ -270,6 +270,35 @@ or the baseline moved and three documents are now pointing at the wrong file.
 See the new capture rule in `CLAUDE.md`. An index that is not updated at the moment work is
 deferred becomes wrong faster than no index at all.
 
+### D5. `PLAN.md`'s M8 Playwright-verification claim was not reproducible — corrected 2026-08-08
+Same stale-claim class as `SPEC.md §5b` item 6 (a claimed safety net that isn't actually
+there): M8's entry stated each of its four steps was "independently verified via Playwright
+across desktop/iPad viewports and all three `tileScale` presets," phrased as a standing,
+re-checkable fact. It described the one-off verification runs performed during the M8 session
+itself accurately at the time, but `board.spec.ts` — the only board-level Playwright coverage
+that could ever re-confirm it — had already gone stale from the M8 testid rename before this
+milestone entry was even written up (§A11), then was removed entirely on
+`feat/landing-auth-persistence`. `PLAN.md` now says so in place, dated, not just struck
+through blind — see §A11 for the full two-cause account.
+
+### D6. `npm test` excludes Playwright e2e by construction — undecided
+`package.json`'s root `"test"` script is `npm run test --workspaces --if-present`, which for
+`packages/ui` runs only its `"test"` script (`vitest run`). `"test:e2e"` (`playwright test`) is
+a separate script the root `npm test` never touches. Every "full suite green" report in this
+project's history has therefore excluded e2e by construction — this is exactly how
+`board.spec.ts` stayed silently broken from the M8 testid rename (2026-07-29) until it was
+deleted (2026-08-08) without anyone's `npm test` ever flagging it (§A11/§D5).
+
+**Two ways to close this, not yet decided between:**
+1. Fold `test:e2e` into the standard/root check (`npm test` or a pre-commit gate), so `git
+   status`/"full suite green" reports actually mean what they imply. Costs real wall-clock time
+   on every run (Playwright spins up browsers) — currently paid only when someone remembers to
+   run it separately, which `board.spec.ts`'s own history shows doesn't reliably happen.
+2. Leave `npm test` vitest-only, but say so explicitly in `CLAUDE.md`'s "Run typecheck + full
+   test suite before every commit" line — so the exclusion is a stated scope decision, not an
+   invisible gap a future stale-claim can hide behind again.
+Owner decision needed; not implemented either way.
+
 ---
 
 ## E. Cleanup sequence (agreed 2026-08-07)
