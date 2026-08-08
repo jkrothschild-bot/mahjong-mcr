@@ -32,7 +32,7 @@ nothing pointed at any more.
 | Milestones | `PLAN.md §2` | M0–M6 and M8 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
 | **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done 2026-08-07, start Phase 2** |
-| **Found mid-cleanup, not worked** | **§F below** | **Empty — keep it that way** |
+| **Found mid-cleanup, not worked** | **§F below** | **1 item (2026-08-08) — call-out tile-name regression** |
 
 ---
 
@@ -139,6 +139,35 @@ been used. **This is not a task so much as a gap in the validation strategy**: e
 channel in `PLAN.md §4` (fixtures, cross-validation, property tests, simulations) is running
 hard, and the only human one is idle. Worth a deliberate decision either to start using it or
 to drop it from `PLAN.md §4` rather than leaving it as notional coverage.
+
+### A11. Board-level Playwright e2e coverage is absent  `[code-verified 2026-08-08]`
+`packages/ui/e2e/board.spec.ts` (one test: navigate to `/`, assert the board and all four
+seat-wind letters render) was removed on `feat/landing-auth-persistence` and replaced by
+`product-shell.spec.ts` (guest start/reload/resume, Play Without Help, iPad-viewport landing/
+account forms) — none of which exercise the board itself. Two independent reasons the old
+test could no longer pass as written, not one: (1) `/` now renders the landing page instead of
+the game, so `page.goto('/')` never reaches a board; (2) `getByTestId('board')` was already
+stale before this branch started — the M8 game-stage rewrite (commit `73c586b`, 2026-07-29)
+renamed that testid to `game-stage`, and `board.spec.ts` was last touched 2026-08-03 without
+picking up the rename, so this assertion had likely been silently failing for days already,
+independent of the shell work.
+
+**This coverage is load-bearing elsewhere and its loss is not merely cosmetic:**
+- `PLAN.md`'s M8 entry states the game-stage rewrite was "independently verified via
+  Playwright across desktop/iPad viewports and all three `tileScale` presets" — that
+  verification has no standing automated re-check now.
+- `PLAN.md §3` defines the `ux-reviewer` subagent entirely around Playwright screenshots at
+  desktop/iPad viewports.
+- §A4 above (iPad touch-target verification, still open) has just lost its nearest automated
+  proxy.
+
+**Not fixed in this pass** (commit-organization/investigation task, `feat/landing-auth-
+persistence`) — the right fix is to PORT the old assertions (navigate through the shell into a
+game, then check the board renders and seat winds are visible with the current `game-stage`
+testid), not to restore the file as-is (reason 2 would still fail it) or leave it silently
+gone. Whoever picks this up should also decide whether a `data-testid="board"` alias is worth
+keeping for e2e stability independent of internal rewrites, given this is the second time a
+testid rename has silently broken a consumer.
 
 ---
 
@@ -350,7 +379,16 @@ surfacing); the 2000-seed self-play re-test (only if Stage 2 reopens the questio
 Append here and keep going. Nothing in this section gets fixed during the cleanup pass; it is
 triaged after §E completes. An empty section means the pass stayed in scope.
 
-*(empty as of 2026-08-07)*
+- **`GameEventAnnouncement` no longer names the claimed tile — a regression against
+  `SPEC.md §5`'s claim call-out requirement** (found 2026-08-08, committing
+  `feat/landing-auth-persistence`, out of scope for that pass to fix). `SPEC.md §5` requires
+  "a one-line explanation (\"West ponged your 5-dot\")"; the removed `CallOutToast`'s
+  `describeAction()` produced exactly that (verb + claimant + tile name). Its replacement,
+  `GameEventAnnouncement`, shows only the actor and action visually (e.g. "WEST" / "PUNG") —
+  `gameEventPresentation.ts`'s `detail` field (`"${actor} claims"`) carries no tile name
+  either, and is `sr-only` besides. No document referenced `CallOutToast` by name (checked), so
+  nothing needs correcting there, but the behavior itself needs restoring. See commit
+  `7cb45c9`'s own message on `feat/landing-auth-persistence` for the full comparison.
 
 ---
 
