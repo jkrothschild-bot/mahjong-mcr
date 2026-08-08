@@ -75,6 +75,9 @@ export interface HandTilesProps {
   // Board.tsx folds the claimed tile into `order` itself (it isn't in the
   // engine hand), so this component needs no other knowledge of the case.
   winningTileId?: TileInstanceId | null
+  // Brief presentation-only settle cue for a newly created/promoted meld.
+  // The id comes from the appended Action; it never changes the hand.
+  recentMeldId?: string
 }
 
 const TILE_GAP = 4
@@ -107,6 +110,7 @@ interface SortableHandTileProps {
   naturalHeight: number
   scale: number
   highlighted: boolean
+  selected: boolean
   justDrawn: boolean
   winning: boolean
   tileScale: TileScale
@@ -130,6 +134,7 @@ function SortableHandTile({
   naturalHeight,
   scale,
   highlighted,
+  selected,
   justDrawn,
   winning,
   tileScale,
@@ -171,6 +176,7 @@ function SortableHandTile({
         className={tileFaceClassName({
           dimmed: isDragging,
           highlighted,
+          selected,
           justDrawn,
           extra: winning ? `cursor-grab ${WINNING_TILE_RING_CLASSES}` : 'cursor-grab',
           scale: tileScale,
@@ -195,6 +201,7 @@ export function HandTiles({
   highlightedTypeId,
   justDrawnTileId,
   winningTileId,
+  recentMeldId,
 }: HandTilesProps) {
   const { tileScale } = useSettingsContext()
   const { scale: stageScale } = useStageMetrics()
@@ -387,6 +394,7 @@ export function HandTiles({
               naturalHeight={tileHeight}
               scale={layout.scale}
               highlighted={selectedTileId === id || highlightedTypeId === typeIdOfInstance(id)}
+              selected={selectedTileId === id}
               justDrawn={justDrawnTileId === id}
               winning={winningTileId === id}
               tileScale={tileScale}
@@ -410,7 +418,14 @@ export function HandTiles({
                 naturalHeight={shelfHeight}
                 scale={layout.scale}
               >
-                <div aria-hidden data-testid={`meld-shelf-${meld.id}`} className={`h-full w-full ${MELD_SHELF_CLASSES}`} />
+                <div
+                  aria-hidden
+                  data-testid={`meld-shelf-${meld.id}`}
+                  data-recent-meld={recentMeldId === meld.id || undefined}
+                  className={`h-full w-full ${MELD_SHELF_CLASSES} ${
+                    recentMeldId === meld.id ? 'ring-2 ring-amber-200 shadow-[0_0_16px_rgba(253,230,138,0.55)]' : ''
+                  }`}
+                />
               </Positioned>
             )
           })}
@@ -428,12 +443,16 @@ export function HandTiles({
               const isConcealedKongBack = meld.kongSource === 'concealed' && (tileIndex === 0 || tileIndex === 3)
               const isClaimedTile = meld.exposure === 'exposed' && meld.claimedFrom?.discardTile === id
               const highlighted = selectedTileId === id || highlightedTypeId === typeId
+              const recentMeldClasses = recentMeldId === meld.id
+                ? 'ring-2 ring-amber-200 shadow-[0_0_14px_rgba(253,230,138,0.5)] transition-[box-shadow]'
+                : ''
               return (
                 <Positioned key={id} layoutId={String(id)} x={p.x} y={p.y} naturalWidth={tileWidth} naturalHeight={tileHeight} scale={layout.scale}>
                   <div
                     data-tile-id={id}
                     data-testid={`meld-tile-${meld.id}-${tileIndex}`}
                     data-claimed-tile={isClaimedTile || undefined}
+                    data-recent-meld={recentMeldId === meld.id || undefined}
                     role="listitem"
                     onClick={onTileClick ? () => onTileClick(id) : undefined}
                     // Item 1: melds sit on a lower baseline than concealed
@@ -449,8 +468,8 @@ export function HandTiles({
                     }}
                     className={
                       isConcealedKongBack
-                        ? meldBackTileClassName({ highlighted, extra: onTileClick ? 'cursor-pointer' : undefined, scale: tileScale })
-                        : meldTileFaceClassName({ highlighted, extra: onTileClick ? 'cursor-pointer' : undefined, scale: tileScale })
+                        ? meldBackTileClassName({ highlighted, extra: [onTileClick ? 'cursor-pointer' : '', recentMeldClasses].filter(Boolean).join(' '), scale: tileScale })
+                        : meldTileFaceClassName({ highlighted, extra: [onTileClick ? 'cursor-pointer' : '', recentMeldClasses].filter(Boolean).join(' '), scale: tileScale })
                     }
                   >
                     {isConcealedKongBack ? <TileBackContent /> : <TileFaceContent typeId={typeId} />}

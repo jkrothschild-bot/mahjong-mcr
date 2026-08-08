@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildWall,
@@ -17,6 +18,7 @@ import {
   type TileTypeId,
 } from '@mahjong-mcr/engine'
 import { ClaimPrompt } from './ClaimPrompt.js'
+import { gameReducer } from './gameReducer.js'
 
 function idsFor(typeId: TileTypeId, count: number): TileInstanceId[] {
   const ids: TileInstanceId[] = []
@@ -79,6 +81,13 @@ describe('ClaimPrompt', () => {
 
     render(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={() => {}} />)
 
+    expect(screen.getByRole('dialog', { name: 'Claim this discard' })).toHaveClass('border-2', 'border-amber-300')
+    const positioner = screen.getByRole('dialog', { name: 'Claim this discard' }).parentElement!
+    expect(positioner.className).toContain('left-3')
+    expect(positioner.className).not.toContain('inset-0')
+    expect(positioner.className).toContain('bottom-[clamp(10rem,24vh,14rem)]')
+    expect(screen.getByRole('heading', { name: 'Claim this discard?' })).toBeInTheDocument()
+    expect(screen.getByText(/discarded/)).toHaveTextContent('North discarded 5 Characters')
     expect(screen.getByRole('button', { name: 'Win' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pass' })).toBeInTheDocument()
   })
@@ -117,6 +126,42 @@ describe('ClaimPrompt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pass' }))
 
     expect(onDeclare).toHaveBeenCalledWith({ kind: 'pass' })
+  })
+
+  it('accepts a touch-style Pung action through the real reducer and closes the prompt', () => {
+    const [humanC5a, humanC5b, discardedC5] = idsFor('C5', 3)
+    const pendingClaim: PendingClaim = {
+      tile: discardedC5!,
+      fromSeat: 3,
+      kind: 'discard',
+      eligibleSeats: [0],
+      declarations: {},
+    }
+    const initial = stateWithPendingClaim(handWith([humanC5a!, humanC5b!]), pendingClaim)
+    initial.players[3] = { ...initial.players[3], discards: [discardedC5!] }
+
+    function Harness() {
+      const [state, setState] = useState(initial)
+      const pending = state.phase === 'awaitingClaims' ? state.pendingClaim : undefined
+      return (
+        <>
+          <ClaimPrompt
+            state={state}
+            pendingClaim={pending}
+            onDeclare={(move) => setState((current) => gameReducer(current, { type: 'apply', seat: 0, move }))}
+          />
+          <output data-testid="claim-result">{state.phase}:{state.players[0].hand.melds[0]?.kind ?? 'none'}</output>
+        </>
+      )
+    }
+
+    render(<Harness />)
+    const pung = screen.getByRole('button', { name: 'Pung' })
+    fireEvent.pointerDown(pung, { pointerType: 'touch' })
+    fireEvent.click(pung)
+
+    expect(screen.queryByRole('dialog', { name: 'Claim this discard' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('claim-result')).toHaveTextContent('awaitingDiscard:pung')
   })
 
   it('does not double-declare on a rapid double click', () => {

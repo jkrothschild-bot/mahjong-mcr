@@ -14,6 +14,27 @@ function stateWithLastDrawnTile(): { state: GameState; drawnTile: number } {
 }
 
 describe('Board', () => {
+  it('marks the active seat with a non-colour border state and a visible turn label', () => {
+    const state = startHand({ seed: 42, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
+    render(
+      <Board
+        state={state}
+        matchState={startMatch(1)}
+        matchScores={ZERO_SCORES}
+        isHumanTurn={true}
+        selectedTileId={null}
+        onTileClick={() => {}}
+        selectedTypeId={null}
+        onInspectTile={() => {}}
+      />,
+    )
+
+    const activeBand = screen.getByTestId(`seat-${state.currentSeat}-turn`).parentElement!
+    expect(activeBand).toHaveAttribute('data-active-turn', 'true')
+    expect(activeBand.className).toContain('border-emerald')
+    expect(screen.getByTestId(`seat-${state.currentSeat}-turn`)).toHaveTextContent('Your turn')
+  })
+
   it("marks GameState.lastDrawnTile in the human's hand while it is their discard turn", () => {
     const { state, drawnTile } = stateWithLastDrawnTile()
 

@@ -143,6 +143,7 @@ export interface SeatLineProps {
   winningTileId?: TileInstanceId | null
   selectedTypeId?: string
   onTileClick?: (id: TileInstanceId) => void
+  recentMeldId?: string
 }
 
 interface FlatTile {
@@ -208,6 +209,7 @@ export function SeatLine({
   winningTileId,
   selectedTypeId,
   onTileClick,
+  recentMeldId,
 }: SeatLineProps) {
   const { tileScale } = useSettingsContext()
   const packAxis = grid.axis ?? 'vertical'
@@ -499,6 +501,9 @@ export function SeatLine({
         // down), while the right seat happened to land at 0°. Normalize the
         // claimed tile to 0° for either side so its face reads upright.
         const displayRotation = tile.claimed && rotated ? 0 : tileRotation + (tile.claimed ? 90 : 0)
+        const recentMeldClasses = tile.meldId === recentMeldId
+          ? 'ring-2 ring-amber-200 shadow-[0_0_14px_rgba(253,230,138,0.5)] transition-[box-shadow]'
+          : ''
         return (
           <Positioned
             key={tile.id}
@@ -524,6 +529,7 @@ export function SeatLine({
                 data-tile-id={tile.id}
                 data-testid={tile.testId}
                 data-claimed-tile={tile.claimed || undefined}
+                data-recent-meld={tile.meldId === recentMeldId || undefined}
                 role="listitem"
                 onClick={onTileClick ? () => onTileClick(tile.id) : undefined}
                 title={revealConcealed && tile.id === winningTileId ? 'Winning tile' : undefined}
@@ -532,18 +538,18 @@ export function SeatLine({
                   tile.kind === 'kongBack'
                     ? seatLineBackClassName({
                         highlighted: selectedTypeId === typeId,
-                        extra: onTileClick ? 'cursor-pointer' : undefined,
+                        extra: [onTileClick ? 'cursor-pointer' : '', recentMeldClasses].filter(Boolean).join(' '),
                         scale: tileScale,
                       })
                     : tile.meldId && revealConcealed
                       ? seatLineMeldFaceClassName({
                           highlighted: selectedTypeId === typeId,
-                          extra: `${onTileClick ? 'cursor-pointer' : ''}${revealConcealed && tile.id === winningTileId ? winningRing : ''}`,
+                          extra: `${onTileClick ? 'cursor-pointer' : ''} ${recentMeldClasses}${revealConcealed && tile.id === winningTileId ? winningRing : ''}`,
                           scale: tileScale,
                         })
                       : seatLineFaceClassName({
                           highlighted: selectedTypeId === typeId,
-                          extra: `${onTileClick ? 'cursor-pointer' : ''}${revealConcealed && tile.id === winningTileId ? winningRing : ''}`,
+                          extra: `${onTileClick ? 'cursor-pointer' : ''} ${recentMeldClasses}${revealConcealed && tile.id === winningTileId ? winningRing : ''}`,
                           scale: tileScale,
                         })
                 }

@@ -47,13 +47,20 @@ describe('SettingsPanel', () => {
     expect(onUpdate).toHaveBeenCalledWith({ tileScale: 'large' })
   })
 
-  // Settings was cut to bot speed and tile size. Asserting the removals is
+  it('turns sound effects off', () => {
+    const onUpdate = vi.fn()
+    render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={onUpdate} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Sound effects/ }))
+    expect(onUpdate).toHaveBeenCalledWith({ soundEffects: false })
+  })
+
+  // Settings was cut to bot speed, tile size and sound. Asserting the removals is
   // what stops one drifting back in unnoticed: each had its own reason for
   // going (see useSettings.ts), so a reappearance should be a decision, not
   // an accident.
-  it('offers only the two settings that survived — no checkboxes at all', () => {
+  it('keeps removed settings out while retaining the single sound checkbox', () => {
     render(<SettingsPanel open onClose={() => {}} settings={DEFAULT_SETTINGS} onUpdate={vi.fn()} />)
-    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(1)
     for (const name of ['Confirm before discard', 'Step mode', 'Color-blind-safe palette', 'Reduce motion']) {
       expect(screen.queryByText(new RegExp(name))).not.toBeInTheDocument()
     }

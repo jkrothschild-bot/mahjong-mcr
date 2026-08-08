@@ -25,6 +25,7 @@ export interface Settings {
   // SPEC.md §8's "tile size / zoom" — a named preset, not a continuous
   // value, matching BOT_SPEED_PRESETS below.
   tileScale: TileScale
+  soundEffects: boolean
 }
 
 // SPEC.md §7's bot-speed presets. A named preset, not a raw slider value,
@@ -41,6 +42,7 @@ export const TILE_SCALE_VALUES: readonly TileScale[] = ['normal', 'large']
 export const DEFAULT_SETTINGS: Settings = {
   botSpeedMs: BOT_SPEED_PRESETS.normal,
   tileScale: 'normal',
+  soundEffects: true,
 }
 
 const STORAGE_KEY = 'mcr-mahjong:settings:v1'
@@ -77,6 +79,7 @@ export function loadSettings(raw: string | null): Settings {
   return {
     botSpeedMs: isNumber(candidate.botSpeedMs) ? candidate.botSpeedMs : DEFAULT_SETTINGS.botSpeedMs,
     tileScale: isTileScale(candidate.tileScale) ? candidate.tileScale : DEFAULT_SETTINGS.tileScale,
+    soundEffects: typeof candidate.soundEffects === 'boolean' ? candidate.soundEffects : DEFAULT_SETTINGS.soundEffects,
   }
 }
 

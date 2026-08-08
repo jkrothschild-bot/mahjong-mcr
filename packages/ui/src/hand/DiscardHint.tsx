@@ -31,9 +31,10 @@ export function DiscardHint({ visible }: DiscardHintProps) {
       // Not interactive and not a focus stop — it's a label, and it sits over
       // the felt where a stray pointer capture would be surprising.
       aria-hidden="true"
-      className="pointer-events-none flex h-full w-full items-center rounded-md border border-sky-400/40 bg-neutral-950/80 px-2 py-1 text-[11px] leading-snug text-sky-200"
+      className="pointer-events-none flex h-full w-full flex-col justify-center rounded-md border border-sky-400/40 bg-neutral-950/80 px-2 py-1 text-[10px] leading-tight text-sky-200"
     >
-      Double-click a tile to discard, or drag it to the discard area.
+      <span>Double-click a tile to discard, or drag it to the discard area.</span>
+      <span className="mt-1 text-sky-100">Tiles can be moved around your hand, using drag and drop.</span>
     </div>
   )
 }

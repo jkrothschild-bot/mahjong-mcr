@@ -9,17 +9,21 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { useMemo, useState } from 'react'
-import type { GameState, MatchState, Seat as SeatId, TileTypeId } from '@mahjong-mcr/engine'
+import { useMemo, useRef, useState } from 'react'
+import type { Action, GameState, MatchState, Seat as SeatId, TileTypeId } from '@mahjong-mcr/engine'
 import { deriveHandOutcome } from '../game/deriveScoreContext.js'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
 import { DISCARD_ZONE_ID, END_ZONE_ID, resolveDragEndAction } from '../hand/resolveReorderTarget.js'
 import { revealOrder } from '../hand/revealOrder.js'
 import { useHandOrder } from '../hand/useHandOrder.js'
+import { isNewDragClinkTarget } from '../hand/dragClink.js'
+import { soundEffectsPlayer } from '../audio/soundEffects.js'
 import { GameStage } from '../stage/GameStage.js'
 import { SharedLayoutEnabledContext } from '../stage/Positioned.js'
 import type { SeatRole } from '../stage/stageLayout.js'
-import { CallOutToast } from '../game/CallOutToast.js'
+import { GameEventAnnouncement } from '../game/GameEventAnnouncement.js'
+import { useGameEventPresentation } from '../game/useGameEventPresentation.js'
+import { useSettingsContext } from '../settings/SettingsContext.js'
 import { DiscardField } from './DiscardField.js'
 import { Seat } from './Seat.js'
 import { TableSurface } from './TableSurface.js'
@@ -87,6 +91,8 @@ export function Board({
   showDiscardHint,
   enableSharedLayout = true,
 }: BoardProps) {
+  const { soundEffects } = useSettingsContext()
+  const { announcement, recentMeldId } = useGameEventPresentation(state, soundEffects)
   // state.seed, not state.handNumber — see useHandOrder's own comment on
   // why handNumber alone can't detect a fresh deal across a Restart (it
   // resets to 1 on every new match, so restarting while still on hand 1
@@ -167,6 +173,16 @@ export function Board({
   // sitting on it awaiting a discard — isHumanTurn already encodes exactly
   // that condition for the human seat, so reuse it rather than re-deriving.
   const justDrawnTileId = isHumanTurn ? (state.lastDrawnTile ?? null) : null
+  const latestAction: Action | undefined = state.actionLog[state.actionLog.length - 1]
+  // Pass declarations can append actions while a discard is still live.
+  // Prefer the pending claim's tile until that window resolves; otherwise
+  // only the immediately preceding discard receives the emphasis.
+  const latestDiscardId =
+    state.phase === 'awaitingClaims' && state.pendingClaim?.kind === 'discard'
+      ? state.pendingClaim.tile
+      : latestAction?.type === 'discard'
+        ? latestAction.tile
+        : null
 
   // Drag-and-drop, lifted from HandTiles.tsx (Phase 7): the human's hand and
   // DiscardField's own drop target (its "you" zone) are separate stage
@@ -175,6 +191,7 @@ export function Board({
   // nearest common ancestor, here, not inside either of them.
   const [activeId, setActiveId] = useState<number | null>(null)
   const [overId, setOverId] = useState<number | typeof END_ZONE_ID | typeof DISCARD_ZONE_ID | null>(null)
+  const lastDragClinkTargetRef = useRef<number | null>(null)
   const sensors = useSensors(
     // 8px of real pointer movement before a drag activates — lets a plain
     // tap still reach onTileClick (discard selection) instead of being
@@ -186,7 +203,9 @@ export function Board({
   )
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveId(event.active.id as number)
+    const id = event.active.id as number
+    lastDragClinkTargetRef.current = null
+    setActiveId(id)
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -195,12 +214,18 @@ export function Board({
       return
     }
     const id = event.over.id
+    const draggedId = event.active.id as number
+    if (isNewDragClinkTarget(lastDragClinkTargetRef.current, draggedId, id)) {
+      lastDragClinkTargetRef.current = id
+      if (soundEffects) soundEffectsPlayer.play('tileClink')
+    }
     setOverId(id === END_ZONE_ID || id === DISCARD_ZONE_ID ? id : (id as number))
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null)
     setOverId(null)
+    lastDragClinkTargetRef.current = null
     const { active, over } = event
     if (!over) return
     const overId = over.id === END_ZONE_ID || over.id === DISCARD_ZONE_ID ? over.id : (over.id as number)
@@ -231,8 +256,9 @@ export function Board({
             own measured available space — freeing up real screen room the
             board (including the bot seat lines' tile size) renders into,
             rather than costing a dedicated row of its own. */}
-        <CallOutToast state={state} />
       </div>
+
+      <GameEventAnnouncement announcement={announcement} />
 
       <DndContext
         sensors={sensors}
@@ -242,6 +268,7 @@ export function Board({
         onDragCancel={() => {
           setActiveId(null)
           setOverId(null)
+          lastDragClinkTargetRef.current = null
         }}
       >
         <GameStage>
@@ -252,6 +279,7 @@ export function Board({
             selectedTypeId={selectedTypeId ?? undefined}
             onTileClick={onInspectTile}
             omitTileId={claimedWinningTile}
+            latestDiscardId={latestDiscardId}
           />
           {state.players.map((player) => {
             const offset = (player.seat - HUMAN_SEAT + 4) % 4
@@ -286,6 +314,7 @@ export function Board({
                     : undefined
                 }
                 revealWinningTileId={winInfo && player.seat === winInfo.winnerSeat ? markedWinningTile : undefined}
+                recentMeldId={recentMeldId ?? undefined}
               />
             )
           })}

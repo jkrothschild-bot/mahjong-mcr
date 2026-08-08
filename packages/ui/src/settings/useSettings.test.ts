@@ -17,7 +17,7 @@ describe('loadSettings', () => {
   })
 
   it('round-trips a fully valid settings object', () => {
-    const settings = { botSpeedMs: 3000, tileScale: 'large' as const }
+    const settings = { botSpeedMs: 3000, tileScale: 'large' as const, soundEffects: false }
     expect(loadSettings(serializeSettings(settings))).toEqual(settings)
   })
 
@@ -40,12 +40,17 @@ describe('loadSettings', () => {
       reducedMotion: true,
       stepMode: true,
     })
-    expect(loadSettings(raw)).toEqual({ botSpeedMs: 3000, tileScale: 'large' })
+    expect(loadSettings(raw)).toEqual({ botSpeedMs: 3000, tileScale: 'large', soundEffects: true })
   })
 
   it('falls back to default tileScale for an unrecognized value', () => {
     const raw = JSON.stringify({ tileScale: 'huge' })
     expect(loadSettings(raw)).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('loads and round-trips the sound preference', () => {
+    const raw = serializeSettings({ ...DEFAULT_SETTINGS, soundEffects: false })
+    expect(loadSettings(raw).soundEffects).toBe(false)
   })
 })
 
@@ -72,5 +77,14 @@ describe('useSettings', () => {
     expect(result.current.settings).toEqual({ ...DEFAULT_SETTINGS, tileScale: 'large' })
     const stored = loadSettings(window.localStorage.getItem('mcr-mahjong:settings:v1'))
     expect(stored).toEqual({ ...DEFAULT_SETTINGS, tileScale: 'large' })
+  })
+
+  it('persists sound-off across a new hook instance', () => {
+    const first = renderHook(() => useSettings())
+    act(() => first.result.current.update({ soundEffects: false }))
+    first.unmount()
+
+    const second = renderHook(() => useSettings())
+    expect(second.result.current.settings.soundEffects).toBe(false)
   })
 })

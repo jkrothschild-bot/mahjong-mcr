@@ -69,6 +69,7 @@ describe('HandTiles', () => {
     render(<HandTiles order={[c1!, c2!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} selectedTileId={c2} />)
 
     expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-2')
+    expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('-translate-y-2')
     expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-2')
   })
 

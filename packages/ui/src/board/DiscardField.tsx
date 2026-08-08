@@ -53,6 +53,10 @@ export interface DiscardFieldProps {
   // LAST tile of the discarder's river (the win claim happens on it
   // immediately): omitting the last tile moves no other tile's grid slot.
   omitTileId?: TileInstanceId | null
+  // The live, claimable or most recently placed discard. Board derives it
+  // from the authoritative action/claim state so a bot pass does not clear
+  // the cue while another player still has a decision.
+  latestDiscardId?: TileInstanceId | null
 }
 
 // Phase 7 (KICKOFF-phase7-board-rebuild.md): the discard pile stops being
@@ -76,7 +80,7 @@ export interface DiscardFieldProps {
 // StageMetricsContext Provider boundary), but Board.tsx (which renders
 // GameStage) is not, so a parent-computed prop would have silently read
 // the context's MIN_DESIGN_WIDTH default at every viewport.
-export function DiscardField({ state, selectedTypeId, onTileClick, omitTileId }: DiscardFieldProps) {
+export function DiscardField({ state, selectedTypeId, onTileClick, omitTileId, latestDiscardId }: DiscardFieldProps) {
   const { tileScale } = useSettingsContext()
   const { designWidth } = useStageMetrics()
   const regions = getBoardRegions(designWidth).discards
@@ -173,6 +177,8 @@ export function DiscardField({ state, selectedTypeId, onTileClick, omitTileId }:
                       data-tile-id={id}
                       data-testid={`discard-tile-${id}`}
                       role="listitem"
+                      data-latest-discard={latestDiscardId === id || undefined}
+                      title={latestDiscardId === id ? 'Latest discard' : undefined}
                       onClick={onTileClick ? () => onTileClick(id) : undefined}
                       // width/height override discardFieldTileClassName's own
                       // Tailwind size class — same reasoning as HandTiles.tsx's
@@ -181,7 +187,12 @@ export function DiscardField({ state, selectedTypeId, onTileClick, omitTileId }:
                       style={{ width: tileWidth, height: tileHeight }}
                       className={discardFieldTileClassName({
                         highlighted: selectedTypeId === typeId,
-                        extra: onTileClick ? 'cursor-pointer' : undefined,
+                        extra: [
+                          onTileClick ? 'cursor-pointer' : '',
+                          latestDiscardId === id
+                            ? '-translate-y-0.5 ring-2 ring-sky-300 shadow-[0_0_14px_rgba(125,211,252,0.65)] transition-[transform,box-shadow]'
+                            : '',
+                        ].filter(Boolean).join(' '),
                         scale: tileScale,
                       })}
                     >

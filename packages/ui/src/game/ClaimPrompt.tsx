@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { legalMoves, typeIdOfInstance, type GameState, type Move, type PendingClaim } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
+import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import { HUMAN_SEAT } from './humanSeat.js'
+import { seatDisplayName } from './seatDisplayName.js'
 
 export interface ClaimPromptProps {
   state: GameState
@@ -63,8 +65,11 @@ export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps
   }
 
   const options = legalMoves(state, HUMAN_SEAT)
+  const claimedType = typeIdOfInstance(pendingClaim.tile)
+  const claimedName = tileDisplayName(claimedType)
+  const discarder = seatDisplayName(pendingClaim.fromSeat, state)
 
-  // Fixed, bottom-anchored overlay — not an in-flow block. Every other
+  // Fixed, raised bottom-left card — not an in-flow block. Every other
   // overlay in the app (ScoreScreen, TileCountGrid, etc.) uses fixed
   // positioning and is correctly excluded from document flow; this one used
   // to render as a normal <main> child instead, so its ~70px of real height
@@ -72,24 +77,48 @@ export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps
   // was enough to overflow the iPad viewport (found via live play — a claim
   // window appearing just 4 rounds into a fresh hand, no cumulative discard
   // buildup needed, already pushed the page 75px past the viewport). The
-  // outer wrapper is pointer-events-none so it doesn't swallow clicks on the
-  // rest of the page when no claim is pending... but since this component
-  // returns null entirely in that case, that's already moot — kept anyway
-  // as the pattern's own defense-in-depth against covering unrelated UI.
+  // The card is deliberately NOT nested in a full-viewport pointer-events
+  // wrapper. That pattern left touch hit-testing dependent on a descendant
+  // re-enabling pointer events beneath a disabled ancestor. Giving the card
+  // its own fixed box is both more reliable on iPad and leaves the human's
+  // hand unobstructed below it.
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center p-2">
+    <div
+      className="fixed bottom-[clamp(10rem,24vh,14rem)] left-3 z-40 w-[min(28rem,calc(100vw-1.5rem))] sm:left-4"
+    >
       <div
-        role="group"
+        role="dialog"
         aria-label="Claim this discard"
-        className="pointer-events-auto flex flex-col gap-2 rounded-lg border border-amber-500 bg-neutral-900 p-3 shadow-lg"
+        aria-describedby="claim-prompt-description"
+        onPointerDown={(event) => event.stopPropagation()}
+        className="w-full touch-manipulation rounded-xl border-2 border-amber-300 bg-neutral-950/97 p-4 shadow-[0_0_30px_rgba(251,191,36,0.34),0_16px_40px_rgba(0,0,0,0.72)] backdrop-blur-sm"
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-4">
+          <div className="flex h-[72px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-amber-300 bg-neutral-100 shadow-lg">
+            <TileFaceContent typeId={claimedType} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Your decision</div>
+            <h2 className="mt-1 text-xl font-semibold text-white">Claim this discard?</h2>
+            <p id="claim-prompt-description" className="mt-0.5 text-sm text-neutral-300">
+              {discarder} discarded <span className="font-semibold text-amber-200">{claimedName}</span>.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
           {options.map((move, index) => (
             <button
               key={index}
               type="button"
               onClick={() => declare(move)}
-              className="min-h-11 rounded-md border border-neutral-600 bg-neutral-800 px-4 text-sm font-medium hover:bg-neutral-700"
+              className={`min-h-12 touch-manipulation rounded-md border px-5 text-sm font-semibold transition-colors ${
+                move.kind === 'pass'
+                  ? 'border-neutral-600 bg-neutral-800 text-neutral-200 hover:bg-neutral-700'
+                  : move.kind === 'win'
+                    ? 'border-emerald-300 bg-emerald-700 text-white hover:bg-emerald-600'
+                    : 'border-amber-300 bg-amber-500 text-neutral-950 hover:bg-amber-400'
+              }`}
             >
               {moveLabel(move)}
             </button>

@@ -60,7 +60,7 @@ const SEAT_MELD_SHIFT: Record<SeatRole, { dx: number; dy: number }> = {
 
 const SORT_BUTTON_TOP = 4
 const DISCARD_HINT_TOP = SORT_BUTTON_TOP + SORT_CONTROL_HEIGHT + 8
-const DISCARD_HINT_HEIGHT = 72
+const DISCARD_HINT_HEIGHT = 84
 
 // Spelled out, not the E/S/W/N abbreviation. The seat band sits on the table
 // rail with room to spare, and a learner shouldn't have to expand an initial
@@ -134,6 +134,7 @@ export interface SeatProps {
   revealExtraTiles?: readonly number[]
   // The tile that completed this seat's win — ring-marked at reveal.
   revealWinningTileId?: number | null
+  recentMeldId?: string
 }
 
 // Phase 7 (KICKOFF-phase7-board-rebuild.md): a player's identity header plus
@@ -167,6 +168,7 @@ export function Seat({
   revealOrder,
   revealExtraTiles,
   revealWinningTileId,
+  recentMeldId,
 }: SeatProps) {
   const { designWidth } = useStageMetrics()
   const { tileScale } = useSettingsContext()
@@ -228,8 +230,14 @@ export function Seat({
             legible against the wood rail, and against a tile back in the
             worst-case overlap above. */}
         <div
-          className={`flex items-center gap-1.5 whitespace-nowrap rounded-full bg-neutral-950/75 px-2 text-xs leading-none ${
-            isCurrentTurn ? 'text-emerald-300' : 'text-neutral-300'
+          data-active-turn={isCurrentTurn || undefined}
+          aria-current={isCurrentTurn ? 'true' : undefined}
+          className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-xs leading-none transition-[border-color,box-shadow,background-color] ${
+            isCurrentTurn
+              ? isHuman
+                ? 'border-emerald-200 bg-emerald-950/95 text-emerald-200 shadow-[0_0_14px_rgba(110,231,183,0.52)]'
+                : 'border-emerald-400 bg-neutral-950/90 text-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.34)]'
+              : 'border-transparent bg-neutral-950/75 text-neutral-300'
           }`}
         >
           <span data-testid={`seat-${seat}-wind`} className="font-semibold">
@@ -307,6 +315,7 @@ export function Seat({
             highlightedTypeId={selectedTypeId}
             justDrawnTileId={justDrawnTileId}
             winningTileId={revealConcealed ? revealWinningTileId : undefined}
+            recentMeldId={recentMeldId}
           />
         </>
       ) : (
@@ -328,6 +337,7 @@ export function Seat({
           meldShiftDirection={SEAT_MELD_SHIFT[role as SeatRole]}
           selectedTypeId={selectedTypeId}
           onTileClick={onInspectTile}
+          recentMeldId={recentMeldId}
         />
       )}
 

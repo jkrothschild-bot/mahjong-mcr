@@ -1,7 +1,7 @@
 import type { GameState, Seat } from '@mahjong-mcr/engine'
 import { HUMAN_SEAT } from './humanSeat.js'
 
-// Shared by CallOutToast and ScoreScreen — a seat is named by its current
+// Shared by game-event announcements and ScoreScreen — a seat is named by its current
 // wind ("East", "South", ...) since that's what rotates hand-to-hand and
 // matches how the board itself labels seats, except the human, always "You".
 export function seatDisplayName(seat: Seat, state: GameState): string {

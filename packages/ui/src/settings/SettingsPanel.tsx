@@ -30,8 +30,9 @@ export interface SettingsPanelProps {
 // step mode, color-blind palette, tile size (PLAN.md M7 Polish scope), and
 // reduce-motion (M8 Step 3 — App.tsx ORs this with the OS-level
 // prefers-reduced-motion query, so either alone disables tile animation).
-// Sound is still unimplemented; the claim timer was removed entirely
-// (owner's call — claims now wait indefinitely for the human's decision).
+// The claim timer remains removed (owner's call — claims wait indefinitely
+// for the human's decision). Sound effects are supplementary and persisted
+// by useSettings; all gameplay feedback remains visual when they are off.
 export function SettingsPanel({ open, onClose, settings, onUpdate }: SettingsPanelProps) {
   if (!open) return null
 
@@ -90,6 +91,19 @@ export function SettingsPanel({ open, onClose, settings, onUpdate }: SettingsPan
             <p className="text-xs text-neutral-400">Larger tiles may require scrolling to see the full board.</p>
           )}
         </fieldset>
+
+        <label className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-neutral-700 px-3">
+          <span>
+            <span className="block font-semibold">Sound effects</span>
+            <span className="block text-xs text-neutral-400">Tile, claim and Mahjong sounds</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={settings.soundEffects}
+            onChange={(event) => onUpdate({ soundEffects: event.target.checked })}
+            className="size-5"
+          />
+        </label>
       </div>
     </div>
   )

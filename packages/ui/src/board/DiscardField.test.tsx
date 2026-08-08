@@ -83,4 +83,14 @@ describe('DiscardField omitTileId', () => {
     render(<DiscardField state={state} omitTileId={null} />)
     expect(screen.getByTestId(`discard-tile-${discarded}`)).toBeInTheDocument()
   })
+
+  it('gives only the latest discard a temporary physical emphasis', () => {
+    const { state, discarded } = stateWithDiscards()
+    render(<DiscardField state={state} latestDiscardId={discarded} />)
+
+    const tile = screen.getByTestId(`discard-tile-${discarded}`)
+    expect(tile).toHaveAttribute('data-latest-discard', 'true')
+    expect(tile.className).toContain('ring-sky-300')
+    expect(tile).toHaveAttribute('title', 'Latest discard')
+  })
 })
