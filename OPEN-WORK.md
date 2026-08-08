@@ -32,7 +32,7 @@ nothing pointed at any more.
 | Milestones | `PLAN.md §2` | M0–M6 and M8 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
 | **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done; Phase 2 (A lane) done 2026-08-07, C lane not started** |
-| **Found mid-cleanup, not worked** | **§F below** | **Empty — keep it that way** |
+| **Found mid-cleanup, not worked** | **§F below** | **1 item (2026-08-08) — Dragon Pung undercounting** |
 
 ---
 
@@ -372,7 +372,10 @@ surfacing); the 2000-seed self-play re-test (only if Stage 2 reopens the questio
 Append here and keep going. Nothing in this section gets fixed during the cleanup pass; it is
 triaged after §E completes. An empty section means the pass stayed in scope.
 
-*(empty as of 2026-08-07)*
+- **`computeRouteToPoints` undercounts Dragon Pung** (found 2026-08-08, during Phase 2's
+  compatibility-table fix — two other bugs found the same pass were fixed because they blocked
+  the work in hand; this one wasn't and is deliberately deferred). Full account, confirmed
+  repro, and proposed handling: `KICKOFF-phase10-strategy-coach.md` § State of play.
 
 ---
 

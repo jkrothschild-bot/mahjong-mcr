@@ -568,6 +568,27 @@ export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext
   // fixture while wiring this in, before it shipped: the `STAGE3_FAN_IDS`
   // guard below is what makes that case fall through to "compatible"
   // instead of being silently blocked.
+  //
+  // PRECONDITION for that fall-through to stay safe (reviewed 2026-08-08):
+  // falling through to "compatible" for a locked-in fan outside the 10
+  // relies on `areExclusive` alone NOT being sufficient here — exclusions.ts
+  // deliberately omits structurally-impossible pairs (its whole domain is
+  // COMPLETE hands; see fan-target-compatibility.ts's own header) — so the
+  // real safety net is that every one of fan-targets.ts's estimators
+  // already reads `hand.melds` and refuses to propose a candidate the
+  // melds structurally rule out. `estimateSimplesAndHonors`'s
+  // `meldHasHonor`/`meldHasTerminal` check (fan-targets.ts:390-392) is the
+  // LOAD-BEARING case: a melded pung of terminals or honors can lock in
+  // some other real fan entirely outside the 10 (e.g. fan 73, Pung of
+  // Terminals or Honors) that structurally forbids All Simples/No Honors,
+  // with no `exclusions.ts` entry to catch it — this only stays safe
+  // because the estimator itself sees those same meld tiles as offending
+  // and never emits the conflicting candidate in the first place, not
+  // because anything in this file checked. **If a future estimator is
+  // added that inspects only `hand.concealedTiles` and ignores
+  // `hand.melds`, this precondition breaks silently**: the fall-through
+  // below would then treat a locked-in out-of-domain fan as compatible
+  // with a candidate the melds already ruled out.
   for (const candidate of candidates) {
     if (candidate.completionProbability <= 0) continue
     if (chosenFanIds.includes(candidate.fanId)) continue
