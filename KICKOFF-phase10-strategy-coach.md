@@ -489,6 +489,69 @@ bugs were in this session's own new orchestration code, not any existing
 detector, so no PyMahjongGB harness re-run was needed (CLAUDE.md's
 re-run trigger is a scoring-logic change; nothing under `scoring/` changed).
 
+**Second review pass, 2026-08-08 — the honor-axis fix above was incomplete,
+replaced with an exhaustive table.** The `directionallyIncompatible` check
+described above only covered the HONOR axis (which fans require vs. forbid
+a honor tile). Review found a SECOND, un-covered axis: Seven Pairs (19) is
+a shape with no pung/kong at all (`win-detection.ts` `isSevenPairs`'s own
+`every count === 2`), incompatible with the 5 fans requiring one (All
+Pungs included) — not caught by the honor sets, since neither fan is honor-
+related. A concealed hand sitting on several pairs made both
+`estimateSevenPairs` and `estimateAllPungs` fire, and `computeRouteToPoints`
+summed both into a false "reaches 8." Fixtured first (`hints.test.ts`'s
+"filters shape-incompatible candidates" test), confirmed failing, before
+any fix.
+
+Rather than patch a third hardcoded set, `packages/engine/src/
+fan-target-compatibility.ts` (+ its own `.test.ts`) now enumerates and
+classifies **all 45 unordered pairs** among the 10 families exhaustively —
+25 compatible, 20 incompatible — replacing both `REQUIRES_HONOR_TILE`/
+`FORBIDS_HONOR_TILE` and `directionallyIncompatible` entirely. A pair is
+ROUTE-COMPATIBLE iff some complete, legal MCR hand scores both — strictly
+weaker than "not in `exclusions.ts`", since that table only ever needs a
+pair when two fans could naively co-fire on a COMPLETE hand; a pair that's
+simply impossible together needs no entry there. Every INCOMPATIBLE verdict
+is grounded in the real detectors' own already-cited guard conditions or
+`win-detection.ts`'s structural definitions; every COMPATIBLE verdict has a
+constructed hand in the test file where **both real detectors** (not the
+estimators) actually fire together — a completeness test fails if any of
+the 45 pairs lacks an explicit entry, so "compatible by omission" can't
+recur a third time. `computeRouteToPoints` now checks this table alongside
+`areExclusive`, not instead of it (three of the 25 compatible pairs — Full
+Flush/No Honors, Dragon Pung/Big Three Dragons, All Simples/No Honors — are
+ALSO real `exclusions.ts` entries; the two questions are independent:
+whether conditions can coexist at all vs. whether real scoring counts both
+once they do).
+
+**A third bug, caught mid-wiring before it shipped, not by planning either:**
+the new table only classifies pairs among the 10 Stage 3 families and
+(correctly, for pairs among the 10) defaults an unknown pair to
+incompatible. Applied naively, this also defaulted any locked-in fan from
+OUTSIDE the 10 (e.g. Concealed Kong, fan 67) to "incompatible with
+everything" — wrongly blocking every Stage 3 candidate whenever such a fan
+was locked in. Fixtured (`hints.test.ts`'s "a locked-in fan outside the 10
+Stage 3 families" test — first written broken against an accidentally-
+tenpai hand that masked the bug behind a legitimately-locked Half Flush,
+corrected once the shanten was checked directly), confirmed failing, fixed
+by gating the compatibility check on `STAGE3_FAN_IDS.includes(id)`.
+
+**Found and reported, deliberately NOT fixed this pass — recorded here per
+CLAUDE.md's capture rule, not left in the chat transcript only:**
+`computeRouteToPoints`'s `chosenFanIds.includes(candidate.fanId)` guard
+(prevents re-selecting a fan already counted) also silently drops a
+legitimate FURTHER unit of a countable fan once ANY amount of it is already
+locked in. Dragon Pung (fan 59) is the only such fan among the 10:
+confirmed via direct repro that one melded dragon pung + a second dragon at
+2 concealed copies produces a real, non-null `fanId: 59` candidate worth +2
+points that never reaches `selected`, undercounting `bestCaseTotal` by
+that amount. This is a distinct bug (undercount, not overcount) from
+everything above, out of scope for a route-COMPATIBILITY fix — it's a
+per-unit accounting question. Proposed handling, not yet decided: track
+remaining capacity per countable fan separately from the compatibility
+check, so a partial lock-in doesn't block a legitimate next increment.
+Whoever picks this up next should decide the approach before touching
+`computeRouteToPoints` again.
+
 ## Explicitly NOT in this phase (any stage)
 
 - Defense/safety integration into the discard ranking (Tile safety tab

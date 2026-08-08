@@ -360,4 +360,56 @@ describe('computeRouteToPoints', () => {
     const selectedFanIds = result.selected.map((c) => c.fanId)
     expect(selectedFanIds.includes(68) && selectedFanIds.includes(76)).toBe(false)
   })
+
+  // Real defect found in review, NOT caught by the honor-axis check above:
+  // Seven Pairs (19) is a shape with NO sets at all (win-detection.ts's
+  // isSevenPairs requires every one of its 7 groups to have count === 2,
+  // never >= 3) — structurally incompatible with ANY fan requiring a
+  // pung/kong (All Pungs included, which requires FOUR). No complete hand
+  // can ever be both, but scoring/exclusions.ts has no [19,49] entry
+  // because the real detectors never needed one (they just never co-fire
+  // on a complete hand) -- the same gap class as the Half Flush/All Simples
+  // bug above, but on the SHAPE axis instead of the honor axis. A concealed
+  // hand sitting on several pairs satisfies both ESTIMATORS at once even
+  // though no real hand can ever score both fans. Fixtured before the fix
+  // per CLAUDE.md.
+  it('filters shape-incompatible candidates not covered by the honor-axis check (Seven Pairs vs All Pungs)', () => {
+    const hand = handWith([
+      ...idsFor('C1', 2), ...idsFor('C2', 2), ...idsFor('C3', 2),
+      ...idsFor('C4', 2), ...idsFor('C5', 2),
+      ...idsFor('C6', 1), ...idsFor('C7', 1), ...idsFor('C8', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    const selectedFanIds = result.selected.map((c) => c.fanId)
+    expect(selectedFanIds.includes(19) && selectedFanIds.includes(49)).toBe(false)
+  })
+
+  // fan-target-compatibility.ts's table only ever classifies pairs among
+  // the 10 Stage 3 families -- isRouteCompatible defaults an unknown pair
+  // to false (see that module's own comment), which is the RIGHT default
+  // for a pair among the 10 (the completeness test guarantees no such pair
+  // is ever actually unknown) but the WRONG default for a locked-in fan
+  // from OUTSIDE the 10 (e.g. Concealed Kong, fanId 67) -- there is no real
+  // conflict there, this module simply has no opinion. Caught while wiring
+  // this module in, before it shipped.
+  it('a locked-in fan outside the 10 Stage 3 families does not block an unrelated Stage 3 candidate', () => {
+    // Deliberately far from tenpai (shanten 3): a hand this close to
+    // complete would make computeHandPlan use the real-waits
+    // intersectFanMatches path instead of the melds-only one, which could
+    // legitimately lock Half Flush in for real (a different, correct
+    // reason for fanId 50 to be absent from `selected`) and mask the actual
+    // gap this fixture targets.
+    const concealedKong: Meld = { id: '0-0', kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles: idsFor('C1', 4), ownerSeat: 0 }
+    const hand: Hand = {
+      ...emptyHand(),
+      concealedTiles: [...idsFor('C4', 2), ...idsFor('C7', 2), ...idsFor('WE', 2), ...idsFor('D2', 1), ...idsFor('D5', 1), ...idsFor('B3', 1), ...idsFor('B6', 1)],
+      melds: [concealedKong],
+    }
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBeGreaterThan(0)
+    expect(plan.lockedInFans).toEqual([{ fanId: 67, count: 1 }]) // Concealed Kong only, melds-only path
+    const result = computeRouteToPoints(hand)
+    expect(result.candidates.some((c) => c.fanId === 50)).toBe(true) // Half Flush candidate exists
+    expect(result.selected.some((c) => c.fanId === 50)).toBe(true) // and isn't wrongly filtered out
+  })
 })

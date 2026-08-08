@@ -1,4 +1,5 @@
 import { rankDiscards } from './bots/policy.js'
+import { isRouteCompatible, STAGE3_FAN_IDS } from './fan-target-compatibility.js'
 import { estimateFanTargets, type FanTargetEstimate } from './fan-targets.js'
 import { groupConcealedByType, ORDERED_STANDARD_TYPE_IDS } from './win-detection.js'
 import type { Hand } from './hand.js'
@@ -478,8 +479,9 @@ export interface RouteToPointsResult {
   candidates: FanTargetEstimate[]
   // The pairwise-COMPATIBLE subset of `candidates` actually counted toward
   // bestCaseTotal: walks `candidates` in value order (greedy), keeping a
-  // candidate only if scoring/exclusions.ts's real mutual-exclusion table
-  // says it can coexist with everything already kept AND with every already
+  // candidate only if BOTH scoring/exclusions.ts's real mutual-exclusion
+  // table AND fan-target-compatibility.ts's route-compatibility table say
+  // it can coexist with everything already kept AND with every already
   // locked-in fan. Without this filter, a naive value-sum could recommend
   // e.g. No Honors alongside Dragon Pung — completing one structurally
   // destroys the other, so summing their points would suggest a route no
@@ -516,25 +518,21 @@ export interface RouteToPointsResult {
 // toward Half Flush" and "keep working toward No Honors" are two genuinely
 // contradictory FUTURE directions for the SAME current tiles (one wants to
 // keep the honor tile present, the other wants it gone), even though no
-// COMPLETE hand could ever be both. Caught this the hard way — an early
-// version of computeRouteToPoints let Half Flush (50) and All Simples (68)
-// sum together into a "reachable" 8-point total on a hand that could never
-// actually score both. Each set below is a direct, already-cited
-// consequence of its members' own fan definitions (fan-targets.ts /
-// scoring/fans-*.ts), not an independent claim: fans requiring at least one
-// dragon/wind/honor tile in the final hand vs. fans forbidding one
-// entirely. Full Flush (22) isn't listed on either side — it's already
-// covered by exclusions.ts's own [22,76] "implies No Honors" entry.
-const REQUIRES_HONOR_TILE = new Set([2, 59, 60, 61, 50]) // Big Three Dragons, Dragon Pung, Prevalent Wind, Seat Wind, Half Flush
-const FORBIDS_HONOR_TILE = new Set([68, 76]) // All Simples, No Honors
-
-function directionallyIncompatible(fanIdA: number, fanIdB: number): boolean {
-  return (
-    (REQUIRES_HONOR_TILE.has(fanIdA) && FORBIDS_HONOR_TILE.has(fanIdB)) ||
-    (REQUIRES_HONOR_TILE.has(fanIdB) && FORBIDS_HONOR_TILE.has(fanIdA))
-  )
-}
-
+// COMPLETE hand could ever be both.
+//
+// Caught TWO instances of this the hard way, on two separate axes: an early
+// version of computeRouteToPoints let Half Flush (50) sum with All Simples
+// (68) — the honor axis — and a later version let Seven Pairs (19) sum with
+// All Pungs (49) — the shape axis (Seven Pairs structurally has no
+// pung/kong at all) — both into a false "reaches 8 points" on a hand that
+// could never actually score both. Two hand-picked axes were never going to
+// be the last ones found by accident, so fan-target-compatibility.ts now
+// enumerates and classifies all 45 pairs among the 10 families exhaustively
+// (25 compatible, 20 incompatible), each grounded in the real detectors'
+// own already-cited guard conditions or win-detection.ts's structural
+// definitions — see that module's own header for the full reasoning and
+// fan-target-compatibility.test.ts for a constructed hand per compatible
+// pair where both real detectors actually fire together.
 export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext = {}): RouteToPointsResult {
   const lockedInFans = computeHandPlan(hand, context).lockedInFans
   const lockedInPoints = lockedInFans.reduce((sum, f) => sum + (FAN_REGISTRY[f.fanId]?.points ?? 0) * f.count, 0)
@@ -550,10 +548,35 @@ export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext
   // compatible families in play, defeating the entire point of the CHANGE 3
   // warning (SPEC §6's trap). Excluded from `selected`/`bestCaseTotal` only;
   // still present in `candidates` verbatim.
+  //
+  // KNOWN GAP, not fixed here (investigated and reported separately,
+  // 2026-08-08): a fanId already in chosenFanIds via lockedInFans is always
+  // skipped below, even when the candidate represents a legitimate FURTHER
+  // unit of the same countable fan (Dragon Pung, fanId 59, is the only such
+  // fan among the 10) — e.g. one melded dragon pung already locked in plus
+  // a second dragon at 2 concealed copies produces a real +2-point
+  // candidate that this loop silently drops. Tracked in OPEN-WORK.md; not
+  // folded into this pass, which is scoped to route COMPATIBILITY, not
+  // per-unit accounting.
+  //
+  // fan-target-compatibility.ts's table only classifies pairs among the 10
+  // Stage 3 families and defaults an unknown pair to incompatible (safe
+  // there, since the completeness test guarantees no pair among the 10 is
+  // ever actually unknown) — WRONG for a locked-in fan from outside the 10
+  // (e.g. Concealed Kong), where this module simply has no opinion. Caught
+  // via hints.test.ts's "a locked-in fan outside the 10 Stage 3 families"
+  // fixture while wiring this in, before it shipped: the `STAGE3_FAN_IDS`
+  // guard below is what makes that case fall through to "compatible"
+  // instead of being silently blocked.
   for (const candidate of candidates) {
     if (candidate.completionProbability <= 0) continue
     if (chosenFanIds.includes(candidate.fanId)) continue
-    if (chosenFanIds.some((id) => areExclusive(id, candidate.fanId) || directionallyIncompatible(id, candidate.fanId))) continue
+    if (
+      chosenFanIds.some(
+        (id) => areExclusive(id, candidate.fanId) || (STAGE3_FAN_IDS.includes(id) && !isRouteCompatible(id, candidate.fanId)),
+      )
+    )
+      continue
     selected.push(candidate)
     chosenFanIds.push(candidate.fanId)
   }
