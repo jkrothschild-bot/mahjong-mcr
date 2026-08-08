@@ -8,6 +8,7 @@ describe('DiscardHint', () => {
     const hint = screen.getByTestId('discard-hint')
     expect(hint.textContent).toMatch(/double-click/i)
     expect(hint.textContent).toMatch(/drag/i)
+    expect(hint).toHaveTextContent('Tiles can be moved around your hand, using drag and drop.')
   })
 
   it('renders nothing once the player has discarded', () => {
