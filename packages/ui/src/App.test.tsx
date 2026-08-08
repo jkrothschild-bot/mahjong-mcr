@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { typeIdOfInstance } from '@mahjong-mcr/engine'
 import App from './App'
 import { sortByMode } from './hand/handOrder.js'
-import { initLoopState } from './game/useGameLoop.js'
+import { initLoopState, type LoopState } from './game/useGameLoop.js'
 
 describe('App', () => {
   it('temporarily toggles a full-board occupancy preview', () => {
@@ -33,6 +33,33 @@ describe('App', () => {
     for (const seat of [0, 1, 2, 3]) {
       expect(screen.getByTestId(`seat-${seat}`)).toBeInTheDocument()
     }
+  })
+
+  it('sends the current match snapshot through the explicit Home control', async () => {
+    const onHome = vi.fn(async (_snapshot: LoopState) => {})
+    render(<App onHome={onHome} />)
+
+    const home = screen.getByRole('button', { name: 'Home' })
+    expect(home).toHaveAttribute('title', 'Home')
+    expect(home).not.toHaveTextContent('Home')
+    fireEvent.click(home)
+    await waitFor(() => expect(onHome).toHaveBeenCalledOnce())
+    expect(onHome.mock.calls[0]![0]).toMatchObject({
+      gameState: { handNumber: 1 },
+      matchState: { matchSeed: 42, matchHandNumber: 1 },
+    })
+  })
+
+  it('shows an icon-only Logout control when authenticated navigation is provided', async () => {
+    const onLogout = vi.fn(async (_snapshot: LoopState) => {})
+    render(<App onLogout={onLogout} />)
+
+    const logout = screen.getByRole('button', { name: 'Log out' })
+    expect(logout).toHaveAttribute('title', 'Log out')
+    expect(logout).not.toHaveTextContent('Log out')
+    fireEvent.click(logout)
+    await waitFor(() => expect(onLogout).toHaveBeenCalledOnce())
+    expect(onLogout.mock.calls[0]![0]).toMatchObject({ matchState: { matchSeed: 42, matchHandNumber: 1 } })
   })
 
   // The fan tracker and waits used to render in flow beneath the board, and
@@ -224,6 +251,17 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
+  })
+
+  it('hides strategic assistance in Play Without Help while keeping legal discards playable', () => {
+    render(<App config={{ variant: 'mcr', mode: 'solo', assistance: 'none' }} />)
+    expect(screen.queryByRole('button', { name: 'Hint' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hand info' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tile counts' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Fan encyclopedia' })).not.toBeInTheDocument()
+    const hand = screen.getByRole('list', { name: 'Your hand' })
+    fireEvent.doubleClick(hand.querySelector('[role="listitem"]')!)
+    expect(screen.getByRole('list', { name: 'You discards' }).querySelectorAll('[role="listitem"]')).toHaveLength(1)
   })
 
   it('opens and closes the replay view, showing hand 1 with the initial deal at move 0', () => {

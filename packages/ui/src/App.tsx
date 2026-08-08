@@ -12,7 +12,7 @@ import { HUMAN_SEAT } from './game/humanSeat.js'
 import { RestartConfirmModal } from './game/RestartConfirmModal.js'
 import { TurnActionPrompt } from './game/TurnActionPrompt.js'
 import { useDiscardFlow } from './game/useDiscardFlow.js'
-import { useGameLoop, type HandMoveLog } from './game/useGameLoop.js'
+import { useGameLoop, type HandMoveLog, type LoopState } from './game/useGameLoop.js'
 import { HandInfoPanel } from './hand/HandInfoPanel.js'
 import { FanEncyclopedia } from './hints/FanEncyclopedia.js'
 import { HintPanel } from './hints/HintPanel.js'
@@ -22,8 +22,27 @@ import { SettingsPanel } from './settings/SettingsPanel.js'
 import { useSettings } from './settings/useSettings.js'
 import { StatsPanel } from './stats/StatsPanel.js'
 import { useSessionStats } from './stats/useSessionStats.js'
+import { capabilitiesFor, DEFAULT_GAME_CONFIG, type GameConfig } from './app/gameConfig.js'
+import { useAnalytics } from './analytics/AnalyticsContext.js'
+import { trackSafely } from './analytics/AnalyticsService.js'
+import { HomeIcon } from './components/HomeIcon.js'
+import { LogoutIcon } from './components/LogoutIcon.js'
+import { soundEffectsPlayer } from './audio/soundEffects.js'
+import { MAHJONG_ANNOUNCEMENT_MS } from './game/gameEventPresentation.js'
 
-function App() {
+export interface AppProps {
+  config?: GameConfig
+  initialSnapshot?: LoopState
+  onSnapshotChange?: (snapshot: LoopState) => void
+  saveStatus?: 'saved' | 'saving' | 'local-only'
+  onRestart?: () => void | Promise<void>
+  onHome?: (snapshot: LoopState) => void | Promise<void>
+  onLogout?: (snapshot: LoopState) => void | Promise<void>
+}
+
+function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, saveStatus = 'saved', onRestart, onHome, onLogout }: AppProps) {
+  const capabilities = capabilitiesFor(config)
+  const analytics = useAnalytics()
   const { settings, update } = useSettings()
   // M8 Step 3: tile-movement animation follows the OS-level
   // prefers-reduced-motion media query, which motion/react's
@@ -40,6 +59,8 @@ function App() {
   const [statsOpen, setStatsOpen] = useState(false)
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const [boardPreviewOpen, setBoardPreviewOpen] = useState(false)
+  const [homePending, setHomePending] = useState(false)
+  const [logoutPending, setLogoutPending] = useState(false)
   const { stats, recordHandResult } = useSessionStats()
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
@@ -51,6 +72,7 @@ function App() {
   const [encyclopediaFanId, setEncyclopediaFanId] = useState<number | undefined>(undefined)
   const [encyclopediaOpen, setEncyclopediaOpen] = useState(false)
   const openEncyclopedia = (fanId?: number) => {
+    trackSafely(analytics, 'scoring_explanation_viewed')
     setEncyclopediaFanId(fanId)
     setEncyclopediaOpen(true)
   }
@@ -71,6 +93,8 @@ function App() {
   } = useGameLoop({
     matchSeed: 42,
     botSpeedMs: settings.botSpeedMs,
+    initialSnapshot,
+    onSnapshotChange,
     // No `paused` any more: the "All discards" overlay was its only caller,
     // and it's gone (the discard field is readable in place now, so a
     // separate full-viewport view of the same tiles wasn't earning its
@@ -94,6 +118,21 @@ function App() {
     : devOccupancyMode
       ? applyDevOccupancy(state, devOccupancyMode, HUMAN_SEAT)
       : state
+
+  // The engine has already completed and persisted the win at this point;
+  // this only lets the revealed table and MAHJONG announcement breathe
+  // before the existing result dialog covers them. Exhaustive draws remain
+  // immediate, and no game action depends on this timer.
+  const winPresentationKey = state.phase === 'handEnded' && state.result?.outcome === 'win'
+    ? `${state.seed}-${state.handNumber}`
+    : null
+  const [presentedWinKey, setPresentedWinKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (!winPresentationKey || presentedWinKey === winPresentationKey) return
+    const timeout = window.setTimeout(() => setPresentedWinKey(winPresentationKey), MAHJONG_ANNOUNCEMENT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [presentedWinKey, winPresentationKey])
+  const resultPresentationReady = winPresentationKey === null || presentedWinKey === winPresentationKey
 
   const openReplay = () => setReplaySnapshot(matchMoveLogs)
 
@@ -128,6 +167,24 @@ function App() {
     [submitHumanMove],
   )
   const { selectedTileId, selectTile, requestDiscardTile } = useDiscardFlow({ onSubmitDiscard })
+  const leaveToHome = async () => {
+    if (!onHome) { window.location.assign(import.meta.env.BASE_URL); return }
+    setHomePending(true)
+    try {
+      await onHome({ gameState: state, matchState, matchScores, matchMoveLogs })
+    } finally {
+      setHomePending(false)
+    }
+  }
+  const logout = async () => {
+    if (!onLogout) return
+    setLogoutPending(true)
+    try {
+      await onLogout({ gameState: state, matchState, matchScores, matchMoveLogs })
+    } finally {
+      setLogoutPending(false)
+    }
+  }
 
   return (
     <SettingsContext.Provider value={settings}>
@@ -140,13 +197,26 @@ function App() {
         matching CLAUDE.md's no-scroll rule now that GameStage's fit-to-
         available-space logic is the thing actually responsible for making
         content fit, rather than manually-tuned per-component pixel budgets. */}
-    <div className="h-svh overflow-hidden bg-neutral-900 text-neutral-100 flex flex-col">
-      <header className="flex items-center justify-between px-4 py-1 border-b border-neutral-700">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-lg font-semibold tracking-tight">MCR Mahjong Mentor</h1>
-          <span className="text-xs text-neutral-400">Learn while you play</span>
+    <div
+      className="h-svh overflow-hidden bg-neutral-900 text-neutral-100 flex flex-col"
+      onPointerDownCapture={() => { if (settings.soundEffects) soundEffectsPlayer.unlock() }}
+      onKeyDownCapture={() => { if (settings.soundEffects) soundEffectsPlayer.unlock() }}
+    >
+      <header className="flex items-center overflow-hidden border-b border-neutral-700 px-4 py-1">
+        <div className="relative z-10 flex shrink-0 items-center gap-2 bg-neutral-900 pr-2">
+          <button type="button" aria-label={homePending ? 'Saving and returning home' : 'Home'} title="Home" disabled={homePending || logoutPending} onClick={() => void leaveToHome()} className="inline-grid size-11 shrink-0 place-items-center rounded-md border border-neutral-600 hover:bg-neutral-800 disabled:opacity-60"><HomeIcon className="size-5" /></button>
+          {onLogout && <button type="button" aria-label={logoutPending ? 'Saving and logging out' : 'Log out'} title="Log out" disabled={homePending || logoutPending} onClick={() => void logout()} className="inline-grid size-11 shrink-0 place-items-center rounded-md border border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-60"><LogoutIcon className="size-5" /></button>}
+          <span aria-hidden="true" className="h-6 w-px bg-neutral-700" />
+          <button type="button" disabled={homePending || logoutPending} onClick={() => void leaveToHome()} className="hidden text-lg font-semibold tracking-tight hover:text-amber-300 disabled:opacity-60 lg:inline">MCR Mahjong Mentor</button>
+          <span className="hidden text-xs text-neutral-400 2xl:inline">Learn while you play</span>
+          <span className="hidden rounded-full border border-neutral-700 px-2 py-0.5 text-xs text-neutral-300 lg:inline-flex">
+            {config.assistance === 'learning' ? 'Learning Mode' : 'Without Help'}
+          </span>
+          <span aria-live="polite" className="hidden text-xs text-neutral-400 xl:inline">
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'local-only' ? 'Saved locally — reconnecting…' : 'Saved'}
+          </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pl-2">
           <button
             type="button"
             aria-pressed={boardPreviewOpen}
@@ -159,37 +229,37 @@ function App() {
           >
             {boardPreviewOpen ? 'Exit full board' : 'Preview full board'}
           </button>
-          <button
+          {capabilities.showTileCounts && <button
             type="button"
             onClick={() => setTileCountGridOpen(true)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Tile counts
-          </button>
-          <button
+          </button>}
+          {capabilities.showStrategyCoach && <button
             type="button"
-            onClick={() => setHintOpen((open) => !open)}
+            onClick={() => setHintOpen((open) => { if (!open) trackSafely(analytics, 'hint_viewed'); return !open })}
             className="min-h-11 min-w-11 rounded-md border border-indigo-500 px-3 text-sm text-indigo-300 hover:bg-indigo-950"
           >
             Hint
-          </button>
+          </button>}
           {/* The fan tracker + waits, which used to sit in flow under the
               board and resize it whenever they had something to say. See
               HandInfoPanel.tsx / the HudBar.tsx tombstone. */}
-          <button
+          {capabilities.showHandInformation && <button
             type="button"
             onClick={() => setHandInfoOpen(true)}
             className="min-h-11 min-w-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Hand info
-          </button>
-          <button
+          </button>}
+          {capabilities.showScoringHelp && <button
             type="button"
             onClick={() => openEncyclopedia()}
             className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
           >
             Fan encyclopedia
-          </button>
+          </button>}
           <button
             type="button"
             onClick={openReplay}
@@ -254,7 +324,7 @@ function App() {
           onRequestDiscardTile={!boardPreviewOpen && isHumanTurn ? requestDiscardTile : undefined}
           selectedTypeId={selectedTypeId}
           onInspectTile={inspectTile}
-          showDiscardHint={!hasHumanDiscarded}
+          showDiscardHint={capabilities.showStrategyCoach && !hasHumanDiscarded}
         />
 
         <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
@@ -265,7 +335,7 @@ function App() {
             see TurnActionPrompt.tsx. */}
         <TurnActionPrompt state={state} isHumanTurn={isHumanTurn} onDeclare={submitHumanMove} />
 
-        {hintOpen && (
+        {capabilities.showStrategyCoach && hintOpen && (
           <HintPanel
             hand={state.players[HUMAN_SEAT].hand}
             prevailingWind={state.prevailingWind}
@@ -280,33 +350,35 @@ function App() {
 
       </main>
 
-      <TileCountGrid
+      {capabilities.showTileCounts && <TileCountGrid
         open={tileCountGridOpen}
         unseenCounts={computeUnseenCounts(state, HUMAN_SEAT)}
         onClose={() => setTileCountGridOpen(false)}
-      />
+      />}
 
-      <ScoreScreen
+      {resultPresentationReady && <ScoreScreen
         state={state}
         matchScores={matchScores}
         onNextHand={startNextHand}
-        onFanClick={openEncyclopedia}
+        onFanClick={capabilities.showScoringHelp ? openEncyclopedia : undefined}
         onReviewHand={openReplay}
-      />
+        matchCompleted={matchState.completed}
+        onMatchComplete={() => window.location.assign(import.meta.env.BASE_URL)}
+      />}
 
-      {encyclopediaOpen && <FanEncyclopedia initialFanId={encyclopediaFanId} onClose={() => setEncyclopediaOpen(false)} />}
+      {capabilities.showScoringHelp && encyclopediaOpen && <FanEncyclopedia initialFanId={encyclopediaFanId} onClose={() => setEncyclopediaOpen(false)} />}
 
       {replaySnapshot && <ReplayView handMoveLogs={replaySnapshot} onClose={() => setReplaySnapshot(null)} />}
 
       <ExportPositionModal open={exportOpen} state={state} forSeat={HUMAN_SEAT} onClose={() => setExportOpen(false)} />
 
-      <HandInfoPanel
+      {capabilities.showHandInformation && <HandInfoPanel
         open={handInfoOpen}
         hand={state.players[HUMAN_SEAT].hand}
         prevailingWind={state.prevailingWind}
         seatWind={state.players[HUMAN_SEAT].seatWind}
         onClose={() => setHandInfoOpen(false)}
-      />
+      />}
 
       <StatsPanel open={statsOpen} stats={stats} onClose={() => setStatsOpen(false)} />
 
@@ -315,9 +387,9 @@ function App() {
       <RestartConfirmModal
         open={restartConfirmOpen}
         onConfirm={() => {
-          resetMatch()
-          setHasHumanDiscarded(false)
           setRestartConfirmOpen(false)
+          if (!onRestart) { resetMatch(); setHasHumanDiscarded(false); return }
+          void Promise.resolve(onRestart()).catch(() => {}).finally(() => { resetMatch(); setHasHumanDiscarded(false) })
         }}
         onCancel={() => setRestartConfirmOpen(false)}
       />
