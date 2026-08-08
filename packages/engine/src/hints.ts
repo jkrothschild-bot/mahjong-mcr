@@ -1,8 +1,12 @@
 import { rankDiscards } from './bots/policy.js'
+import { isRouteCompatible, STAGE3_FAN_IDS } from './fan-target-compatibility.js'
+import { estimateFanTargets, type FanTargetEstimate } from './fan-targets.js'
 import { groupConcealedByType, ORDERED_STANDARD_TYPE_IDS } from './win-detection.js'
 import type { Hand } from './hand.js'
 import type { Meld } from './meld.js'
 import { MINIMUM_POINTS_TO_WIN } from './scoring/derive-context.js'
+import { areExclusive } from './scoring/exclusions.js'
+import { FAN_REGISTRY } from './scoring/registry.js'
 import { isDragonTypeId, isWindTypeId, parseSuited } from './scoring/set-helpers.js'
 import type { FanMatch } from './scoring/types.js'
 import { calculateShantenFromCounts, type ShantenResult } from './shanten.js'
@@ -460,4 +464,145 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
     bestCaseReachesMinimum: allBasicPoints.some((p) => p >= MINIMUM_POINTS_TO_WIN),
     worstCaseReachesMinimum: allBasicPoints.every((p) => p >= MINIMUM_POINTS_TO_WIN),
   }
+}
+
+// Phase 10 Stage 3 orchestration layer (KICKOFF-phase10-strategy-coach.md's
+// "Route to eight points" panel) — sits one layer above fan-targets.ts'
+// estimateFanTargets exactly the way computeBestMoveHint sits above
+// evaluateDiscards: fan-targets.ts stays a flat, per-family list (so each
+// family stays independently fixtured and cited, per that file's own
+// comment); composing "locked-in fans + best candidates, together" into one
+// picture is this file's job instead.
+export interface RouteToPointsResult {
+  // Every applicable Stage 3 target for this hand, unfiltered —
+  // estimateFanTargets(hand, context) verbatim, sorted by value descending.
+  candidates: FanTargetEstimate[]
+  // The pairwise-COMPATIBLE subset of `candidates` actually counted toward
+  // bestCaseTotal: walks `candidates` in value order (greedy), keeping a
+  // candidate only if BOTH scoring/exclusions.ts's real mutual-exclusion
+  // table AND fan-target-compatibility.ts's route-compatibility table say
+  // it can coexist with everything already kept AND with every already
+  // locked-in fan. Without this filter, a naive value-sum could recommend
+  // e.g. No Honors alongside Dragon Pung — completing one structurally
+  // destroys the other, so summing their points would suggest a route no
+  // real hand could ever actually score.
+  selected: FanTargetEstimate[]
+  // Sum of already-locked-in fans' points (computeHandPlan's own
+  // lockedInFans — melds-only pre-tenpai, the stricter real-waits
+  // intersection at tenpai, per that function's existing logic).
+  lockedInPoints: number
+  // lockedInPoints + sum(selected fans' points). A CEILING this hand could
+  // plausibly reach if every selected target lands — not a forecast; each
+  // target's own completionProbability (and probabilityBasis tier) still
+  // applies and is not folded into this number.
+  bestCaseTotal: number
+  reachesMinimum: boolean
+  // CHANGE 3 (KICKOFF-phase10-strategy-coach.md, owner review 2026-08-07):
+  // explicit, not left for a UI to infer from an empty candidates/selected
+  // array. SPEC §6 names "whether the hand can reach the 8-point minimum" as
+  // the single most valuable thing this panel can say, so silence here is
+  // not an acceptable outcome. Always the exact negation of reachesMinimum —
+  // kept as its own field so a consumer never has to derive it (and risk the
+  // polarity) from the rest of this shape; a UI is REQUIRED to render this,
+  // not merely permitted to, when true.
+  warning: boolean
+}
+
+// scoring/exclusions.ts's table only ever needs a pair when two fans COULD
+// naively co-fire on the same COMPLETE hand (the real detectors' own
+// domain) — it has no entry for e.g. [50,76] (Half Flush / No Honors)
+// because a complete hand can never satisfy both anyway (detectHalfFlush's
+// own `hasHonor` guard makes that structurally impossible), so the real
+// detectors just never co-fire and no rule is needed. fan-targets.ts's
+// estimators don't have that luxury: on an INCOMPLETE hand, "keep working
+// toward Half Flush" and "keep working toward No Honors" are two genuinely
+// contradictory FUTURE directions for the SAME current tiles (one wants to
+// keep the honor tile present, the other wants it gone), even though no
+// COMPLETE hand could ever be both.
+//
+// Caught TWO instances of this the hard way, on two separate axes: an early
+// version of computeRouteToPoints let Half Flush (50) sum with All Simples
+// (68) — the honor axis — and a later version let Seven Pairs (19) sum with
+// All Pungs (49) — the shape axis (Seven Pairs structurally has no
+// pung/kong at all) — both into a false "reaches 8 points" on a hand that
+// could never actually score both. Two hand-picked axes were never going to
+// be the last ones found by accident, so fan-target-compatibility.ts now
+// enumerates and classifies all 45 pairs among the 10 families exhaustively
+// (25 compatible, 20 incompatible), each grounded in the real detectors'
+// own already-cited guard conditions or win-detection.ts's structural
+// definitions — see that module's own header for the full reasoning and
+// fan-target-compatibility.test.ts for a constructed hand per compatible
+// pair where both real detectors actually fire together.
+export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext = {}): RouteToPointsResult {
+  const lockedInFans = computeHandPlan(hand, context).lockedInFans
+  const lockedInPoints = lockedInFans.reduce((sum, f) => sum + (FAN_REGISTRY[f.fanId]?.points ?? 0) * f.count, 0)
+
+  const candidates = estimateFanTargets(hand, context)
+  const selected: FanTargetEstimate[] = []
+  const chosenFanIds: number[] = lockedInFans.map((f) => f.fanId)
+
+  // A zero-probability candidate (this file's own linear shanten/heuristic
+  // scales bottom out at exactly 0, not just "small") contributes nothing
+  // real to a BEST case — counting its full raw points anyway would make
+  // "reaches the minimum" trivially true for nearly any hand with 3+
+  // compatible families in play, defeating the entire point of the CHANGE 3
+  // warning (SPEC §6's trap). Excluded from `selected`/`bestCaseTotal` only;
+  // still present in `candidates` verbatim.
+  //
+  // KNOWN GAP, not fixed here (investigated and reported separately,
+  // 2026-08-08): a fanId already in chosenFanIds via lockedInFans is always
+  // skipped below, even when the candidate represents a legitimate FURTHER
+  // unit of the same countable fan (Dragon Pung, fanId 59, is the only such
+  // fan among the 10) — e.g. one melded dragon pung already locked in plus
+  // a second dragon at 2 concealed copies produces a real +2-point
+  // candidate that this loop silently drops. Tracked in OPEN-WORK.md; not
+  // folded into this pass, which is scoped to route COMPATIBILITY, not
+  // per-unit accounting.
+  //
+  // fan-target-compatibility.ts's table only classifies pairs among the 10
+  // Stage 3 families and defaults an unknown pair to incompatible (safe
+  // there, since the completeness test guarantees no pair among the 10 is
+  // ever actually unknown) — WRONG for a locked-in fan from outside the 10
+  // (e.g. Concealed Kong), where this module simply has no opinion. Caught
+  // via hints.test.ts's "a locked-in fan outside the 10 Stage 3 families"
+  // fixture while wiring this in, before it shipped: the `STAGE3_FAN_IDS`
+  // guard below is what makes that case fall through to "compatible"
+  // instead of being silently blocked.
+  //
+  // PRECONDITION for that fall-through to stay safe (reviewed 2026-08-08):
+  // falling through to "compatible" for a locked-in fan outside the 10
+  // relies on `areExclusive` alone NOT being sufficient here — exclusions.ts
+  // deliberately omits structurally-impossible pairs (its whole domain is
+  // COMPLETE hands; see fan-target-compatibility.ts's own header) — so the
+  // real safety net is that every one of fan-targets.ts's estimators
+  // already reads `hand.melds` and refuses to propose a candidate the
+  // melds structurally rule out. `estimateSimplesAndHonors`'s
+  // `meldHasHonor`/`meldHasTerminal` check (fan-targets.ts:390-392) is the
+  // LOAD-BEARING case: a melded pung of terminals or honors can lock in
+  // some other real fan entirely outside the 10 (e.g. fan 73, Pung of
+  // Terminals or Honors) that structurally forbids All Simples/No Honors,
+  // with no `exclusions.ts` entry to catch it — this only stays safe
+  // because the estimator itself sees those same meld tiles as offending
+  // and never emits the conflicting candidate in the first place, not
+  // because anything in this file checked. **If a future estimator is
+  // added that inspects only `hand.concealedTiles` and ignores
+  // `hand.melds`, this precondition breaks silently**: the fall-through
+  // below would then treat a locked-in out-of-domain fan as compatible
+  // with a candidate the melds already ruled out.
+  for (const candidate of candidates) {
+    if (candidate.completionProbability <= 0) continue
+    if (chosenFanIds.includes(candidate.fanId)) continue
+    if (
+      chosenFanIds.some(
+        (id) => areExclusive(id, candidate.fanId) || (STAGE3_FAN_IDS.includes(id) && !isRouteCompatible(id, candidate.fanId)),
+      )
+    )
+      continue
+    selected.push(candidate)
+    chosenFanIds.push(candidate.fanId)
+  }
+
+  const bestCaseTotal = lockedInPoints + selected.reduce((sum, c) => sum + c.points, 0)
+  const reachesMinimum = bestCaseTotal >= MINIMUM_POINTS_TO_WIN
+  return { candidates, selected, lockedInPoints, bestCaseTotal, reachesMinimum, warning: !reachesMinimum }
 }

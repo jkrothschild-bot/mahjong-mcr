@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chooseDiscard, rankDiscards } from './bots/policy.js'
-import { computeBestMoveHint, computeHandPlan, deriveOneLinerReason } from './hints.js'
+import { computeBestMoveHint, computeHandPlan, computeRouteToPoints, deriveOneLinerReason } from './hints.js'
 import { emptyHand, type Hand } from './hand.js'
 import type { Meld } from './meld.js'
 import { evaluateDiscards } from './tile-efficiency.js'
@@ -294,5 +294,122 @@ describe('computeHandPlan', () => {
     const plan = computeHandPlan(handWith(concealed), { prevailingWind: 'east', seatWind: 'north' })
     expect(plan.shanten.shanten).toBe(0)
     expect(plan.primaryRoute).toBe('standard')
+  })
+})
+
+describe('computeRouteToPoints', () => {
+  it('warns when nothing reaches the 8-point minimum', () => {
+    // Same "too speculative" scattered hand as fan-targets.test.ts's
+    // estimateAllPungs fixture — 13 distinct singles, nothing close to any target.
+    const hand = handWith([
+      ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    expect(result.reachesMinimum).toBe(false)
+    expect(result.warning).toBe(true)
+    expect(result.bestCaseTotal).toBeLessThan(8)
+  })
+
+  it('does not warn once a real candidate clears the minimum on its own', () => {
+    // Two dragon pungs sitting CONCEALED (never declared as melds), plus a
+    // partial third — lockedInFansFromMelds sees nothing (melds-only), but
+    // estimateDragonTargets recognizes the concealed pungs and offers Big
+    // Three Dragons (88pts) as a candidate, clearing 8 on its own.
+    const hand = handWith([
+      ...idsFor('DR', 3), ...idsFor('DG', 3), ...idsFor('DW', 2),
+      ...idsFor('C1', 1), ...idsFor('C2', 1), ...idsFor('C3', 1), ...idsFor('C4', 1), ...idsFor('C5', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    expect(result.reachesMinimum).toBe(true)
+    expect(result.warning).toBe(false)
+    expect(result.bestCaseTotal).toBeGreaterThanOrEqual(8)
+    expect(result.selected.some((c) => c.fanId === 2)).toBe(true)
+  })
+
+  it('filters directionally-incompatible candidates not covered by exclusions.ts (Half Flush vs All Simples/No Honors)', () => {
+    // Real bug found while writing this function: Half Flush (50) requires
+    // keeping a honor tile, All Simples (68)/No Honors (76) require
+    // discarding every honor tile — contradictory directions for the same
+    // hand, but not a scoring/exclusions.ts entry (a COMPLETE hand can never
+    // satisfy both anyway, so the real detectors never needed one). An
+    // earlier version of computeRouteToPoints summed 50+68's raw points
+    // (6+2=8) into a false "reaches minimum" on exactly this hand.
+    const hand = handWith([
+      ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
+      ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+      ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    const selectedFanIds = result.selected.map((c) => c.fanId)
+    expect(selectedFanIds).toContain(50)
+    expect(selectedFanIds).not.toContain(68)
+    expect(selectedFanIds).not.toContain(76)
+    expect(result.reachesMinimum).toBe(false)
+  })
+
+  it('filters mutually-exclusive candidates out of the greedy sum (All Simples vs No Honors, exclusions.ts [68,76])', () => {
+    const hand = handWith([...idsFor('C5', 4), ...idsFor('C6', 4), ...idsFor('D5', 4), ...idsFor('D6', 1)])
+    const result = computeRouteToPoints(hand)
+    const candidateFanIds = result.candidates.map((c) => c.fanId)
+    expect(candidateFanIds).toContain(68)
+    expect(candidateFanIds).toContain(76)
+    const selectedFanIds = result.selected.map((c) => c.fanId)
+    expect(selectedFanIds.includes(68) && selectedFanIds.includes(76)).toBe(false)
+  })
+
+  // Real defect found in review, NOT caught by the honor-axis check above:
+  // Seven Pairs (19) is a shape with NO sets at all (win-detection.ts's
+  // isSevenPairs requires every one of its 7 groups to have count === 2,
+  // never >= 3) — structurally incompatible with ANY fan requiring a
+  // pung/kong (All Pungs included, which requires FOUR). No complete hand
+  // can ever be both, but scoring/exclusions.ts has no [19,49] entry
+  // because the real detectors never needed one (they just never co-fire
+  // on a complete hand) -- the same gap class as the Half Flush/All Simples
+  // bug above, but on the SHAPE axis instead of the honor axis. A concealed
+  // hand sitting on several pairs satisfies both ESTIMATORS at once even
+  // though no real hand can ever score both fans. Fixtured before the fix
+  // per CLAUDE.md.
+  it('filters shape-incompatible candidates not covered by the honor-axis check (Seven Pairs vs All Pungs)', () => {
+    const hand = handWith([
+      ...idsFor('C1', 2), ...idsFor('C2', 2), ...idsFor('C3', 2),
+      ...idsFor('C4', 2), ...idsFor('C5', 2),
+      ...idsFor('C6', 1), ...idsFor('C7', 1), ...idsFor('C8', 1),
+    ])
+    const result = computeRouteToPoints(hand)
+    const selectedFanIds = result.selected.map((c) => c.fanId)
+    expect(selectedFanIds.includes(19) && selectedFanIds.includes(49)).toBe(false)
+  })
+
+  // fan-target-compatibility.ts's table only ever classifies pairs among
+  // the 10 Stage 3 families -- isRouteCompatible defaults an unknown pair
+  // to false (see that module's own comment), which is the RIGHT default
+  // for a pair among the 10 (the completeness test guarantees no such pair
+  // is ever actually unknown) but the WRONG default for a locked-in fan
+  // from OUTSIDE the 10 (e.g. Concealed Kong, fanId 67) -- there is no real
+  // conflict there, this module simply has no opinion. Caught while wiring
+  // this module in, before it shipped.
+  it('a locked-in fan outside the 10 Stage 3 families does not block an unrelated Stage 3 candidate', () => {
+    // Deliberately far from tenpai (shanten 3): a hand this close to
+    // complete would make computeHandPlan use the real-waits
+    // intersectFanMatches path instead of the melds-only one, which could
+    // legitimately lock Half Flush in for real (a different, correct
+    // reason for fanId 50 to be absent from `selected`) and mask the actual
+    // gap this fixture targets.
+    const concealedKong: Meld = { id: '0-0', kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles: idsFor('C1', 4), ownerSeat: 0 }
+    const hand: Hand = {
+      ...emptyHand(),
+      concealedTiles: [...idsFor('C4', 2), ...idsFor('C7', 2), ...idsFor('WE', 2), ...idsFor('D2', 1), ...idsFor('D5', 1), ...idsFor('B3', 1), ...idsFor('B6', 1)],
+      melds: [concealedKong],
+    }
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBeGreaterThan(0)
+    expect(plan.lockedInFans).toEqual([{ fanId: 67, count: 1 }]) // Concealed Kong only, melds-only path
+    const result = computeRouteToPoints(hand)
+    expect(result.candidates.some((c) => c.fanId === 50)).toBe(true) // Half Flush candidate exists
+    expect(result.selected.some((c) => c.fanId === 50)).toBe(true) // and isn't wrongly filtered out
   })
 })

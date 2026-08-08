@@ -31,8 +31,8 @@ nothing pointed at any more.
 | Product-level deferrals | `SPEC.md §11` | Live, coarse |
 | Milestones | `PLAN.md §2` | M0–M6 and M8 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
-| **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done 2026-08-07, start Phase 2** |
-| **Found mid-cleanup, not worked** | **§F below** | **Empty as of 2026-08-08** |
+| **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done; Phase 2 (A lane) done 2026-08-07, C lane not started** |
+| **Found mid-cleanup, not worked** | **§F below** | **1 item (2026-08-08) — Dragon Pung undercounting** |
 
 ---
 
@@ -185,8 +185,19 @@ Do not restate these here; follow the link.
   not started** (`CLAUDE.md`).
 - **Phase 10 Strategy Coach** — `KICKOFF-phase10-strategy-coach.md § State of play`.
   Stage 2 (depth-2 evaluation) specified, not started, deprioritised behind Stage 3.
-  Stage 3 in progress: 5 of 10 families done, 5 remaining (All Pungs, Prevalent Wind, Seat
-  Wind, All Simples, No Honors), then the orchestration layer per that doc's CHANGE 3.
+  ~~Stage 3 in progress: 5 of 10 families done, 5 remaining~~ **Stage 3's engine layer done,
+  2026-08-07/08 (§E Phase 2, `feat/phase10-stage3`, not yet merged to `main`):** all 10
+  families plus the `computeRouteToPoints` orchestration layer (CHANGE 3's tri-state warning
+  contract) shipped and tested. Compatibility filtering went through two passes: an honor-axis
+  check found 2026-08-07, then a review pass 2026-08-08 found a second, uncovered shape axis
+  (Seven Pairs vs. any pung-requiring fan) and replaced both hardcoded checks with
+  `fan-target-compatibility.ts` — an exhaustive, fixture-verified table over all 45 pairs among
+  the 10 families. See the KICKOFF doc's own state-of-play notes for the three bugs found (two
+  overcounting, one undercounting) across both passes.
+  **Open, recorded 2026-08-08, not yet fixed:** `computeRouteToPoints` undercounts Dragon
+  Pung (fan 59) — a locked-in partial pung silently blocks a legitimate further unit's
+  candidate. See the KICKOFF doc's own note for the confirmed repro and proposed handling.
+  Still open: the UI panel that renders `computeRouteToPoints`'s output — engine-only so far.
   The 2000-seed self-play re-test remains parked.
 - **M7 Polish (ongoing)** — `PLAN.md §2`: tile art finalisation, iPad touch tuning,
   accessibility scaling, colour-blind palette, save/resume.
@@ -383,10 +394,21 @@ start the moment this lands.
 
 ### Phase 2 — split the lanes
 
-**C:** landing page, against the single reconciled spec, on its own branch.
-**A:** Phase 10 Stage 3 — the 5 remaining families (All Pungs, Prevalent Wind, Seat Wind,
-All Simples, No Honors), then the orchestration layer per `KICKOFF-phase10`'s CHANGE 3, with
-pairwise compatibility filtering added to its greedy sum.
+**C:** landing page, against the single reconciled spec, on its own branch. Not started by
+this session — Codex's lane.
+**A:** ~~Phase 10 Stage 3 — the 5 remaining families... then the orchestration layer...~~
+**Done, 2026-08-07/08, on `feat/phase10-stage3` (not yet merged to `main`).** All 5 remaining
+families (All Pungs, Prevalent Wind, Seat Wind, All Simples, No Honors) plus
+`computeRouteToPoints` (the CHANGE 3 orchestration layer) shipped with pairwise compatibility
+filtering — see `KICKOFF-phase10-strategy-coach.md`'s own state-of-play notes for three real
+bugs this filtering caught across two passes (exclusions.ts's table alone doesn't catch these;
+it only covers pairs that could naively co-fire on a COMPLETE hand), replacing two hardcoded
+axis-checks with `fan-target-compatibility.ts`'s exhaustive 45-pair table. One further bug
+(Dragon Pung per-unit undercounting) found and recorded, deliberately not fixed this pass.
+Full engine suite green (559 tests), typecheck clean, zero files touched under
+`scoring/`/`win-detection.ts`/`exclusions.ts`.
+**Still open, not this phase:** merging `feat/phase10-stage3` to `main`, and the actual UI
+panel rendering `computeRouteToPoints`'s output (engine-only so far).
 
 ### Phase 3 — verification pass (A, small)
 
@@ -418,8 +440,14 @@ surfacing); the 2000-seed self-play re-test (only if Stage 2 reopens the questio
 Append here and keep going. Nothing in this section gets fixed during the cleanup pass; it is
 triaged after §E completes. An empty section means the pass stayed in scope.
 
-No untriaged findings remain as of 2026-08-08. The claim call-out regression found here was
-fixed and closed as §C5 above.
+- **`computeRouteToPoints` undercounts Dragon Pung** (found 2026-08-08, during Phase 2's
+  compatibility-table fix — two other bugs found the same pass were fixed because they blocked
+  the work in hand; this one wasn't and is deliberately deferred). Full account, confirmed
+  repro, and proposed handling: `KICKOFF-phase10-strategy-coach.md` § State of play. Still
+  open as of this merge (2026-08-08).
+- ~~The claim call-out regression found here~~ ✅ fixed and closed as §C5 above, 2026-08-08
+  (`feat/landing-auth-persistence`). Struck through rather than removed, per this section's own
+  closing convention — the record of what was found and fixed is worth more than the tidiness.
 
 ---
 

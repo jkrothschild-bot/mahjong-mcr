@@ -4,9 +4,13 @@ Read `CLAUDE.md`, `SPEC.md` §6, and `PLAN.md` before starting. This phase
 upgrades the shared hint/bot evaluation core in `packages/engine` and the
 coach UI that renders it. It is deliberately staged. **Stage 1 is complete,
 reviewed, and accepted (2026-08-06) — see its own decision-tree resolution
-below.** **Stage 3 is now active, chosen deliberately ahead of Stage 2**
-(same date, same section) — read Stage 3's own "design" subsection before
-writing any estimator code. Stage 2 remains specified but not started.
+below.** **Stage 3's engine layer (all 10 fan-target families plus the
+`computeRouteToPoints` orchestration function) is complete as of
+2026-08-07** — see its own "design" subsection for the full family list and
+the state-of-play note just above "Explicitly NOT in this phase" for what
+shipped and a real bug found while building it. Not yet done: the actual UI
+panel that renders `computeRouteToPoints`'s output (still engine-only).
+Stage 2 remains specified but not started.
 
 ## State of play / resume here (2026-08-06)
 
@@ -435,6 +439,118 @@ rules-lawyer pass per family). Each family gets its own fixtures in a new
 remaining 7**: Seven Pairs (`shanten` basis), Half/Full Flush (`heuristic`
 basis), and Dragon Pung/Big Three Dragons together (the `shanten`-adjacent
 basis) — one of each mechanism, working end to end, before the rest.
+
+**All 10 families plus the orchestration layer are now done (2026-08-07,
+Phase 2 of OPEN-WORK.md's cleanup sequence, on `feat/phase10-stage3`).**
+The remaining 5: All Pungs (fan 49, `shanten` basis — a genuinely new
+"pungs-only" restricted shanten metric, since no such shape exists in
+`shanten.ts`; unlike the general standard shape, pung/pair blocks never
+interact across TYPES the way chow blocks interact across adjacent RANKS,
+so greedy-by-value block selection is provably optimal here, no exhaustive
+search needed — see the estimator's own comment in `fan-targets.ts` for the
+full reasoning and a worked example); Prevalent Wind / Seat Wind (fans 60/
+61, `heuristic` basis per the design's own classification, `count/3` of the
+target wind tile); All Simples / No Honors (fans 68/76, `heuristic` basis,
+same shared-scan style as Half/Full Flush).
+
+`computeRouteToPoints` (`hints.ts`) is the CHANGE-3 orchestration layer:
+composes `computeHandPlan`'s already-locked-in fans with a greedy,
+value-ordered selection from `estimateFanTargets`'s candidates, filtered for
+pairwise compatibility, into a `bestCaseTotal` and an explicit
+`reachesMinimum`/`warning` tri-state — never inferred from an empty list,
+per CHANGE 3's own contract.
+
+**Real bug found and fixed while building this, not from planning:**
+`scoring/exclusions.ts`'s table only needs an entry when two fans could
+naively co-fire on the same COMPLETE hand — it has no entry for e.g. Half
+Flush (50) vs. All Simples (68), because a complete hand can never satisfy
+both anyway (Half Flush structurally requires a honor tile; All Simples
+forbids one), so the real detectors just never co-fire and no rule was ever
+needed. But two of fan-targets.ts's ESTIMATORS, running on an INCOMPLETE
+hand, genuinely can both fire at once — "keep working toward Half Flush"
+and "keep working toward All Simples" are contradictory directions for the
+same current tiles, not a naive co-firing. An early version of
+`computeRouteToPoints` summed both fans' raw points into a false "reaches
+8" on a hand that could never actually score both. Fixed with a small,
+explicit `directionallyIncompatible` check in `hints.ts` (which fans
+require vs. forbid a honor tile — a direct, already-cited consequence of
+each fan's own definition, not an independent rulebook claim) alongside the
+real `exclusions.ts` table. Fixtured directly (`hints.test.ts`'s
+"filters directionally-incompatible candidates" test) before the fix, per
+CLAUDE.md's fixture-first convention. A second, related gap — a
+zero-`completionProbability` candidate (Seven Pairs at its own formula's
+worst-case shanten) still contributing its FULL raw points to the greedy
+sum — was caught by the same fixture and fixed by excluding
+`completionProbability <= 0` candidates from `selected` (still visible in
+`candidates`, just never counted toward the ceiling).
+
+No changes to `scoring/`, `win-detection.ts`, or `exclusions.ts` — both
+bugs were in this session's own new orchestration code, not any existing
+detector, so no PyMahjongGB harness re-run was needed (CLAUDE.md's
+re-run trigger is a scoring-logic change; nothing under `scoring/` changed).
+
+**Second review pass, 2026-08-08 — the honor-axis fix above was incomplete,
+replaced with an exhaustive table.** The `directionallyIncompatible` check
+described above only covered the HONOR axis (which fans require vs. forbid
+a honor tile). Review found a SECOND, un-covered axis: Seven Pairs (19) is
+a shape with no pung/kong at all (`win-detection.ts` `isSevenPairs`'s own
+`every count === 2`), incompatible with the 5 fans requiring one (All
+Pungs included) — not caught by the honor sets, since neither fan is honor-
+related. A concealed hand sitting on several pairs made both
+`estimateSevenPairs` and `estimateAllPungs` fire, and `computeRouteToPoints`
+summed both into a false "reaches 8." Fixtured first (`hints.test.ts`'s
+"filters shape-incompatible candidates" test), confirmed failing, before
+any fix.
+
+Rather than patch a third hardcoded set, `packages/engine/src/
+fan-target-compatibility.ts` (+ its own `.test.ts`) now enumerates and
+classifies **all 45 unordered pairs** among the 10 families exhaustively —
+25 compatible, 20 incompatible — replacing both `REQUIRES_HONOR_TILE`/
+`FORBIDS_HONOR_TILE` and `directionallyIncompatible` entirely. A pair is
+ROUTE-COMPATIBLE iff some complete, legal MCR hand scores both — strictly
+weaker than "not in `exclusions.ts`", since that table only ever needs a
+pair when two fans could naively co-fire on a COMPLETE hand; a pair that's
+simply impossible together needs no entry there. Every INCOMPATIBLE verdict
+is grounded in the real detectors' own already-cited guard conditions or
+`win-detection.ts`'s structural definitions; every COMPATIBLE verdict has a
+constructed hand in the test file where **both real detectors** (not the
+estimators) actually fire together — a completeness test fails if any of
+the 45 pairs lacks an explicit entry, so "compatible by omission" can't
+recur a third time. `computeRouteToPoints` now checks this table alongside
+`areExclusive`, not instead of it (three of the 25 compatible pairs — Full
+Flush/No Honors, Dragon Pung/Big Three Dragons, All Simples/No Honors — are
+ALSO real `exclusions.ts` entries; the two questions are independent:
+whether conditions can coexist at all vs. whether real scoring counts both
+once they do).
+
+**A third bug, caught mid-wiring before it shipped, not by planning either:**
+the new table only classifies pairs among the 10 Stage 3 families and
+(correctly, for pairs among the 10) defaults an unknown pair to
+incompatible. Applied naively, this also defaulted any locked-in fan from
+OUTSIDE the 10 (e.g. Concealed Kong, fan 67) to "incompatible with
+everything" — wrongly blocking every Stage 3 candidate whenever such a fan
+was locked in. Fixtured (`hints.test.ts`'s "a locked-in fan outside the 10
+Stage 3 families" test — first written broken against an accidentally-
+tenpai hand that masked the bug behind a legitimately-locked Half Flush,
+corrected once the shanten was checked directly), confirmed failing, fixed
+by gating the compatibility check on `STAGE3_FAN_IDS.includes(id)`.
+
+**Found and reported, deliberately NOT fixed this pass — recorded here per
+CLAUDE.md's capture rule, not left in the chat transcript only:**
+`computeRouteToPoints`'s `chosenFanIds.includes(candidate.fanId)` guard
+(prevents re-selecting a fan already counted) also silently drops a
+legitimate FURTHER unit of a countable fan once ANY amount of it is already
+locked in. Dragon Pung (fan 59) is the only such fan among the 10:
+confirmed via direct repro that one melded dragon pung + a second dragon at
+2 concealed copies produces a real, non-null `fanId: 59` candidate worth +2
+points that never reaches `selected`, undercounting `bestCaseTotal` by
+that amount. This is a distinct bug (undercount, not overcount) from
+everything above, out of scope for a route-COMPATIBILITY fix — it's a
+per-unit accounting question. Proposed handling, not yet decided: track
+remaining capacity per countable fan separately from the compatibility
+check, so a partial lock-in doesn't block a legitimate next increment.
+Whoever picks this up next should decide the approach before touching
+`computeRouteToPoints` again.
 
 ## Explicitly NOT in this phase (any stage)
 

@@ -26,10 +26,11 @@
 import type { Hand } from './hand.js'
 import { meldTileTypeId } from './meld.js'
 import { FAN_REGISTRY } from './scoring/registry.js'
-import { parseSuited, type SuitChar } from './scoring/set-helpers.js'
+import { isHonorTypeId, isTerminalTypeId, parseSuited, windTypeId, type SuitChar } from './scoring/set-helpers.js'
 import { sevenPairsShantenFromCounts } from './shanten.js'
-import { typeIdOfInstance, type TileTypeId } from './tiles.js'
-import { groupConcealedByType } from './win-detection.js'
+import { typeIdOfInstance, type TileTypeId, type Wind } from './tiles.js'
+import { groupConcealedByType, ORDERED_STANDARD_TYPE_IDS } from './win-detection.js'
+import type { WinCircumstanceContext } from './waits.js'
 
 export interface FanTargetEstimate {
   fanId: number
@@ -254,11 +255,179 @@ export function estimateDragonTargets(hand: Hand): FanTargetEstimate[] {
   return results
 }
 
+// 49. All Pungs — 6 pts. §3.8.1 p.16 / App.1 p.38: "A hand formed by four
+// Pungs (or Kongs) and one pair." (Same citation scoring/fans-6.ts's real
+// detectAllPungs already uses.) probabilityBasis: 'shanten' — a genuinely
+// new distance metric (shanten.ts has no "pungs only" shape), but built from
+// the SAME additive block-cost theory standardShantenFromCounts itself
+// documents as "standard shanten-calculator theory, not sourced from the MCR
+// rulebook" — restricted to pung/kong-eligible blocks only (no chow option).
+// Unlike the general standard shape, pung/pair blocks never interact across
+// TYPES the way chow blocks do across adjacent RANKS (a pung of C1 and a
+// pung of C4 never compete for the same tile), so the optimal block
+// selection has no cross-type search to do: for a given tile budget, always
+// prefer completing an available pung (value 2/slot) over settling for a
+// pair-toward-pung (value 1/slot) — greedy-by-value is provably optimal
+// here, unlike the general case searchBlocks() exists to solve exhaustively.
+// Structurally impossible with any CHOW meld (a chow can never become a
+// pung); exposed pung/kong melds are fine, mirroring detectAllPungs' own
+// `sets.every(s => s.kind !== 'chow')` check.
+function pungOnlyBlockValue(counts: Readonly<Record<TileTypeId, number>>, budget: number): number {
+  let pungEligible = 0
+  let pairEligible = 0
+  for (const id of ORDERED_STANDARD_TYPE_IDS) {
+    const count = counts[id] ?? 0
+    if (count >= 3) pungEligible++
+    else if (count === 2) pairEligible++
+  }
+  const usedPungs = Math.min(pungEligible, budget)
+  const usedPairs = Math.min(pairEligible, budget - usedPungs)
+  return 2 * usedPungs + usedPairs
+}
+
+function allPungsShantenFromCounts(counts: Readonly<Record<TileTypeId, number>>, meldCount: number): number {
+  const n = 4 - meldCount
+  if (n < 0) return Infinity
+
+  let best = 8 - 2 * meldCount - pungOnlyBlockValue(counts, n)
+
+  // Mirrors standardShantenFromCounts' own head-pair trial loop exactly —
+  // try reserving each type with >=2 copies as the head, recompute the
+  // block value on what's left, take the min.
+  for (const type of ORDERED_STANDARD_TYPE_IDS) {
+    if ((counts[type] ?? 0) < 2) continue
+    const withoutHead = { ...counts }
+    withoutHead[type]! -= 2
+    best = Math.min(best, 8 - 2 * meldCount - pungOnlyBlockValue(withoutHead, n) - 1)
+  }
+
+  return best
+}
+
+export function estimateAllPungs(hand: Hand): FanTargetEstimate | null {
+  if (hand.melds.some((m) => m.kind === 'chow')) return null
+  const counts = groupConcealedByType(hand.concealedTiles)
+  const shanten = allPungsShantenFromCounts(counts, hand.melds.length)
+  if (shanten === Infinity) return null
+
+  const fanId = 49
+  const points = FAN_REGISTRY[fanId]!.points
+  // The direct completion target for each existing pair-toward-pung group —
+  // its own third copy. Doesn't attempt to also account for hands still
+  // missing pairs entirely (too far off to name a specific tile yet); an
+  // empty result there is treated as "too speculative for v1" and the whole
+  // estimate is skipped below, same posture as Dragon Pung's own
+  // concealedCount === 0 skip.
+  const tilesNeeded = (Object.entries(counts) as [TileTypeId, number][])
+    .filter(([, count]) => count === 2)
+    .map(([id]) => id)
+    .sort()
+
+  const status: 'locked' | 'inProgress' = shanten < 0 ? 'locked' : 'inProgress'
+  if (status === 'inProgress' && tilesNeeded.length === 0) return null
+
+  // Worst case for a fresh, meldless hand is shanten 8 (n=4, zero pung/pair
+  // blocks available); the additive formula's own "8 - 2*meldCount" baseline
+  // scales that worst case down as melds accumulate, so the same proportion
+  // is used as the denominator here rather than a fixed constant.
+  const worst = 8 - 2 * hand.melds.length
+  const completionProbability = status === 'locked' ? 1 : clamp01((worst - shanten) / (worst + 1))
+  return { fanId, points, status, tilesNeeded: status === 'locked' ? [] : tilesNeeded, completionProbability, probabilityBasis: 'shanten', value: completionProbability * points }
+}
+
+// 60. Prevalent Wind — 2 pts. §3.8.1 p.16 / App.1 p.39: "A Pung or Kong of
+// the Wind Tile that matches the current Prevalent (round) Wind." / 61. Seat
+// Wind — 2 pts. §3.8.1 p.16 / App.1 p.39: "A Pung or Kong of the Wind Tile
+// that matches the player's own Seat Wind." (Same citations
+// scoring/fans-2.ts's real detectPrevalentWind/detectSeatWind already use.)
+// Needs context — silently produces nothing for whichever wind isn't
+// supplied, same undefined-safe posture as the real detectors' own
+// `!ctx.prevailingWind`/`!ctx.seatWind` guards.
+//
+// probabilityBasis: 'heuristic' per the Stage 3 design's own classification
+// (KICKOFF-phase10-strategy-coach.md) — a single named wind is simpler to
+// treat with this file's general per-family formula style than to build
+// Dragon Pung's shared multi-unit scan for just one target tile each.
+// completionProbability is simply currentCount/3 (an exact discrete count,
+// same shape as Dragon Pung's own formula) — still filed under 'heuristic'
+// because, unlike Dragon Pung/Big Three Dragons, there's no multi-unit
+// "how many of N are already done" structure backing it, just a single
+// count; decisions.md #35 covers the classification rationale.
+function windTarget(hand: Hand, wind: Wind | undefined, fanId: 60 | 61): FanTargetEstimate | null {
+  if (!wind) return null
+  const targetType = windTypeId(wind)
+  const concealedCount = groupConcealedByType(hand.concealedTiles)[targetType] ?? 0
+  const isMeldedPung = hand.melds.some((m) => m.kind !== 'chow' && meldTileTypeId(m) === targetType)
+  const points = FAN_REGISTRY[fanId]!.points
+
+  if (isMeldedPung || concealedCount >= 3) {
+    return { fanId, points, status: 'locked', tilesNeeded: [], completionProbability: 1, probabilityBasis: 'heuristic', value: points }
+  }
+  if (concealedCount === 0) return null // too speculative for v1, same posture as Dragon Pung
+  const completionProbability = clamp01(concealedCount / 3)
+  return { fanId, points, status: 'inProgress', tilesNeeded: [targetType], completionProbability, probabilityBasis: 'heuristic', value: completionProbability * points }
+}
+
+export function estimateWindTargets(hand: Hand, context: WinCircumstanceContext = {}): FanTargetEstimate[] {
+  const results = [windTarget(hand, context.prevailingWind, 60), windTarget(hand, context.seatWind, 61)]
+  return results.filter((e): e is FanTargetEstimate => e !== null)
+}
+
+// 68. All Simples — 2 pts. §3.8.1 p.16 / App.1 p.40: "A hand formed entirely
+// without Terminal or Honor tiles." / 76. No Honors — 1 pt. §3.8.1 p.16 /
+// App.1 p.41: "A hand formed entirely of suit tiles, without Winds or
+// Dragons." (Same citations scoring/fans-2.ts's detectAllSimples and
+// scoring/fans-1.ts's detectNoHonors already use.) One shared tile-
+// membership scan feeding both — All Simples is strictly narrower (bans
+// terminals too), but they're kept as two separate estimates since a hand
+// can be legitimately working toward either independently (e.g. a hand
+// with a locked terminal chow can still reach No Honors but never All
+// Simples).
+//
+// probabilityBasis: 'heuristic' (decisions.md #35) — same "offending tiles
+// relative to hand size" formula as Half/Full Flush.
+export function estimateSimplesAndHonors(hand: Hand): FanTargetEstimate[] {
+  const meldTypeIds = hand.melds.flatMap((m) => m.tiles.map(typeIdOfInstance))
+  const meldHasHonor = meldTypeIds.some(isHonorTypeId)
+  const meldHasTerminal = meldTypeIds.some(isTerminalTypeId)
+
+  const concealedTypeIds = hand.concealedTiles.map(typeIdOfInstance)
+  const denominator = concealedTypeIds.length || 1
+  const results: FanTargetEstimate[] = []
+
+  if (!meldHasHonor) {
+    const fanId = 76
+    const points = FAN_REGISTRY[fanId]!.points
+    const tilesNeeded = [...new Set(concealedTypeIds.filter(isHonorTypeId))].sort()
+    const status: 'locked' | 'inProgress' = tilesNeeded.length === 0 ? 'locked' : 'inProgress'
+    const completionProbability = clamp01(1 - tilesNeeded.length / denominator)
+    results.push({ fanId, points, status, tilesNeeded, completionProbability, probabilityBasis: 'heuristic', value: completionProbability * points })
+  }
+
+  if (!meldHasHonor && !meldHasTerminal) {
+    const fanId = 68
+    const points = FAN_REGISTRY[fanId]!.points
+    const tilesNeeded = [...new Set(concealedTypeIds.filter((id) => isHonorTypeId(id) || isTerminalTypeId(id)))].sort()
+    const status: 'locked' | 'inProgress' = tilesNeeded.length === 0 ? 'locked' : 'inProgress'
+    const completionProbability = clamp01(1 - tilesNeeded.length / denominator)
+    results.push({ fanId, points, status, tilesNeeded, completionProbability, probabilityBasis: 'heuristic', value: completionProbability * points })
+  }
+
+  return results
+}
+
 // Aggregates every family's estimate into one flat, sorted list. No fixed
 // cap here — "top N for display" is a UI-layer decision for the later
 // panel-composition step (KICKOFF-phase10-strategy-coach.md's Stage 3
 // design, "Not solving in the engine layer"), not baked in here.
-export function estimateFanTargets(hand: Hand): FanTargetEstimate[] {
-  const estimates: (FanTargetEstimate | null)[] = [estimateSevenPairs(hand), estimateHalfFullFlush(hand), ...estimateDragonTargets(hand)]
+export function estimateFanTargets(hand: Hand, context: WinCircumstanceContext = {}): FanTargetEstimate[] {
+  const estimates: (FanTargetEstimate | null)[] = [
+    estimateSevenPairs(hand),
+    estimateAllPungs(hand),
+    estimateHalfFullFlush(hand),
+    ...estimateDragonTargets(hand),
+    ...estimateWindTargets(hand, context),
+    ...estimateSimplesAndHonors(hand),
+  ]
   return estimates.filter((e): e is FanTargetEstimate => e !== null).sort((a, b) => b.value - a.value)
 }
