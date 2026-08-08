@@ -479,7 +479,7 @@ export interface BoardRegions {
 }
 
 // Vertical bands (top to bottom), fixed regardless of designWidth — sum to
-// STAGE_HEIGHT exactly: 14 + 80 + 24 + 500 + 24 + 140 + 14 = 796.
+// STAGE_HEIGHT exactly: 14 + 80 + 12 + 524 + 12 + 140 + 14 = 796.
 // North reserves exactly one 80px playing-tile row. Its uncommon flowers
 // are an overlay below the wall, so an empty flower tray never steals a
 // permanent row from the discard field.
@@ -495,8 +495,13 @@ export const RAIL_PX = 14
 
 const HEADER_H = RAIL_PX
 const NORTH_LINE_H = 80
-const WALL_H = 24
-const FIELD_H = 500
+// One physical tile course is enough to frame the discard field. The old
+// 24px/two-course wall spent scarce edge space on decoration and left the
+// side racks almost touching the outer table rail, especially on iPad.
+const WALL_H = 12
+// Reclaim the two removed horizontal courses for the playing field while
+// keeping the human and north bands, and the stage height, unchanged.
+const FIELD_H = 524
 const HUMAN_ROW_H = 140
 const NORTH_HEADER_Y = 0
 const NORTH_LINE_Y = NORTH_HEADER_Y + HEADER_H
@@ -515,9 +520,13 @@ const HUMAN_HEADER_Y = HUMAN_ROW_Y + HUMAN_ROW_H
 //
 // Two rotated columns hold the 18-tile main-hand maximum at 161px
 // (2*80+1). Flowers share this same footprint at the bottom, so they add no
-// third column. The recovered side width belongs to the discard field.
-const SIDE_WIDTH = 169
-const SIDE_OUTER_INSET = 4
+// third column. The playing width stays fixed; only its edge inset changes.
+// Keep the discard field's horizontal boundaries stable, but spend the
+// 12px recovered from each side wall on rail clearance for the side racks.
+// The rack therefore moves inward from 4px to 16px without losing any of
+// its 161px two-column tile capacity.
+const SIDE_WIDTH = 181
+const SIDE_OUTER_INSET = 16
 const SIDE_MAIN_WIDTH = 161
 // The side tray extends down into the otherwise unused outer edge of the
 // human band. At 188px it can pack all eight rotated flower/season tiles at

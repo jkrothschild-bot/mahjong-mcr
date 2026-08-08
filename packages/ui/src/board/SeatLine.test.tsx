@@ -7,13 +7,12 @@ import { SeatLine } from './SeatLine.js'
 
 const TEST_REGION: Rect = { x: 0, y: 0, width: 400, height: 200 }
 
-// The REAL west/east seat line geometry (stageLayout.ts's SIDE_WIDTH 176 and
-// SIDE_LINE_H 600). The generous TEST_REGION above is fine for tests that
+// The real west/east seat line geometry. The generous TEST_REGION above is fine for tests that
 // only care about which tiles render, but anything asserting column packing
 // or worst-case fit has to use the actual budget — that budget is the whole
 // question.
-const SIDE_REGION: Rect = { x: 4, y: 5, width: 161, height: 613 }
-const SIDE_FLOWER_REGION: Rect = { x: 4, y: 572, width: 161, height: 188 }
+const SIDE_REGION: Rect = { x: 16, y: 5, width: 161, height: 625 }
+const SIDE_FLOWER_REGION: Rect = { x: 16, y: 572, width: 161, height: 188 }
 
 // Positioned writes the placed box inline on its own wrapper, so the
 // wrapper's style IS the layout.

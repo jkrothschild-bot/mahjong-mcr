@@ -36,7 +36,7 @@ export function GameEventAnnouncement({ announcement }: GameEventAnnouncementPro
             >
               {announcement.title}
             </div>
-            <span className="sr-only">{announcement.detail}</span>
+            <div className="mt-2 text-sm font-medium text-neutral-200">{announcement.detail}</div>
           </div>
         </motion.div>
       )}

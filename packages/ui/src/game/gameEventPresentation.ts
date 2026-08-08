@@ -1,4 +1,5 @@
-import type { Action, GameState } from '@mahjong-mcr/engine'
+import { typeIdOfInstance, type Action, type GameState } from '@mahjong-mcr/engine'
+import { tileDisplayName } from '../board/tileNames.js'
 import type { SoundEffect, SpokenCall } from '../audio/soundEffects.js'
 import { seatDisplayName } from './seatDisplayName.js'
 import { HUMAN_SEAT } from './humanSeat.js'
@@ -27,6 +28,33 @@ function idFor(action: Action, state: GameState): string {
   return `${state.seed}-${state.handNumber}-${action.seq}-${action.type}`
 }
 
+function verbFor(claimType: 'chow' | 'pung' | 'kong'): string {
+  return claimType === 'chow' ? 'chowed' : claimType === 'pung' ? 'ponged' : 'konged'
+}
+
+// The single source of user-facing action phrasing. The former CallOutToast
+// established this wording; the prominent announcement reuses it so actor,
+// action and tile context cannot drift between presentation components.
+export function describeAction(action: Action, state: GameState): string | null {
+  const actor = seatDisplayName(action.seat, state)
+  switch (action.type) {
+    case 'claim': {
+      const fromWhom = action.fromSeat === HUMAN_SEAT ? 'your' : `${seatDisplayName(action.fromSeat, state)}'s`
+      return `${actor} ${verbFor(action.claimType)} ${fromWhom} ${tileDisplayName(typeIdOfInstance(action.claimedTile))}`
+    }
+    case 'concealedKong':
+      return `${actor} declared a concealed kong of ${tileDisplayName(typeIdOfInstance(action.tiles[0]!))}`
+    case 'addedKong':
+      return `${actor} added ${tileDisplayName(typeIdOfInstance(action.addedTile))} to make a kong`
+    case 'win':
+      return `${actor} won the hand!`
+    case 'robKongWin':
+      return `${actor} robbed the kong to win!`
+    default:
+      return null
+  }
+}
+
 export function presentGameAction(action: Action, state: GameState): PresentedGameAction {
   const actor = seatDisplayName(action.seat, state)
   switch (action.type) {
@@ -40,7 +68,7 @@ export function presentGameAction(action: Action, state: GameState): PresentedGa
           kind: 'claim',
           title,
           actor,
-          detail: `${actor} claims`,
+          detail: describeAction(action, state)!,
           durationMs: CLAIM_ANNOUNCEMENT_MS,
           meldId: action.meldId,
         },
@@ -56,7 +84,7 @@ export function presentGameAction(action: Action, state: GameState): PresentedGa
           kind: 'claim',
           title: 'KONG',
           actor,
-          detail: `${actor} declares`,
+          detail: describeAction(action, state)!,
           durationMs: CLAIM_ANNOUNCEMENT_MS,
           meldId: action.meldId,
         },
@@ -71,7 +99,7 @@ export function presentGameAction(action: Action, state: GameState): PresentedGa
           kind: 'mahjong',
           title: 'MAHJONG!',
           actor,
-          detail: `${actor} wins the hand`,
+          detail: describeAction(action, state)!,
           durationMs: MAHJONG_ANNOUNCEMENT_MS,
         },
         sound: 'mahjong',

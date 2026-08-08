@@ -73,6 +73,14 @@ describe('game-event presentation', () => {
 
     expect(screen.getByTestId('game-event-announcement')).toHaveTextContent(title)
     expect(screen.getByTestId('game-event-announcement')).toHaveTextContent('South')
+    expect(screen.getByTestId('game-event-announcement')).toHaveTextContent(
+      claimType === 'chow'
+        ? 'South chowed your 2 Characters'
+        : claimType === 'pung'
+          ? 'South ponged your 2 Characters'
+          : 'South konged your 2 Characters',
+    )
+    expect(screen.getByText(/South (?:chowed|ponged|konged) your 2 Characters/)).not.toHaveClass('sr-only')
     // The action is already fully applied; presentation does not hold the
     // state in a claim window or wait for its own animation to finish.
     expect(claimed.phase).toBe('awaitingDiscard')

@@ -87,6 +87,17 @@ export function serializeSettings(settings: Settings): string {
   return JSON.stringify(settings)
 }
 
+// Event-time read used by the application-wide audio unlock boundary. It
+// deliberately reads storage afresh so toggling sound in the game takes
+// effect without introducing a second Settings state owner above routing.
+export function storedSoundEffectsEnabled(): boolean {
+  try {
+    return loadSettings(window.localStorage.getItem(STORAGE_KEY)).soundEffects
+  } catch {
+    return DEFAULT_SETTINGS.soundEffects
+  }
+}
+
 export interface UseSettingsResult {
   settings: Settings
   update: (patch: Partial<Settings>) => void

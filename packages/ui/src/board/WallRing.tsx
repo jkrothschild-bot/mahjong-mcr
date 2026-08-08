@@ -30,28 +30,24 @@ const TILE_COURSE_BASE: CSSProperties = {
     'inset 0 2px 1px rgba(255,255,235,0.9), inset 0 -3px 3px rgba(92,49,20,0.38), 0 2px 3px rgba(0,0,0,0.42)',
 }
 
-// Two independently offset courses make the wall read as stacked physical
-// tiles rather than one striped ribbon. Each course has an ivory face,
-// bevelled top/bottom edges and a dark grout line between individual tiles.
+// A single slim course frames the playing field without consuming the edge
+// space needed by the side racks. It retains the ivory face, bevelled edges
+// and dark grout lines that make the strip read as individual wall tiles.
 function WallSegment({ orientation, edge }: { orientation: 'horizontal' | 'vertical'; edge: string }) {
   const horizontal = orientation === 'horizontal'
-  const courseStyle = (offset: boolean): CSSProperties => ({
+  const courseStyle: CSSProperties = {
     ...TILE_COURSE_BASE,
     backgroundImage: horizontal
       ? 'repeating-linear-gradient(90deg, transparent 0 20px, rgba(78,43,20,0.78) 20px 22px)'
       : 'repeating-linear-gradient(0deg, transparent 0 20px, rgba(78,43,20,0.78) 20px 22px)',
-    backgroundPosition: offset ? (horizontal ? '11px 0' : '0 11px') : '0 0',
-  })
+  }
 
   return (
     <div
       data-testid={`wall-segment-${edge}`}
-      className={`flex h-full w-full overflow-hidden rounded-[3px] bg-amber-950/80 p-px shadow-[0_3px_5px_rgba(0,0,0,0.5)] ${
-        horizontal ? 'flex-col' : 'flex-row'
-      }`}
+      className="flex h-full w-full overflow-hidden rounded-[3px] bg-amber-950/80 p-px shadow-[0_3px_5px_rgba(0,0,0,0.5)]"
     >
-      <div data-testid={`wall-course-${edge}-outer`} className="min-h-0 min-w-0 flex-1" style={courseStyle(false)} />
-      <div data-testid={`wall-course-${edge}-inner`} className="min-h-0 min-w-0 flex-1" style={courseStyle(true)} />
+      <div data-testid={`wall-course-${edge}`} className="h-full w-full min-h-0 min-w-0" style={courseStyle} />
     </div>
   )
 }

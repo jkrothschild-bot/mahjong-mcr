@@ -32,7 +32,7 @@ nothing pointed at any more.
 | Milestones | `PLAN.md §2` | M0–M6 and M8 complete, M7 ongoing |
 | **UI / layout deferrals** | **§A below** | **New — these had no home** |
 | **Cleanup sequence & lanes** | **§E below** | **Active — Phases 0-1 done 2026-08-07, start Phase 2** |
-| **Found mid-cleanup, not worked** | **§F below** | **1 item (2026-08-08) — call-out tile-name regression** |
+| **Found mid-cleanup, not worked** | **§F below** | **Empty as of 2026-08-08** |
 
 ---
 
@@ -222,6 +222,10 @@ directly with a date, the same way item 1 already was.
   `useReducedMotion`; `SettingsPanel.tsx` exposes a tile-animation toggle. §12 now says so.
   `PLAN.md §2` gained the M8 entry `HandTiles.tsx:120`'s comment referenced but that the
   milestone list itself never had.
+- **~~§C5 — claim call-out tile naming regression.~~ ✅ fixed 2026-08-08.**
+  `GameEventAnnouncement` now visibly renders the shared `describeAction()` wording,
+  restoring actor, action, source and claimed-tile context while retaining the prominent
+  announcement and sound.
 
 Leaving these reading as open is not harmless — it is what makes a long-lived checklist stop
 being trusted, and it inflates the apparent size of the remaining work.
@@ -414,16 +418,8 @@ surfacing); the 2000-seed self-play re-test (only if Stage 2 reopens the questio
 Append here and keep going. Nothing in this section gets fixed during the cleanup pass; it is
 triaged after §E completes. An empty section means the pass stayed in scope.
 
-- **`GameEventAnnouncement` no longer names the claimed tile — a regression against
-  `SPEC.md §5`'s claim call-out requirement** (found 2026-08-08, committing
-  `feat/landing-auth-persistence`, out of scope for that pass to fix). `SPEC.md §5` requires
-  "a one-line explanation (\"West ponged your 5-dot\")"; the removed `CallOutToast`'s
-  `describeAction()` produced exactly that (verb + claimant + tile name). Its replacement,
-  `GameEventAnnouncement`, shows only the actor and action visually (e.g. "WEST" / "PUNG") —
-  `gameEventPresentation.ts`'s `detail` field (`"${actor} claims"`) carries no tile name
-  either, and is `sr-only` besides. No document referenced `CallOutToast` by name (checked), so
-  nothing needs correcting there, but the behavior itself needs restoring. See commit
-  `7cb45c9`'s own message on `feat/landing-auth-persistence` for the full comparison.
+No untriaged findings remain as of 2026-08-08. The claim call-out regression found here was
+fixed and closed as §C5 above.
 
 ---
 

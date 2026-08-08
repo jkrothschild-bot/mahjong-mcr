@@ -27,7 +27,6 @@ import { useAnalytics } from './analytics/AnalyticsContext.js'
 import { trackSafely } from './analytics/AnalyticsService.js'
 import { HomeIcon } from './components/HomeIcon.js'
 import { LogoutIcon } from './components/LogoutIcon.js'
-import { soundEffectsPlayer } from './audio/soundEffects.js'
 import { MAHJONG_ANNOUNCEMENT_MS } from './game/gameEventPresentation.js'
 
 export interface AppProps {
@@ -197,11 +196,7 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
         matching CLAUDE.md's no-scroll rule now that GameStage's fit-to-
         available-space logic is the thing actually responsible for making
         content fit, rather than manually-tuned per-component pixel budgets. */}
-    <div
-      className="h-svh overflow-hidden bg-neutral-900 text-neutral-100 flex flex-col"
-      onPointerDownCapture={() => { if (settings.soundEffects) soundEffectsPlayer.unlock() }}
-      onKeyDownCapture={() => { if (settings.soundEffects) soundEffectsPlayer.unlock() }}
-    >
+    <div className="h-svh overflow-hidden bg-neutral-900 text-neutral-100 flex flex-col">
       <header className="flex items-center overflow-hidden border-b border-neutral-700 px-4 py-1">
         <div className="relative z-10 flex shrink-0 items-center gap-2 bg-neutral-900 pr-2">
           <button type="button" aria-label={homePending ? 'Saving and returning home' : 'Home'} title="Home" disabled={homePending || logoutPending} onClick={() => void leaveToHome()} className="inline-grid size-11 shrink-0 place-items-center rounded-md border border-neutral-600 hover:bg-neutral-800 disabled:opacity-60"><HomeIcon className="size-5" /></button>

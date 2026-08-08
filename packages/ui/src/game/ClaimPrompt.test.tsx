@@ -83,9 +83,15 @@ describe('ClaimPrompt', () => {
 
     expect(screen.getByRole('dialog', { name: 'Claim this discard' })).toHaveClass('border-2', 'border-amber-300')
     const positioner = screen.getByRole('dialog', { name: 'Claim this discard' }).parentElement!
-    expect(positioner.className).toContain('left-3')
+    expect(positioner.className).toContain('left-1/2')
+    expect(positioner.className).toContain('top-1/2')
+    expect(positioner.className).toContain('-translate-x-1/2')
+    expect(positioner.className).toContain('-translate-y-1/2')
     expect(positioner.className).not.toContain('inset-0')
-    expect(positioner.className).toContain('bottom-[clamp(10rem,24vh,14rem)]')
+    const claimedTile = screen.getByTestId('claim-prompt-tile')
+    expect(claimedTile.className).toContain('relative')
+    expect(claimedTile.className).toContain('overflow-hidden')
+    expect(claimedTile.className).toContain('h-[59.4px]')
     expect(screen.getByRole('heading', { name: 'Claim this discard?' })).toBeInTheDocument()
     expect(screen.getByText(/discarded/)).toHaveTextContent('North discarded 5 Characters')
     expect(screen.getByRole('button', { name: 'Win' })).toBeInTheDocument()

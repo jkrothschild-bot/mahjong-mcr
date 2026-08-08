@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { legalMoves, typeIdOfInstance, type GameState, type Move, type PendingClaim } from '@mahjong-mcr/engine'
 import { tileDisplayName } from '../board/tileNames.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
+import { tileFaceCompactClassName } from '../tiles/tileStyles.js'
 import { HUMAN_SEAT } from './humanSeat.js'
 import { seatDisplayName } from './seatDisplayName.js'
 
@@ -69,22 +70,23 @@ export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps
   const claimedName = tileDisplayName(claimedType)
   const discarder = seatDisplayName(pendingClaim.fromSeat, state)
 
-  // Fixed, raised bottom-left card — not an in-flow block. Every other
+  // Fixed, table-centred card — not an in-flow block. Every other
   // overlay in the app (ScoreScreen, TileCountGrid, etc.) uses fixed
   // positioning and is correctly excluded from document flow; this one used
   // to render as a normal <main> child instead, so its ~70px of real height
   // added directly to the page whenever a claim window opened, which alone
   // was enough to overflow the iPad viewport (found via live play — a claim
   // window appearing just 4 rounds into a fresh hand, no cumulative discard
-  // buildup needed, already pushed the page 75px past the viewport). The
+  // buildup needed, already pushed the page 75px past the viewport).
   // The card is deliberately NOT nested in a full-viewport pointer-events
   // wrapper. That pattern left touch hit-testing dependent on a descendant
   // re-enabling pointer events beneath a disabled ancestor. Giving the card
   // its own fixed box is both more reliable on iPad and leaves the human's
-  // hand unobstructed below it.
+  // hand unobstructed below it. A direct 50%/50% anchor places the decision
+  // over the table centre without a screen-sized backdrop or hit target.
   return (
     <div
-      className="fixed bottom-[clamp(10rem,24vh,14rem)] left-3 z-40 w-[min(28rem,calc(100vw-1.5rem))] sm:left-4"
+      className="fixed left-1/2 top-1/2 z-40 w-[min(30rem,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2"
     >
       <div
         role="dialog"
@@ -94,7 +96,11 @@ export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps
         className="w-full touch-manipulation rounded-xl border-2 border-amber-300 bg-neutral-950/97 p-4 shadow-[0_0_30px_rgba(251,191,36,0.34),0_16px_40px_rgba(0,0,0,0.72)] backdrop-blur-sm"
       >
         <div className="flex items-center gap-4">
-          <div className="flex h-[72px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-amber-300 bg-neutral-100 shadow-lg">
+          <div
+            aria-hidden="true"
+            data-testid="claim-prompt-tile"
+            className={tileFaceCompactClassName({ extra: 'pointer-events-none ring-2 ring-amber-300 shadow-lg' })}
+          >
             <TileFaceContent typeId={claimedType} />
           </div>
           <div className="min-w-0 flex-1">

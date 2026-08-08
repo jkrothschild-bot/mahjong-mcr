@@ -39,12 +39,27 @@ function audioContextConstructor(): AudioContextConstructor | undefined {
   return window.AudioContext ?? (window as Window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext
 }
 
+function requiresSpeechPrimer(): boolean {
+  if (typeof navigator === 'undefined') return false
+  // iPadOS 13+ can identify itself as macOS when "Request Desktop Website"
+  // is enabled, so touch capability is the reliable second half of this
+  // check. Other desktop browsers must not receive the silent primer: some
+  // Chromium versions leave a zero-volume utterance at the head of the
+  // queue and never reach the real claim word behind it.
+  return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // Original, generated-at-runtime audio: a very short filtered impact plus
 // three inharmonic resonances approximates two hard ceramic tiles touching.
 // There are no downloaded assets, licence concerns, network requests, or
 // decoding delays.
 export function createSoundEffectsPlayer(): SoundEffectsPlayer {
   let context: AudioContext | null = null
+  let speechPrimed = false
+  // WebKit can release a locally-scoped utterance before it starts on a
+  // busy page. Retain each one until Safari reports completion or failure.
+  const activeUtterances = new Set<SpeechSynthesisUtterance>()
 
   function getContext(): AudioContext | null {
     if (context) return context
@@ -58,9 +73,41 @@ export function createSoundEffectsPlayer(): SoundEffectsPlayer {
     }
   }
 
+  function speakRetained(utterance: SpeechSynthesisUtterance, onError?: () => void) {
+    const synthesis = window.speechSynthesis
+    const release = () => activeUtterances.delete(utterance)
+    utterance.onend = release
+    utterance.onerror = () => {
+      release()
+      onError?.()
+    }
+    activeUtterances.add(utterance)
+    if (synthesis.paused) synthesis.resume()
+    synthesis.speak(utterance)
+  }
+
+  function primeSpeech() {
+    if (!requiresSpeechPrimer() || speechPrimed || typeof window === 'undefined' || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return
+    try {
+      // iPad Safari requires speech playback to be initialized from a real
+      // user gesture. Queueing an inaudible non-breaking space here opens
+      // that path; later claim calls may then occur from game-loop effects.
+      window.speechSynthesis.getVoices()
+      const primer = new SpeechSynthesisUtterance('\u00a0')
+      primer.lang = 'en-US'
+      primer.rate = 10
+      primer.volume = 0
+      speechPrimed = true
+      speakRetained(primer, () => { speechPrimed = false })
+    } catch {
+      speechPrimed = false
+    }
+  }
+
   function unlock() {
     const audioContext = getContext()
     if (audioContext?.state === 'suspended') void audioContext.resume().catch(() => {})
+    primeSpeech()
   }
 
   function scheduleImpact(audioContext: AudioContext, impact: Impact) {
@@ -137,7 +184,7 @@ export function createSoundEffectsPlayer(): SoundEffectsPlayer {
       // Kept deliberately below the ceramic impacts so a spoken call adds
       // character without jumping out of the device speakers.
       utterance.volume = 0.48
-      window.speechSynthesis.speak(utterance)
+      speakRetained(utterance)
     } catch {
       // Voice availability varies by browser/device and is never required
       // to understand the visual claim announcement.

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { InfoPage } from '../pages/InfoPage.js'
 import { LandingPage } from '../pages/LandingPage.js'
@@ -10,11 +10,23 @@ import { AccountPage } from '../pages/AccountPage.js'
 import { AuthProvider } from '../auth/AuthContext.js'
 import { GuestSaveMigration } from '../components/GuestSaveMigration.js'
 import { AnalyticsProvider } from '../analytics/AnalyticsContext.js'
+import { soundEffectsPlayer, type SoundEffectsPlayer } from '../audio/soundEffects.js'
+import { storedSoundEffectsEnabled } from '../settings/useSettings.js'
 
 const GamePage = lazy(async () => ({ default: (await import('../pages/GamePage.js')).GamePage }))
 
 export function RootApp() {
-  return <BrowserRouter basename={import.meta.env.BASE_URL}><AuthProvider><AnalyticsProvider><GuestSaveMigration /><AppRoutes /></AnalyticsProvider></AuthProvider></BrowserRouter>
+  return <SoundUnlockBoundary><BrowserRouter basename={import.meta.env.BASE_URL}><AuthProvider><AnalyticsProvider><GuestSaveMigration /><AppRoutes /></AnalyticsProvider></AuthProvider></BrowserRouter></SoundUnlockBoundary>
+}
+
+export function SoundUnlockBoundary({ children, player = soundEffectsPlayer }: { children: ReactNode; player?: SoundEffectsPlayer }) {
+  const unlock = () => {
+    if (storedSoundEffectsEnabled()) player.unlock()
+  }
+  // `contents` keeps this event boundary out of every page's layout while
+  // allowing the landing-page Start tap—not merely a later in-game tap—to
+  // satisfy iPad Safari's user-activation requirement.
+  return <div className="contents" onPointerDownCapture={unlock} onKeyDownCapture={unlock}>{children}</div>
 }
 
 export function AppRoutes() {
