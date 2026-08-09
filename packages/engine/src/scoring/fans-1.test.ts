@@ -354,6 +354,47 @@ describe('Wait-type fans (77 Edge, 78 Closed, 79 Single)', () => {
     expect(FANS_1_DETECTORS[78]!(ctx)).toEqual([])
     expect(FANS_1_DETECTORS[79]!(ctx)).toEqual([])
   })
+
+  // BUG FIXTURE (docs/rules/decisions.md #36) — documents the CURRENT, WRONG
+  // behavior so the suite stays green until the fix lands in its own commit,
+  // per CLAUDE.md's fixture-before-fix rule.
+  //
+  // classifyWait guards with `if (!ctx.winningTile ...)`. TileInstanceId is a
+  // 0-based index into TILE_TYPE_BY_ID and instance 0 is a REAL tile (the
+  // first physical copy of C1), so `!0 === true` makes the guard treat a
+  // perfectly valid winning tile as absent. Result: all three wait fans
+  // silently vanish for that one tile, and the SAME hand scores differently
+  // depending on which physical copy of a type completed it.
+  //
+  // Worse than a display defect: moves.ts's canDeclareWin gates legality on
+  // `basicPoints >= MINIMUM_POINTS_TO_WIN`, so a hand whose 8th point comes
+  // from a wait fan is REJECTED as an illegal win when the winning tile
+  // happens to be instance 0. See score-hand.test.ts's companion fixture.
+  //
+  // When fixed, both assertions below flip to expect the fan.
+  it('BUG: suppresses the wait fan when the winning tile is physical instance 0', () => {
+    const c1 = idsFor('C1', 2)
+    expect(c1[0]).toBe(0) // the whole point of the fixture — instance 0 is a real C1
+    const concealedTiles = [...c1, ...idsFor('B2', 3), ...idsFor('B8', 3), ...idsFor('D4', 3), ...idsFor('C7', 3)]
+    const decomposition: Decomposition = {
+      pair: 'C1',
+      sets: [
+        { type: 'pung', tiles: ['B2', 'B2', 'B2'] },
+        { type: 'pung', tiles: ['B8', 'B8', 'B8'] },
+        { type: 'pung', tiles: ['D4', 'D4', 'D4'] },
+        { type: 'pung', tiles: ['C7', 'C7', 'C7'] },
+      ],
+    }
+
+    // Winning on instance 1 — the second copy of C1 — correctly gives Single Wait.
+    const withInstance1 = ctxWith({ concealedTiles, decomposition, winningTile: c1[1] })
+    expect(FANS_1_DETECTORS[79]!(withInstance1)).toEqual([{ fanId: 79, count: 1 }])
+
+    // Winning on instance 0 — the first copy of the SAME type, same hand —
+    // wrongly gives nothing. This is the bug.
+    const withInstance0 = ctxWith({ concealedTiles, decomposition, winningTile: c1[0] })
+    expect(FANS_1_DETECTORS[79]!(withInstance0)).toEqual([])
+  })
 })
 
 describe('Self-Drawn (fan 80)', () => {

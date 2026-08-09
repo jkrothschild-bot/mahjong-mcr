@@ -373,6 +373,36 @@ describe('scoreHand — knitted-tile shapes (fans 20/34/35) reach real scoring, 
     }
   })
 
+  // BUG FIXTURE (docs/rules/decisions.md #36) — the whole-hand consequence of
+  // fans-1.ts's `!ctx.winningTile` guard treating physical instance 0 as
+  // absent. Documents the CURRENT, WRONG behavior; flips when the fix lands.
+  //
+  // This is the case that matters: the hand below is worth exactly 8 with its
+  // Single Wait and exactly 7 without, and moves.ts's canDeclareWin gates on
+  // `basicPoints >= MINIMUM_POINTS_TO_WIN`. So the identical hand is a legal
+  // win or an illegal one purely by which physical copy of C1 completed it.
+  it('BUG: the same hand crosses the 8-point minimum or not depending on which physical copy won it', () => {
+    const c1 = idsFor('C1', 2)
+    // Three exposed pungs + one CONCEALED pung (plain tiles) + the pair. The
+    // fourth set is deliberately left concealed so Melded Hand (53) doesn't
+    // fire — it excludes Single Wait via exclusions.ts's [53,79], which would
+    // mask the bug this fixture exists to pin.
+    const concealedTiles = [...c1, ...idsFor('C7', 3)]
+    const melds = [
+      pungMeld('m0', idsFor('B2', 3)),
+      pungMeld('m1', idsFor('B8', 3)),
+      pungMeld('m2', idsFor('D4', 3)),
+    ]
+    const shared = { concealedTiles, melds, winMethod: 'discard' as const }
+
+    // All Pungs (6) + No Honors (1) + Single Wait (1) = 8 — a legal win.
+    expect(scoreHand({ ...shared, winningTile: c1[1] }).basicPoints).toBe(8)
+
+    // Same tiles, same everything, winning tile is instance 0 instead: the
+    // wait fan disappears and the hand falls a point short of the minimum.
+    expect(scoreHand({ ...shared, winningTile: c1[0] }).basicPoints).toBe(7)
+  })
+
   it('a Knitted Straight hand is no longer stuck at Chicken Hand\'s 8-point floor', () => {
     // Before the fix, isWinningHand was false for this exact hand, so it
     // couldn't even be declared a win. Sanity-check the floor didn't just

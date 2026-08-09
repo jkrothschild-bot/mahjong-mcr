@@ -1330,6 +1330,43 @@ corrected to match. See each item's status.
     the umbrella citation for the CLASS of non-rulebook reasoning, matching how item #16 covers
     `defense.ts`'s three signals under one entry rather than three.
 
+36. **`classifyWait`'s falsy-zero guard suppressed all three wait fans for one physical tile
+    (fans 77/78/79) — a real engine bug, found 2026-08-09 by an independent review, NOT by the
+    PyMahjongGB harness's own triage.** `scoring/fans-1.ts`'s `classifyWait` opened with
+    `if (!ctx.winningTile || !ctx.decomposition) return null`. `TileInstanceId` is a 0-based
+    index into `TILE_TYPE_BY_ID` and instance `0` is a real tile — the first physical copy of
+    `C1` — so `!0 === true` made the guard treat a valid winning tile as absent. Whenever the
+    winning tile was that specific copy, Edge Wait (77), Closed Wait (78) and Single Wait (79)
+    all silently failed to fire.
+
+    **Why this is worse than a 1-point display defect:** `moves.ts`'s `canDeclareWin` gates
+    legality on `scoreHand(params).basicPoints >= MINIMUM_POINTS_TO_WIN`, so a hand whose 8th
+    point comes from a wait fan was REJECTED as an illegal win when the winning tile happened to
+    be instance 0. The identical hand was legal or illegal purely by which physical copy
+    completed it — a direct violation of the invariant that a score depends only on tile TYPES
+    plus context. Pinned by `score-hand.test.ts`'s companion fixture (7 vs 8 points on one hand)
+    and `fans-1.test.ts`'s detector-level fixture.
+
+    **Why 559 green tests missed it:** every existing fixture picks its own tile instances via
+    `idsFor`, which naturally allocates low indices for the hand's FIRST-named type — so
+    instance 0 only lands on the winning tile if a fixture happens to make `C1` both the pair
+    and the win, which none did. Unit fixtures cannot systematically reach this class. The check
+    that does is `property.test.ts`'s new `scoring is invariant under physical tile identity`
+    test: re-map every tile in a scored hand to a different physical copy of the same type and
+    assert the score is unchanged. It caught the bug in one run (47 failures / 12,000
+    comparisons, every one traced to this single cause) and went to 0 after the fix.
+
+    **Validation:** full suite green (561 passed, 1 skipped); typecheck clean. PyMahjongGB
+    cross-check rerun for the fans touched per CLAUDE.md — 4,500 hands across three fresh seeds
+    (`20260809`, `777001`, `424242`), `our_bug` 0, `unclassified` 69 → 54, no NEW
+    `our_bug`/UNCLASSIFIED introduced. Note the pre-fix residual on those seeds (69/4500 = 1.53%)
+    matched item #34's recorded 1200-hand rate (18/1200 = 1.5%) almost exactly, which is worth
+    remembering: **a stable unclassified RATE across runs is not evidence of an absent bug.**
+    This one sat inside that residual for two full triage passes, misread as more of the same
+    benign `Single Wait` ↔ `Closed Wait` decomposition ties item #34(a) had already confirmed.
+    The tell that separated it from a genuine tie was the points column, not the fan-name diff:
+    a benign tie has `ours == pmgb` totals, these had `ours == pmgb - 1`.
+
 ## Open follow-up work
 
 - ~~**Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/
