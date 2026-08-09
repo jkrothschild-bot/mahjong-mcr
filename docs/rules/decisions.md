@@ -1427,3 +1427,19 @@ corrected to match. See each item's status.
   examples is a substantially larger task, tracked here rather than folded into M5.
 - Phase 10's 2000-seed self-play regression question (item #18's "State of play" note) — still
   parked; see item #33's own session for whether it was picked up as time-permitting work.
+- **Short Straight (71) and Two Terminal Chows (72) are existence checks, so a hand containing
+  TWO disjoint qualifying pairs of chows scores 1 where the rules give 2** (found 2026-08-09,
+  same review as item #36; deliberately not fixed in that pass to keep its scope to the
+  instance-0 bug). Both detectors in `fans-1.ts` `return [{ fanId, count: 1 }]` on the first
+  match, with the trade-off stated in fan 71's own comment ("counting disjoint pairs would need
+  extra bookkeeping this 1-point fan doesn't seem to warrant"). Unlike most entries here this
+  is NOT a rulebook ambiguity — §3.9.1's Non-Identical Principle (a set used for one fan can't
+  be reused for another) is exactly what makes two disjoint pairs two separate scorings, so the
+  rules-side answer is not in doubt; only whether the bookkeeping is worth 1 point.
+  **Confirmed live, not theoretical:** validation seed `1400279412` (chows D1-2-3 + D4-5-6 AND
+  B3-4-5 + B6-7-8) scores 4 against PyMahjongGB's 5. Genuinely rare — across 4,500 hands the
+  aggregate was Short Straight 250 vs 251, i.e. exactly one hand — so low priority as a POINTS
+  defect. Worth weighing differently as a TEACHING defect: this project's whole purpose is
+  showing a learner the correct fan breakdown, and a knowingly-wrong count is a different
+  category of wrong from a rare one. Fix would be a maximum-disjoint-pairing count over the
+  chow multiset, same shape as the per-rank counting fans 69/70 already do.
