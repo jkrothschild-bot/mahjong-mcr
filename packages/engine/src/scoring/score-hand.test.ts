@@ -373,15 +373,15 @@ describe('scoreHand — knitted-tile shapes (fans 20/34/35) reach real scoring, 
     }
   })
 
-  // BUG FIXTURE (docs/rules/decisions.md #36) — the whole-hand consequence of
-  // fans-1.ts's `!ctx.winningTile` guard treating physical instance 0 as
-  // absent. Documents the CURRENT, WRONG behavior; flips when the fix lands.
+  // REGRESSION FIXTURE (docs/rules/decisions.md #36) — the whole-hand
+  // consequence of fans-1.ts's old `!ctx.winningTile` guard treating physical
+  // instance 0 as absent.
   //
-  // This is the case that matters: the hand below is worth exactly 8 with its
+  // This is the case that mattered: the hand below is worth exactly 8 with its
   // Single Wait and exactly 7 without, and moves.ts's canDeclareWin gates on
-  // `basicPoints >= MINIMUM_POINTS_TO_WIN`. So the identical hand is a legal
-  // win or an illegal one purely by which physical copy of C1 completed it.
-  it('BUG: the same hand crosses the 8-point minimum or not depending on which physical copy won it', () => {
+  // `basicPoints >= MINIMUM_POINTS_TO_WIN`. So the identical hand used to be a
+  // legal win or an illegal one purely by which physical copy of C1 won it.
+  it('scores the same hand identically whichever physical copy is the winning tile', () => {
     const c1 = idsFor('C1', 2)
     // Three exposed pungs + one CONCEALED pung (plain tiles) + the pair. The
     // fourth set is deliberately left concealed so Melded Hand (53) doesn't
@@ -395,12 +395,10 @@ describe('scoreHand — knitted-tile shapes (fans 20/34/35) reach real scoring, 
     ]
     const shared = { concealedTiles, melds, winMethod: 'discard' as const }
 
-    // All Pungs (6) + No Honors (1) + Single Wait (1) = 8 — a legal win.
+    // All Pungs (6) + No Honors (1) + Single Wait (1) = 8 — a legal win,
+    // whichever copy of C1 completed it.
     expect(scoreHand({ ...shared, winningTile: c1[1] }).basicPoints).toBe(8)
-
-    // Same tiles, same everything, winning tile is instance 0 instead: the
-    // wait fan disappears and the hand falls a point short of the minimum.
-    expect(scoreHand({ ...shared, winningTile: c1[0] }).basicPoints).toBe(7)
+    expect(scoreHand({ ...shared, winningTile: c1[0] }).basicPoints).toBe(8)
   })
 
   it('a Knitted Straight hand is no longer stuck at Chicken Hand\'s 8-point floor', () => {

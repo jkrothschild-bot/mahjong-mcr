@@ -206,8 +206,16 @@ type WaitShape = 'edge' | 'closed' | 'single'
 // side), that's Edge Wait. Any other position (the low or high end of a
 // non-terminal chow — an inherently two-sided shape) classifies as none of
 // the three, which is correct: MCR doesn't name a fan for a plain open wait.
+//
+// The `winningTile` guard below MUST stay an explicit `=== undefined` check,
+// never a falsy one: TileInstanceId is a 0-based index into TILE_TYPE_BY_ID,
+// so instance 0 is a real tile (the first physical copy of C1) and `!0` would
+// silently discard it — suppressing all three wait fans for that one copy and
+// making the same hand score differently depending on which physical tile
+// completed it. That was a live bug; see docs/rules/decisions.md #36 and
+// property.test.ts's tile-identity invariance test.
 function classifyWait(ctx: HandContext): WaitShape | null {
-  if (!ctx.winningTile || !ctx.decomposition) return null
+  if (ctx.winningTile === undefined || !ctx.decomposition) return null
   const idx = ctx.concealedTiles.indexOf(ctx.winningTile)
   if (idx === -1) return null
   const preWinTiles = ctx.concealedTiles.slice()
