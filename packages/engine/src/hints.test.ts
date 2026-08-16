@@ -298,22 +298,30 @@ describe('computeHandPlan', () => {
 })
 
 describe('computeRouteToPoints', () => {
-  it('warns when nothing reaches the 8-point minimum', () => {
-    // Same "too speculative" scattered hand as fan-targets.test.ts's
-    // estimateAllPungs fixture — 13 distinct singles, nothing close to any target.
+  // Same "too speculative" scattered hand as fan-targets.test.ts's
+  // estimateAllPungs fixture — 13 distinct singles, nothing close to any
+  // target. Pre-tenpai (shanten far from 0, no waits at all), so
+  // computeHandPlan has no tenpai-exact answer to fall back on either — this
+  // MUST land on 'unknown', not 'unreachable'. Asserting 'unreachable' here
+  // would be exactly the bug this fix exists to prevent: "none of the 10
+  // Stage 3 families reaches 8" is not the same claim as "this hand cannot
+  // reach 8" — a hand this far from tenpai can still complete via a family
+  // Stage 3 never modeled (Pure/Mixed Straight, Chicken Hand, ...).
+  it('is unknown pre-tenpai when no Stage 3 family has a route yet', () => {
     const hand = handWith([
       ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
       ...idsFor('D1', 1), ...idsFor('D4', 1), ...idsFor('D7', 1),
       ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
       ...idsFor('WE', 1), ...idsFor('WS', 1), ...idsFor('WW', 1), ...idsFor('WN', 1),
     ])
+    const plan = computeHandPlan(hand)
+    expect(plan.bestCaseReachesMinimum).toBeNull() // pre-tenpai: no tenpai-exact answer exists
     const result = computeRouteToPoints(hand)
-    expect(result.reachesMinimum).toBe(false)
-    expect(result.warning).toBe(true)
+    expect(result.minimumPointsStatus).toBe('unknown')
     expect(result.bestCaseTotal).toBeLessThan(8)
   })
 
-  it('does not warn once a real candidate clears the minimum on its own', () => {
+  it('is reachable once a real candidate clears the minimum on its own', () => {
     // Two dragon pungs sitting CONCEALED (never declared as melds), plus a
     // partial third — lockedInFansFromMelds sees nothing (melds-only), but
     // estimateDragonTargets recognizes the concealed pungs and offers Big
@@ -323,10 +331,74 @@ describe('computeRouteToPoints', () => {
       ...idsFor('C1', 1), ...idsFor('C2', 1), ...idsFor('C3', 1), ...idsFor('C4', 1), ...idsFor('C5', 1),
     ])
     const result = computeRouteToPoints(hand)
-    expect(result.reachesMinimum).toBe(true)
-    expect(result.warning).toBe(false)
+    expect(result.minimumPointsStatus).toBe('reachable')
     expect(result.bestCaseTotal).toBeGreaterThanOrEqual(8)
     expect(result.selected.some((c) => c.fanId === 2)).toBe(true)
+  })
+
+  // The bug this fix exists for, reproduced directly: a tenpai hand where
+  // the 10 Stage 3 families find nothing worth counting (bestCaseTotal stays
+  // at 3, from real locked-in fans alone), but the hand is genuinely tenpai
+  // on a route that clears 8 — Mixed Triple Chow (fan 41, 8pts), deliberately
+  // outside the 10 families (CHANGE 1's own dropped-family list only names
+  // Pure/Mixed Straight explicitly, but the exact same "outside the 10"
+  // reasoning applies to any fan this file never modeled). Two exposed chow
+  // melds in different suits (Dots 4-5-6, Bamboo 1-2-3) structurally rule
+  // out Seven Pairs/All Pungs (chow melds) and Half/Full Flush (2 meld
+  // suits) — this ISN'T a coincidence of estimator generosity, it's a hand
+  // where the families genuinely have nothing to offer. The two-tile
+  // ryanmen wait (Characters 4-5, waiting 3 or 6) is the crux: completing
+  // with 6 continues the SAME 4-5-6 run already present in both melded
+  // suits, forming Mixed Triple Chow for real (11/12pts); completing with 3
+  // breaks that pattern and stays low (4/5pts). Since the two branches don't
+  // share fan 41, computeHandPlan's own lockedInFans (the exact intersection
+  // across every wait) correctly excludes it — this hand is the live proof
+  // that lockedInFans alone (the pre-fix behaviour) is NOT sufficient either;
+  // only bestCaseReachesMinimum's `.some()` semantics catches this route.
+  it('is reachable via the tenpai-exact fallback even when no Stage 3 family or locked-in fan alone accounts for it', () => {
+    const chowDots: Meld = { id: '0-0', kind: 'chow', exposure: 'exposed', tiles: [...idsFor('D4', 1), ...idsFor('D5', 1), ...idsFor('D6', 1)], ownerSeat: 0 }
+    const chowBamboo: Meld = { id: '0-1', kind: 'chow', exposure: 'exposed', tiles: [...idsFor('B1', 1), ...idsFor('B2', 1), ...idsFor('B3', 1)], ownerSeat: 0 }
+    const hand: Hand = {
+      ...emptyHand(),
+      concealedTiles: [...idsFor('B4', 1), ...idsFor('B5', 1), ...idsFor('B6', 1), ...idsFor('C4', 1), ...idsFor('C5', 1), ...idsFor('C1', 2)],
+      melds: [chowDots, chowBamboo],
+    }
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBe(0)
+    expect(plan.bestCaseReachesMinimum).toBe(true) // the C6 branch alone clears 8
+    expect(plan.lockedInFans.map((f) => f.fanId)).not.toContain(41) // not common to BOTH branches
+
+    const result = computeRouteToPoints(hand)
+    expect(result.bestCaseTotal).toBeLessThan(8) // the 10 families + locked-in fans alone don't reach it
+    expect(result.minimumPointsStatus).toBe('reachable') // but the tenpai-exact fallback correctly does
+  })
+
+  // The other genuinely-grounded state: a tenpai hand where BOTH win methods
+  // score under 8, AND the Stage 3 families correctly find nothing either.
+  // Two exposed pungs in different suits (Characters/Dots, rank 2) block
+  // Seven Pairs (any meld) and Half/Full Flush (2 meld suits) structurally;
+  // the tanki wait on East Wind (a single concealed copy, never count===2)
+  // keeps All Pungs' own estimator from firing too (its tilesNeeded is
+  // built from exact-count-2 types, and this hand has none until it wins).
+  // Unlike the pre-tenpai fixture above, computeHandPlan DOES have a
+  // tenpai-exact answer here, and it's a real, grounded "no" — this is the
+  // one state CLAUDE.md's fixture rule requires never being inferred from
+  // partial family coverage alone.
+  it('is unreachable only when computeHandPlan’s tenpai-exact answer is a grounded no', () => {
+    const pungChar2: Meld = { id: '0-0', kind: 'pung', exposure: 'exposed', tiles: idsFor('C2', 3), ownerSeat: 0 }
+    const pungDot2: Meld = { id: '0-1', kind: 'pung', exposure: 'exposed', tiles: idsFor('D2', 3), ownerSeat: 0 }
+    const hand: Hand = {
+      ...emptyHand(),
+      concealedTiles: [...idsFor('B4', 1), ...idsFor('B5', 1), ...idsFor('B6', 1), ...idsFor('B7', 1), ...idsFor('B8', 1), ...idsFor('B9', 1), ...idsFor('WE', 1)],
+      melds: [pungChar2, pungDot2],
+    }
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBe(0)
+    expect(plan.bestCaseReachesMinimum).toBe(false) // both discard (4pts) and self-draw (5pts) stay under 8
+
+    const result = computeRouteToPoints(hand)
+    expect(result.bestCaseTotal).toBeLessThan(8)
+    expect(result.minimumPointsStatus).toBe('unreachable')
   })
 
   it('filters directionally-incompatible candidates not covered by exclusions.ts (Half Flush vs All Simples/No Honors)', () => {
@@ -348,7 +420,8 @@ describe('computeRouteToPoints', () => {
     expect(selectedFanIds).toContain(50)
     expect(selectedFanIds).not.toContain(68)
     expect(selectedFanIds).not.toContain(76)
-    expect(result.reachesMinimum).toBe(false)
+    expect(result.bestCaseTotal).toBeLessThan(8)
+    expect(result.minimumPointsStatus).toBe('unknown') // pre-tenpai — no grounds to assert 'unreachable'
   })
 
   it('filters mutually-exclusive candidates out of the greedy sum (All Simples vs No Honors, exclusions.ts [68,76])', () => {

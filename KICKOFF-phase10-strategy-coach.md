@@ -552,6 +552,86 @@ check, so a partial lock-in doesn't block a legitimate next increment.
 Whoever picks this up next should decide the approach before touching
 `computeRouteToPoints` again.
 
+**Tri-state `warning`/`reachesMinimum` bug found and fixed, 2026-08-16, on
+`feat/phase10-stage3` (not yet merged to `main`).** `computeRouteToPoints`
+called `computeHandPlan(hand, context)` but destructured only
+`.lockedInFans` from the result, discarding `.bestCaseReachesMinimum` — at
+tenpai, the EXACT answer, derived from `computeWaits` over the real
+`scoreHand`, covering every one of the 81 fans (including fan 43 Chicken
+Hand, `scoring/score-hand.ts`'s zero-fan 8-point floor). `warning`/
+`reachesMinimum` were instead derived purely from `bestCaseTotal` — the
+10-family greedy approximation — so `warning: true` asserted "this hand
+cannot reach 8 points" when it actually meant only "none of the 10 Stage 3
+families reaches 8." Confirmed via a constructed repro before any fix
+(`hints.test.ts`'s "is reachable via the tenpai-exact fallback..." test): two
+exposed chow melds (Dots 4-5-6, Bamboo 1-2-3) block Seven Pairs/All
+Pungs/Half-Full Flush structurally, so the 10 families and locked-in fans
+together total only 3 points — yet the hand is genuinely tenpai on a
+ryanmen where one branch scores 11/12 points via Mixed Triple Chow (fan 41,
+8pts, outside all 10 families and not caught by `lockedInFans` either,
+since it's not common to both branches of the wait). Old code would have
+told a learner this hand can never reach 8; it can.
+
+Fixed by replacing the `warning: boolean` / `reachesMinimum: boolean` pair
+with a single `minimumPointsStatus: 'reachable' | 'unreachable' | 'unknown'`
+tri-state on `RouteToPointsResult` (`packages/engine/src/hints.ts`):
+`'reachable'` when either the family-greedy `bestCaseTotal` clears
+`MINIMUM_POINTS_TO_WIN` OR `computeHandPlan`'s `bestCaseReachesMinimum` is
+`true`; `'unreachable'` ONLY when `bestCaseReachesMinimum` is explicitly
+`false` (grounded in the tenpai-exact computation, never inferred from
+partial family coverage); `'unknown'` otherwise — the honest pre-tenpai
+default when no family has found a route yet. Four fixtures added to
+`hints.test.ts`'s `computeRouteToPoints` suite covering all three states,
+including the differential-wait repro above and a genuinely-grounded
+`'unreachable'` tenpai hand (two exposed number pungs in different suits +
+a tanki wait, both win methods scoring under 8, confirmed via
+`computeHandPlan` directly before asserting on `computeRouteToPoints`). The
+pre-existing pre-tenpai "scattered hand" fixture was corrected from
+asserting `warning: true` to asserting `'unknown'` — under the old boolean
+contract this fixture was itself already misusing the pre-fix API's only
+available "no" state for a hand with no grounds to say so; it's pre-tenpai,
+so `computeHandPlan.bestCaseReachesMinimum` is `null`, not `false`.
+
+No changes to `scoring/`, `win-detection.ts`, or `exclusions.ts` — purely an
+orchestration-layer fix in `hints.ts`, so no PyMahjongGB re-run needed (same
+posture as the two bugs recorded above). Full engine suite green (561
+tests, 1 pre-existing skip), typecheck clean.
+
+**A separate, pre-existing defect surfaced while hunting for these
+fixtures, NOT fixed here (out of scope — touching `fan-targets.ts`'s
+estimators was excluded from this pass): the family estimators' own
+"ceiling, not forecast" design (`RouteToPointsResult.bestCaseTotal` sums
+FULL raw points for any candidate with `completionProbability > 0`,
+however small, per that field's own doc comment) makes `bestCaseTotal`
+reach 8+ almost trivially for most non-degenerate hands — e.g. Half/Full
+Flush's heuristic returns a nonzero candidate for nearly any hand with at
+least one suited tile of the majority suit, and Seven Pairs similarly for
+any hand with so much as one pair-forming type, each contributing their
+FULL 6-24 points regardless of how small the probability actually is. This
+made constructing a genuinely-grounded `'unreachable'` tenpai fixture
+require deliberately engineered melds (see above) rather than an ordinary
+hand — an ordinary tenpai hand's family ceiling is very likely to clear 8
+even when the real answer is "no." Worth a deliberate look at whether
+`selected`'s greedy sum should weight by probability, or exclude candidates
+below some floor, before this panel ships to a UI — not decided here.**
+
+**Still-open coverage gap, unchanged by this fix, restated here since the
+fix's own repro fixture leans directly on it:** Stage 3 covers 10 of the
+81 fans. CHANGE 1 (2026-08-07) deliberately dropped Pure Straight (fan 21)
+and Mixed Straight (fan 39) to make room for Big Three Dragons, reasoning
+that a player can see a straight forming unaided more easily than the
+harder-to-eyeball fans kept instead. Knitted shapes (Knitted Straight,
+Lesser/Greater Honors and Knitted Tiles) were never added at all — named
+as "real but rarer" in the original design notes and never revisited.
+Nothing about this pass's fix changes that scope decision; it only makes
+the panel honest about a hand reaching 8 through one of the fans Stage 3
+doesn't model (exactly what this fix's own repro fixture demonstrates via
+Mixed Triple Chow, a fan outside the 10 families for a different reason —
+never in the candidate list at all, dropped or otherwise). Whoever revisits
+Stage 3's family coverage next should decide whether Pure/Mixed Straight
+belong back in, and whether knitted shapes are worth a v2 family, rather
+than this being silently forgotten.
+
 ## Explicitly NOT in this phase (any stage)
 
 - Defense/safety integration into the discard ranking (Tile safety tab

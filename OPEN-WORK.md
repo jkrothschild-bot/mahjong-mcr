@@ -168,6 +168,20 @@ Do not restate these here; follow the link.
   **Open, recorded 2026-08-08, not yet fixed:** `computeRouteToPoints` undercounts Dragon
   Pung (fan 59) — a locked-in partial pung silently blocks a legitimate further unit's
   candidate. See the KICKOFF doc's own note for the confirmed repro and proposed handling.
+  **Fixed 2026-08-16, `code-verified`, on `feat/phase10-stage3` (still not merged):** the
+  CHANGE 3 contract's `warning`/`reachesMinimum` booleans were derived ONLY from the 10-family
+  greedy approximation, never from `computeHandPlan`'s tenpai-exact `bestCaseReachesMinimum` —
+  `warning: true` could assert "cannot reach 8 points" on a hand that genuinely could (e.g.
+  tenpai on a fan outside the 10 families). Replaced with an explicit
+  `minimumPointsStatus: 'reachable' | 'unreachable' | 'unknown'`, `'unreachable'` asserted only
+  when grounded in the tenpai-exact answer. Full account, repro fixture, and a separate
+  pre-existing `bestCaseTotal`-inflation defect found (not fixed) while building the repro: see
+  the KICKOFF doc's own state-of-play notes, dated 2026-08-16. Full engine suite green (561
+  tests), typecheck clean, `scoring/`/`win-detection.ts`/`exclusions.ts` untouched.
+  **Still open, `doc-only`, restated 2026-08-16 (unchanged by the fix above):** Stage 3 covers
+  10 of 81 fans — Pure Straight/Mixed Straight dropped in CHANGE 1, knitted shapes never added.
+  See the KICKOFF doc's own coverage-gap note for the reasoning; not decided whether either
+  belongs in a v2 pass.
   Still open: the UI panel that renders `computeRouteToPoints`'s output — engine-only so far.
   The 2000-seed self-play re-test remains parked.
 - **M7 Polish (ongoing)** — `PLAN.md §2`: tile art finalisation, iPad touch tuning,
