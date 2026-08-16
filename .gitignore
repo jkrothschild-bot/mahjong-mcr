@@ -30,3 +30,8 @@ validation/.report.json
 validation/__pycache__/
 *.pyc
 
+# Phase 10 Strategy Coach self-play calibration harness (validation/src/
+# selfplay/) — same posture as the PyMahjongGB cases above: reproducible
+# from a recorded seed range, not checked in.
+validation/selfplay-samples/
+
