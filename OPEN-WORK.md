@@ -173,11 +173,21 @@ Do not restate these here; follow the link.
   greedy approximation, never from `computeHandPlan`'s tenpai-exact `bestCaseReachesMinimum` —
   `warning: true` could assert "cannot reach 8 points" on a hand that genuinely could (e.g.
   tenpai on a fan outside the 10 families). Replaced with an explicit
-  `minimumPointsStatus: 'reachable' | 'unreachable' | 'unknown'`, `'unreachable'` asserted only
-  when grounded in the tenpai-exact answer. Full account, repro fixture, and a separate
-  pre-existing `bestCaseTotal`-inflation defect found (not fixed) while building the repro: see
-  the KICKOFF doc's own state-of-play notes, dated 2026-08-16. Full engine suite green (561
-  tests), typecheck clean, `scoring/`/`win-detection.ts`/`exclusions.ts` untouched.
+  `minimumPointsStatus: 'reachable' | 'currentWaitsFallShort' | 'unknown'` tri-state.
+  **Review pass, same day, caught the first version's own precedence bug before merge:** it
+  checked the inflated family estimate (`bestCaseTotal`) BEFORE the grounded tenpai-exact
+  answer, so `||` short-circuited past a real `bestCaseReachesMinimum === false` and reported
+  `'reachable'` anyway — coupled directly to the `bestCaseTotal`-inflation defect noted below.
+  Corrected to exact-beats-estimate precedence (tenpai-exact answer checked first and treated
+  as final whenever it exists; the family estimate is consulted only pre-tenpai). The negative
+  state was also renamed from `'unreachable'` to `'currentWaitsFallShort'` — the field is
+  derived from the hand's CURRENT waits only, and a tenpai hand can always be broken and
+  rebuilt toward something bigger, so `'unreachable'` overclaimed a permanence it can't
+  support. Five fixtures now cover all three states, including a dedicated precedence
+  regression guard. Full account: see the KICKOFF doc's own state-of-play notes, dated
+  2026-08-16 (two entries: the original fix, then the same-day review correction). Full engine
+  suite green (562 tests), typecheck clean, `scoring/`/`win-detection.ts`/`exclusions.ts`
+  untouched throughout.
   **Still open, `doc-only`, restated 2026-08-16 (unchanged by the fix above):** Stage 3 covers
   10 of 81 fans — Pure Straight/Mixed Straight dropped in CHANGE 1, knitted shapes never added.
   See the KICKOFF doc's own coverage-gap note for the reasoning; not decided whether either

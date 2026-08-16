@@ -484,26 +484,46 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
 // Stage 3 families). That made `warning: true` assert "this hand cannot
 // reach 8 points" on hands that provably CAN — e.g. tenpai on a legal
 // Chicken Hand win, or on Pure/Mixed Straight (deliberately outside the 10
-// families per CHANGE 1). Found and fixed before the UI panel existed to
-// display it. Three genuinely different states, not two:
+// families per CHANGE 1).
+//
+// The SECOND version (still on this branch, before this comment) fixed that
+// but got the PRECEDENCE backwards: it checked `bestCaseTotal >=
+// MINIMUM_POINTS_TO_WIN` FIRST, so an inflated family estimate (see
+// bestCaseTotal's own doc comment on the estimator-generosity defect) could
+// short-circuit past a grounded tenpai-exact 'false' and report 'reachable'
+// anyway — confirmed via this file's own test fixtures below (tenpai,
+// bestCaseReachesMinimum false, bestCaseTotal >= 8 purely from estimator
+// noise). Exact must beat estimate, not the reverse: computeHandPlan's own
+// bestCaseReachesMinimum is checked FIRST whenever it exists (non-null,
+// i.e. tenpai), and the family estimate is consulted only when there is no
+// exact answer to defer to. Three genuinely different states, not two:
 export type MinimumPointsStatus =
-  // A concrete route to >=8 is identified — either the 10-family greedy sum
-  // (lockedInPoints + selected) already clears MINIMUM_POINTS_TO_WIN, or (at
-  // tenpai) computeHandPlan's own real-waits-derived bestCaseReachesMinimum
-  // says so directly, even when the winning fan sits outside all 10 Stage 3
-  // families and so never appears in `selected`.
+  // A concrete route to >=8 is identified — either computeHandPlan's own
+  // real-waits-derived bestCaseReachesMinimum says so directly (even when
+  // the winning fan sits outside all 10 Stage 3 families and so never
+  // appears in `selected`), or, pre-tenpai where no exact answer exists yet,
+  // the 10-family greedy sum (lockedInPoints + selected) clears
+  // MINIMUM_POINTS_TO_WIN on its own.
   | 'reachable'
-  // Asserted ONLY when grounded in computeHandPlan's tenpai-exact
-  // bestCaseReachesMinimum being false (built from computeWaits over the
-  // real scoreHand, every wait, both win methods) — never inferred from the
-  // 10 families' own partial coverage falling short, since that only proves
-  // "these 10 families don't reach it," not "nothing does."
-  | 'unreachable'
-  // The honest pre-tenpai default: no Stage 3 family has found a route yet,
-  // and there is no tenpai-exact answer to fall back on either. Partial
-  // family coverage this far from tenpai is not grounds to assert
-  // impossibility — this hand may well complete via a family Stage 3 never
-  // modeled, or one it modeled but hasn't reached shanten-0 progress on yet.
+  // Grounded ONLY in computeHandPlan's tenpai-exact bestCaseReachesMinimum
+  // being false (built from computeWaits over the real scoreHand, every
+  // wait, both win methods) — never inferred from the 10 families' own
+  // partial coverage falling short, since that only proves "these 10
+  // families don't reach it," not "nothing does."
+  //
+  // Deliberately NOT named 'unreachable': bestCaseReachesMinimum is derived
+  // from the hand's CURRENT waits only. A tenpai hand can always be broken
+  // and rebuilt toward a different, larger hand — this state says nothing
+  // about that possibility, only that finishing the CURRENT shape, on any
+  // of its CURRENT waits, tops out under the minimum. Name it for exactly
+  // what it claims; UI copy gets written directly off this name, and
+  // "unreachable" would overclaim a permanence this field cannot support.
+  | 'currentWaitsFallShort'
+  // The honest pre-tenpai default: no tenpai-exact answer exists yet, and
+  // the 10-family estimate hasn't found a route either. Partial family
+  // coverage this far from tenpai is not grounds to assert impossibility —
+  // this hand may well complete via a family Stage 3 never modeled, or one
+  // it modeled but hasn't reached shanten-0 progress on yet.
   | 'unknown'
 
 export interface RouteToPointsResult {
@@ -636,16 +656,22 @@ export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext
 
   const bestCaseTotal = lockedInPoints + selected.reduce((sum, c) => sum + c.points, 0)
 
-  // Grounding order matters: a family-based route clearing the bar is
-  // always sufficient for 'reachable' on its own, tenpai-or-not. Only once
-  // that fails do we fall back to computeHandPlan's tenpai-exact answer —
-  // 'unreachable' requires it to be explicitly false (never merely absent),
-  // per MinimumPointsStatus's own doc comment.
+  // Exact beats estimate, estimate only speaks when exact is silent.
+  // handPlan.bestCaseReachesMinimum is non-null only at tenpai, where it's
+  // the real computeWaits-derived answer — checked FIRST and taken as final
+  // either way (true -> 'reachable', false -> 'currentWaitsFallShort'),
+  // never overridden by bestCaseTotal. The family estimate is consulted
+  // only pre-tenpai, where there is no exact answer yet, and even then only
+  // to raise 'unknown' to 'reachable' — it can never downgrade a tenpai-exact
+  // 'true'. See MinimumPointsStatus's own doc comment for why the earlier
+  // version of this branch (bestCaseTotal checked first) was backwards.
   const minimumPointsStatus: MinimumPointsStatus =
-    bestCaseTotal >= MINIMUM_POINTS_TO_WIN || handPlan.bestCaseReachesMinimum === true
-      ? 'reachable'
-      : handPlan.bestCaseReachesMinimum === false
-        ? 'unreachable'
+    handPlan.bestCaseReachesMinimum !== null
+      ? handPlan.bestCaseReachesMinimum
+        ? 'reachable'
+        : 'currentWaitsFallShort'
+      : bestCaseTotal >= MINIMUM_POINTS_TO_WIN
+        ? 'reachable'
         : 'unknown'
 
   return { candidates, selected, lockedInPoints, bestCaseTotal, minimumPointsStatus }

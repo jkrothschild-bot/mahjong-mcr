@@ -573,18 +573,12 @@ since it's not common to both branches of the wait). Old code would have
 told a learner this hand can never reach 8; it can.
 
 Fixed by replacing the `warning: boolean` / `reachesMinimum: boolean` pair
-with a single `minimumPointsStatus: 'reachable' | 'unreachable' | 'unknown'`
-tri-state on `RouteToPointsResult` (`packages/engine/src/hints.ts`):
-`'reachable'` when either the family-greedy `bestCaseTotal` clears
-`MINIMUM_POINTS_TO_WIN` OR `computeHandPlan`'s `bestCaseReachesMinimum` is
-`true`; `'unreachable'` ONLY when `bestCaseReachesMinimum` is explicitly
-`false` (grounded in the tenpai-exact computation, never inferred from
-partial family coverage); `'unknown'` otherwise — the honest pre-tenpai
-default when no family has found a route yet. Four fixtures added to
-`hints.test.ts`'s `computeRouteToPoints` suite covering all three states,
-including the differential-wait repro above and a genuinely-grounded
-`'unreachable'` tenpai hand (two exposed number pungs in different suits +
-a tanki wait, both win methods scoring under 8, confirmed via
+with a single `minimumPointsStatus: 'reachable' | 'currentWaitsFallShort' |
+'unknown'` tri-state on `RouteToPointsResult` (`packages/engine/src/hints.ts`).
+Two fixtures added to `hints.test.ts`'s `computeRouteToPoints` suite for
+this first pass: the differential-wait repro above, and a
+tenpai-with-a-grounded-no hand (two exposed number pungs in different
+suits + a tanki wait, both win methods scoring under 8, confirmed via
 `computeHandPlan` directly before asserting on `computeRouteToPoints`). The
 pre-existing pre-tenpai "scattered hand" fixture was corrected from
 asserting `warning: true` to asserting `'unknown'` — under the old boolean
@@ -592,10 +586,47 @@ contract this fixture was itself already misusing the pre-fix API's only
 available "no" state for a hand with no grounds to say so; it's pre-tenpai,
 so `computeHandPlan.bestCaseReachesMinimum` is `null`, not `false`.
 
-No changes to `scoring/`, `win-detection.ts`, or `exclusions.ts` — purely an
-orchestration-layer fix in `hints.ts`, so no PyMahjongGB re-run needed (same
-posture as the two bugs recorded above). Full engine suite green (561
-tests, 1 pre-existing skip), typecheck clean.
+**Review pass, same day (2026-08-16), found this first fix's own precedence
+was backwards — corrected before merge, still on `feat/phase10-stage3`.**
+The first version's branch read `bestCaseTotal >= MINIMUM_POINTS_TO_WIN ||
+handPlan.bestCaseReachesMinimum === true`, checking the ESTIMATE first —
+`||` short-circuits, so an inflated `bestCaseTotal` (see the separate
+estimator-generosity defect two paragraphs below) could report `'reachable'`
+even when `bestCaseReachesMinimum` was a grounded, tenpai-exact `false`.
+The review caught this by re-examining the fix's own scratch exploration
+transcript: two constructed hands (a three-suit tenpai shape with no melds,
+and a two-melds-plus-tanki-wait shape) had ALREADY reproduced exactly this
+— `bestCaseReachesMinimum: false` alongside `bestCaseTotal` of 53 and 10
+respectively — but the first pass read those results as merely
+demonstrating the (separately real) estimator-inflation defect, not as a
+live failure of its OWN new branch. Corrected to the actual principle —
+exact beats estimate, estimate only speaks when exact is silent:
+`handPlan.bestCaseReachesMinimum !== null ? (bestCaseReachesMinimum ?
+'reachable' : 'currentWaitsFallShort') : (bestCaseTotal >=
+MINIMUM_POINTS_TO_WIN ? 'reachable' : 'unknown')` — the tenpai-exact answer,
+when it exists, is checked FIRST and is final either direction; the family
+estimate is consulted only pre-tenpai, and only to raise `'unknown'` to
+`'reachable'`, never to downgrade a tenpai-exact `true`.
+
+Same review also renamed the negative state from `'unreachable'` to
+`'currentWaitsFallShort'`: `bestCaseReachesMinimum` is derived from the
+hand's CURRENT waits only, and a tenpai hand can always be broken and
+rebuilt toward a different, larger hand — `'unreachable'` claimed a
+permanence the field can't support, and the UI copy this drives will be
+written directly off the name. A third fixture was added specifically to
+pin the precedence fix: the three-suit no-melds hand from the review's own
+re-examination above (`bestCaseReachesMinimum: false`, `bestCaseTotal: 53`)
+now asserts `'currentWaitsFallShort'`, not `'reachable'` — this is the
+regression guard for the exact bug the review found. Five fixtures total in
+`hints.test.ts`'s `computeRouteToPoints` suite now cover all three states,
+including both the original grounded-no fixture and this precedence
+regression guard.
+
+No changes to `scoring/`, `win-detection.ts`, or `exclusions.ts` in either
+pass — purely an orchestration-layer fix in `hints.ts`, so no PyMahjongGB
+re-run needed (same posture as the two bugs recorded above). Full engine
+suite green (562 tests, 1 pre-existing skip) after the review-pass fix,
+typecheck clean.
 
 **A separate, pre-existing defect surfaced while hunting for these
 fixtures, NOT fixed here (out of scope — touching `fan-targets.ts`'s
@@ -608,12 +639,11 @@ Flush's heuristic returns a nonzero candidate for nearly any hand with at
 least one suited tile of the majority suit, and Seven Pairs similarly for
 any hand with so much as one pair-forming type, each contributing their
 FULL 6-24 points regardless of how small the probability actually is. This
-made constructing a genuinely-grounded `'unreachable'` tenpai fixture
-require deliberately engineered melds (see above) rather than an ordinary
-hand — an ordinary tenpai hand's family ceiling is very likely to clear 8
-even when the real answer is "no." Worth a deliberate look at whether
-`selected`'s greedy sum should weight by probability, or exclude candidates
-below some floor, before this panel ships to a UI — not decided here.**
+is precisely what the precedence bug above let leak into
+`minimumPointsStatus` before the review-pass fix — the two are coupled, not
+coincidental. Worth a deliberate look at whether `selected`'s greedy sum
+should weight by probability, or exclude candidates below some floor,
+before this panel ships to a UI — not decided here.**
 
 **Still-open coverage gap, unchanged by this fix, restated here since the
 fix's own repro fixture leans directly on it:** Stage 3 covers 10 of the

@@ -302,11 +302,11 @@ describe('computeRouteToPoints', () => {
   // estimateAllPungs fixture — 13 distinct singles, nothing close to any
   // target. Pre-tenpai (shanten far from 0, no waits at all), so
   // computeHandPlan has no tenpai-exact answer to fall back on either — this
-  // MUST land on 'unknown', not 'unreachable'. Asserting 'unreachable' here
-  // would be exactly the bug this fix exists to prevent: "none of the 10
-  // Stage 3 families reaches 8" is not the same claim as "this hand cannot
-  // reach 8" — a hand this far from tenpai can still complete via a family
-  // Stage 3 never modeled (Pure/Mixed Straight, Chicken Hand, ...).
+  // MUST land on 'unknown', not 'currentWaitsFallShort'. Asserting the latter
+  // here would be exactly the bug this fix exists to prevent: "none of the
+  // 10 Stage 3 families reaches 8" is not the same claim as "this hand
+  // cannot reach 8" — a hand this far from tenpai can still complete via a
+  // family Stage 3 never modeled (Pure/Mixed Straight, Chicken Hand, ...).
   it('is unknown pre-tenpai when no Stage 3 family has a route yet', () => {
     const hand = handWith([
       ...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1),
@@ -383,8 +383,11 @@ describe('computeRouteToPoints', () => {
   // Unlike the pre-tenpai fixture above, computeHandPlan DOES have a
   // tenpai-exact answer here, and it's a real, grounded "no" — this is the
   // one state CLAUDE.md's fixture rule requires never being inferred from
-  // partial family coverage alone.
-  it('is unreachable only when computeHandPlan’s tenpai-exact answer is a grounded no', () => {
+  // partial family coverage alone. Named currentWaitsFallShort, not
+  // "unreachable" — see MinimumPointsStatus's own doc comment for why a
+  // tenpai hand's CURRENT waits falling short is not a permanent claim
+  // (the hand could still be broken and rebuilt toward something bigger).
+  it('is currentWaitsFallShort when computeHandPlan’s tenpai-exact answer is a grounded no, and the family estimate agrees', () => {
     const pungChar2: Meld = { id: '0-0', kind: 'pung', exposure: 'exposed', tiles: idsFor('C2', 3), ownerSeat: 0 }
     const pungDot2: Meld = { id: '0-1', kind: 'pung', exposure: 'exposed', tiles: idsFor('D2', 3), ownerSeat: 0 }
     const hand: Hand = {
@@ -398,7 +401,41 @@ describe('computeRouteToPoints', () => {
 
     const result = computeRouteToPoints(hand)
     expect(result.bestCaseTotal).toBeLessThan(8)
-    expect(result.minimumPointsStatus).toBe('unreachable')
+    expect(result.minimumPointsStatus).toBe('currentWaitsFallShort')
+  })
+
+  // Regression fixture for the precedence bug found in review (2026-08-16,
+  // same day as the fix above): the FIRST attempt at this branch checked
+  // `bestCaseTotal >= MINIMUM_POINTS_TO_WIN` before consulting
+  // computeHandPlan.bestCaseReachesMinimum, so an inflated family estimate
+  // (see bestCaseTotal's own doc comment on the separate, unfixed
+  // estimator-generosity defect: Half/Full Flush and Seven Pairs both
+  // return a nonzero candidate — and therefore contribute FULL raw points —
+  // for nearly any hand with a suited tile or a pair-forming type) could
+  // short-circuit past a grounded tenpai-exact 'false' and report
+  // 'reachable' anyway. This hand triggers exactly that: no melds at all
+  // (so nothing structurally blocks Seven Pairs or Half/Full Flush), a
+  // three-suit tenpai shape scoring 5/7 points on its only wait (a real,
+  // grounded currentWaitsFallShort per computeHandPlan) — yet the family
+  // estimate alone (Full Flush 22 + Seven Pairs 19 + All Simples 68, none
+  // of them realistic for this exact shape) sums to 53, comfortably over
+  // the minimum. The precedence fix must keep exact 'false' authoritative
+  // regardless of how inflated the estimate is.
+  it('is currentWaitsFallShort even when the (separately buggy) family estimate is inflated past the minimum', () => {
+    const hand = handWith([
+      ...idsFor('B1', 1), ...idsFor('B2', 1),
+      ...idsFor('C4', 1), ...idsFor('C5', 1), ...idsFor('C6', 1),
+      ...idsFor('D2', 1), ...idsFor('D3', 1), ...idsFor('D4', 1),
+      ...idsFor('B6', 1), ...idsFor('B7', 1), ...idsFor('B8', 1),
+      ...idsFor('D8', 2),
+    ])
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBe(0)
+    expect(plan.bestCaseReachesMinimum).toBe(false) // both discard (5pts) and self-draw (7pts) stay under 8
+
+    const result = computeRouteToPoints(hand)
+    expect(result.bestCaseTotal).toBeGreaterThanOrEqual(8) // the inflated family estimate, left uncorrected
+    expect(result.minimumPointsStatus).toBe('currentWaitsFallShort') // exact still wins over estimate
   })
 
   it('filters directionally-incompatible candidates not covered by exclusions.ts (Half Flush vs All Simples/No Honors)', () => {
@@ -421,7 +458,7 @@ describe('computeRouteToPoints', () => {
     expect(selectedFanIds).not.toContain(68)
     expect(selectedFanIds).not.toContain(76)
     expect(result.bestCaseTotal).toBeLessThan(8)
-    expect(result.minimumPointsStatus).toBe('unknown') // pre-tenpai — no grounds to assert 'unreachable'
+    expect(result.minimumPointsStatus).toBe('unknown') // pre-tenpai — no grounds to assert currentWaitsFallShort
   })
 
   it('filters mutually-exclusive candidates out of the greedy sum (All Simples vs No Honors, exclusions.ts [68,76])', () => {
