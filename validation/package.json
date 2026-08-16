@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "generate": "tsx src/generate.ts"
+    "generate": "tsx src/generate.ts",
+    "selfplay:sample": "tsx src/selfplay/sample.ts",
+    "selfplay:report": "tsx src/selfplay/report.ts"
   },
   "dependencies": {
     "@mahjong-mcr/engine": "*"

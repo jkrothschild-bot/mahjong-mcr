@@ -75,6 +75,52 @@ Tiles), and 35 (Knitted Straight) can never appear in a generated case:
 scope by design: every generated case has `flowerCount: 0` (see
 `generate.ts`'s header comment).
 
+## Strategy Coach self-play calibration harness (Phase 10)
+
+A second, unrelated harness under `src/selfplay/` — same package, same TS +
+`tsx` conventions, but it doesn't touch scoring or PyMahjongGB at all. It
+plays full self-play hands with the engine's own production bot policy
+(`bots/policy.ts`'s `chooseMove`) and measures how well
+`computeRouteToPoints`'s `minimumPointsStatus` predicts whether the hand it's
+evaluating actually goes on to finish (a legal win — always >=8 points by
+construction of the win-legality gate). See
+`KICKOFF-phase10-strategy-coach.md`'s state-of-play notes and
+`docs/rules/decisions.md` for the recorded results of the runs this backs.
+
+```sh
+# 1. Play hands and record samples (chunked — a single hand costs ~1.8s of
+#    real self-play, so a few thousand hands needs sub-10-minute chunks).
+#    Appends to selfplay-samples/{samples,outcomes}.jsonl.
+npm run selfplay:sample --workspace=@mahjong-mcr/validation -- <count> <seedStart>
+# e.g., run in 250-hand chunks:
+npm run selfplay:sample --workspace=@mahjong-mcr/validation -- 250 0
+npm run selfplay:sample --workspace=@mahjong-mcr/validation -- 250 250
+# ...
+
+# 2. Report calibration: BEFORE (today's real minimumPointsStatus) vs AFTER
+#    (a hypothetical per-family distance gate on fans 19/22/50/68/76, reusing
+#    the REAL areExclusive/isRouteCompatible selection logic so it can never
+#    drift from computeRouteToPoints' own rule — only the admission bar
+#    changes), bucketed by shanten.
+npm run selfplay:report --workspace=@mahjong-mcr/validation -- <sevenPairsShantenMax> <flushTilesNeededMax> <simplesHonorsTilesNeededMax>
+# e.g., the thresholds actually shipped (see decisions.md):
+npm run selfplay:report --workspace=@mahjong-mcr/validation -- 1 1 1
+```
+
+`report.ts` self-checks on every run: recomputing the ungated total via its
+own re-implementation of the selection walk must reproduce today's real
+`bestCaseTotal`/`minimumPointsStatus` exactly, or it refuses to trust the
+gated numbers it prints. Read **honestly**, not just at face value: seat 0 is
+always played by the same efficiency-only bot policy as every other seat,
+not a coached human optimizing for the 8-point minimum, and the report's own
+output shows `P(seat0 eventually wins)` sits nearly flat (~18-20%) across
+shanten 1 through 5 — most of the variance in "did this hand finish" is
+4-player race/wall-exhaustion noise, not hand quality at the sampled
+decision point. This caps how much lift *any* estimate-based signal can
+show against this ground truth; the report's own before/after numbers and
+`docs/rules/decisions.md`'s entry say so explicitly rather than overselling
+a clean win.
+
 ## Layout
 
 ```
@@ -94,9 +140,13 @@ validation/
     build-pmgb-input.ts   converts a GeneratedCase into MahjongFanCalculator's exact argument shape
     score-with-engine.ts  thin wrapper around this engine's own scoreHand
     generate.ts           CLI entry point (see "Running the harness" above)
+    selfplay/               Phase 10 Strategy Coach calibration harness (see its own section above) — unrelated to PyMahjongGB
+      sample.ts               plays self-play hands, writes selfplay-samples/{samples,outcomes}.jsonl
+      report.ts                reads that JSONL, prints the before/after calibration report
   fan-map.json           (see above — read by both languages)
   compare.py              the Python half: scores every case with PyMahjongGB and reports
   allowlist.py             the triage classifier + the cited known-divergence record
   requirements.txt
   cases/                  generated output (gitignored; regenerate with the command above)
+  selfplay-samples/       selfplay harness output (gitignored; regenerate with the command above)
 ```
