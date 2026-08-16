@@ -522,4 +522,52 @@ describe('computeRouteToPoints', () => {
     expect(result.candidates.some((c) => c.fanId === 50)).toBe(true) // Half Flush candidate exists
     expect(result.selected.some((c) => c.fanId === 50)).toBe(true) // and isn't wrongly filtered out
   })
+
+  // The (c)+(d) fix (docs/rules/decisions.md item #37): a REAL hand pulled directly from
+  // validation/src/selfplay/'s calibration dataset (seed 0, turn 2), not
+  // hand-constructed — bestCaseTotal was 50 pre-tenpai on this exact hand,
+  // carried entirely by Full Flush (22), Seven Pairs (19) and All Simples
+  // (68), none of which are remotely close (7, 11, and 2 offending
+  // tiles/steps away respectively). crediblePointsTotal gates those three
+  // on their own native distance and correctly drops to 7 — still short of
+  // the minimum — flipping minimumPointsStatus from the old code's
+  // 'reachable' to 'unknown'. bestCaseTotal itself is UNCHANGED (still 50):
+  // this fixture is also the executable proof that the two fields answer
+  // different questions now, not just a claim in a comment.
+  it('crediblePointsTotal gates the three worst-offending families, correcting minimumPointsStatus pre-tenpai without touching bestCaseTotal', () => {
+    const hand = handWith([
+      ...idsFor('B3', 1), ...idsFor('C4', 1), ...idsFor('C9', 1), ...idsFor('D2', 1), ...idsFor('D8', 1),
+      ...idsFor('D9', 1), ...idsFor('D7', 1), ...idsFor('C2', 1), ...idsFor('C8', 1), ...idsFor('C5', 1),
+      ...idsFor('D3', 2), ...idsFor('B2', 1),
+    ])
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBeGreaterThan(0) // pre-tenpai
+
+    const result = computeRouteToPoints(hand)
+    expect(result.bestCaseTotal).toBe(50) // unchanged from before this pass
+    expect(result.selected.map((c) => c.fanId)).toEqual(expect.arrayContaining([22, 19, 68]))
+    expect(result.crediblePointsTotal).toBeLessThan(8)
+    expect(result.credibleSelected.map((c) => c.fanId)).not.toEqual(expect.arrayContaining([22, 19, 68]))
+    expect(result.minimumPointsStatus).toBe('unknown')
+  })
+
+  // The gate is a proximity requirement, not a blanket exclusion — Seven
+  // Pairs (19) is still admitted into credibleSelected once the hand is
+  // genuinely close (sevenPairsShanten <= 1), same as it always was in
+  // `selected`. Five concealed pairs + three unrelated singles: seven-pairs
+  // shanten is 1 (six-of-seven pairs' worth of progress), while the
+  // standard shape sits further back, so the hand is pre-tenpai overall.
+  it('admits a gated family into credibleSelected once it is genuinely close to its own shape', () => {
+    const hand = handWith([
+      ...idsFor('C1', 2), ...idsFor('C4', 2), ...idsFor('C7', 2), ...idsFor('D1', 2), ...idsFor('D4', 2),
+      ...idsFor('B1', 1), ...idsFor('B4', 1), ...idsFor('B7', 1),
+    ])
+    const plan = computeHandPlan(hand)
+    expect(plan.shanten.shanten).toBeGreaterThan(0) // pre-tenpai
+
+    const result = computeRouteToPoints(hand)
+    expect(result.credibleSelected.some((c) => c.fanId === 19)).toBe(true)
+    expect(result.crediblePointsTotal).toBeGreaterThanOrEqual(8)
+    expect(result.minimumPointsStatus).toBe('reachable')
+  })
 })
