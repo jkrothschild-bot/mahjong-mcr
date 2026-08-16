@@ -497,10 +497,10 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
 //
 // The THIRD version (docs/rules/decisions.md item #37) fixed what the
 // estimate itself MEANS pre-tenpai. The precedence fix alone didn't touch
-// the estimate's own quality — `bestCaseTotal` sums
-// FULL raw points for any candidate with merely nonzero completionProbability,
-// and three families (Seven Pairs 19, Half/Full Flush 22/50, All
-// Simples/No Honors 68/76) return a nonzero candidate on almost any
+// the estimate's own quality — `bestCaseTotal` sums FULL raw points for any
+// candidate with merely nonzero completionProbability, and three families
+// (Seven Pairs 19, Half/Full Flush 22/50, All Simples/No Honors 68/76)
+// return a nonzero candidate on almost any
 // concealed hand, regardless of how far off they actually are. Measured via
 // `validation/src/selfplay/`'s calibration harness across 2,000 self-played
 // hands: `bestCaseTotal >= MINIMUM_POINTS_TO_WIN` pre-tenpai 93.3% of the
@@ -581,9 +581,9 @@ export interface RouteToPointsResult {
   // families found (via validation/src/selfplay/'s calibration harness) to
   // carry ~93% of bestCaseTotal's over-inflation — Seven Pairs (19),
   // Half/Full Flush (22/50), All Simples/No Honors (68/76) — are admitted
-  // only within CREDIBILITY_GATES' own distance of their shape, not merely
-  // "completionProbability > 0." Each family is gated on its OWN NATIVE
-  // metric (shanten steps for Seven Pairs, via sevenPairsShantenFromCounts;
+  // only within passesCredibilityGate's own distance of their shape, not
+  // merely "completionProbability > 0." Each family is gated on its OWN
+  // NATIVE metric (shanten steps for Seven Pairs, via sevenPairsShantenFromCounts;
   // offending-tile count for the rest, via tilesNeeded.length) — never a
   // shared probability threshold, since FanTargetEstimate's own
   // probabilityBasis field forbids treating 'shanten' and 'heuristic'
