@@ -552,6 +552,116 @@ check, so a partial lock-in doesn't block a legitimate next increment.
 Whoever picks this up next should decide the approach before touching
 `computeRouteToPoints` again.
 
+**Tri-state `warning`/`reachesMinimum` bug found and fixed, 2026-08-16, on
+`feat/phase10-stage3` (not yet merged to `main`).** `computeRouteToPoints`
+called `computeHandPlan(hand, context)` but destructured only
+`.lockedInFans` from the result, discarding `.bestCaseReachesMinimum` — at
+tenpai, the EXACT answer, derived from `computeWaits` over the real
+`scoreHand`, covering every one of the 81 fans (including fan 43 Chicken
+Hand, `scoring/score-hand.ts`'s zero-fan 8-point floor). `warning`/
+`reachesMinimum` were instead derived purely from `bestCaseTotal` — the
+10-family greedy approximation — so `warning: true` asserted "this hand
+cannot reach 8 points" when it actually meant only "none of the 10 Stage 3
+families reaches 8." Confirmed via a constructed repro before any fix
+(`hints.test.ts`'s "is reachable via the tenpai-exact fallback..." test): two
+exposed chow melds (Dots 4-5-6, Bamboo 1-2-3) block Seven Pairs/All
+Pungs/Half-Full Flush structurally, so the 10 families and locked-in fans
+together total only 3 points — yet the hand is genuinely tenpai on a
+ryanmen where one branch scores 11/12 points via Mixed Triple Chow (fan 41,
+8pts, outside all 10 families and not caught by `lockedInFans` either,
+since it's not common to both branches of the wait). Old code would have
+told a learner this hand can never reach 8; it can.
+
+Fixed by replacing the `warning: boolean` / `reachesMinimum: boolean` pair
+with a single `minimumPointsStatus: 'reachable' | 'currentWaitsFallShort' |
+'unknown'` tri-state on `RouteToPointsResult` (`packages/engine/src/hints.ts`).
+Two fixtures added to `hints.test.ts`'s `computeRouteToPoints` suite for
+this first pass: the differential-wait repro above, and a
+tenpai-with-a-grounded-no hand (two exposed number pungs in different
+suits + a tanki wait, both win methods scoring under 8, confirmed via
+`computeHandPlan` directly before asserting on `computeRouteToPoints`). The
+pre-existing pre-tenpai "scattered hand" fixture was corrected from
+asserting `warning: true` to asserting `'unknown'` — under the old boolean
+contract this fixture was itself already misusing the pre-fix API's only
+available "no" state for a hand with no grounds to say so; it's pre-tenpai,
+so `computeHandPlan.bestCaseReachesMinimum` is `null`, not `false`.
+
+**Review pass, same day (2026-08-16), found this first fix's own precedence
+was backwards — corrected before merge, still on `feat/phase10-stage3`.**
+The first version's branch read `bestCaseTotal >= MINIMUM_POINTS_TO_WIN ||
+handPlan.bestCaseReachesMinimum === true`, checking the ESTIMATE first —
+`||` short-circuits, so an inflated `bestCaseTotal` (see the separate
+estimator-generosity defect two paragraphs below) could report `'reachable'`
+even when `bestCaseReachesMinimum` was a grounded, tenpai-exact `false`.
+The review caught this by re-examining the fix's own scratch exploration
+transcript: two constructed hands (a three-suit tenpai shape with no melds,
+and a two-melds-plus-tanki-wait shape) had ALREADY reproduced exactly this
+— `bestCaseReachesMinimum: false` alongside `bestCaseTotal` of 53 and 10
+respectively — but the first pass read those results as merely
+demonstrating the (separately real) estimator-inflation defect, not as a
+live failure of its OWN new branch. Corrected to the actual principle —
+exact beats estimate, estimate only speaks when exact is silent:
+`handPlan.bestCaseReachesMinimum !== null ? (bestCaseReachesMinimum ?
+'reachable' : 'currentWaitsFallShort') : (bestCaseTotal >=
+MINIMUM_POINTS_TO_WIN ? 'reachable' : 'unknown')` — the tenpai-exact answer,
+when it exists, is checked FIRST and is final either direction; the family
+estimate is consulted only pre-tenpai, and only to raise `'unknown'` to
+`'reachable'`, never to downgrade a tenpai-exact `true`.
+
+Same review also renamed the negative state from `'unreachable'` to
+`'currentWaitsFallShort'`: `bestCaseReachesMinimum` is derived from the
+hand's CURRENT waits only, and a tenpai hand can always be broken and
+rebuilt toward a different, larger hand — `'unreachable'` claimed a
+permanence the field can't support, and the UI copy this drives will be
+written directly off the name. A third fixture was added specifically to
+pin the precedence fix: the three-suit no-melds hand from the review's own
+re-examination above (`bestCaseReachesMinimum: false`, `bestCaseTotal: 53`)
+now asserts `'currentWaitsFallShort'`, not `'reachable'` — this is the
+regression guard for the exact bug the review found. Five fixtures total in
+`hints.test.ts`'s `computeRouteToPoints` suite now cover all three states,
+including both the original grounded-no fixture and this precedence
+regression guard.
+
+No changes to `scoring/`, `win-detection.ts`, or `exclusions.ts` in either
+pass — purely an orchestration-layer fix in `hints.ts`, so no PyMahjongGB
+re-run needed (same posture as the two bugs recorded above). Full engine
+suite green (562 tests, 1 pre-existing skip) after the review-pass fix,
+typecheck clean.
+
+**A separate, pre-existing defect surfaced while hunting for these
+fixtures, NOT fixed here (out of scope — touching `fan-targets.ts`'s
+estimators was excluded from this pass): the family estimators' own
+"ceiling, not forecast" design (`RouteToPointsResult.bestCaseTotal` sums
+FULL raw points for any candidate with `completionProbability > 0`,
+however small, per that field's own doc comment) makes `bestCaseTotal`
+reach 8+ almost trivially for most non-degenerate hands — e.g. Half/Full
+Flush's heuristic returns a nonzero candidate for nearly any hand with at
+least one suited tile of the majority suit, and Seven Pairs similarly for
+any hand with so much as one pair-forming type, each contributing their
+FULL 6-24 points regardless of how small the probability actually is. This
+is precisely what the precedence bug above let leak into
+`minimumPointsStatus` before the review-pass fix — the two are coupled, not
+coincidental. Worth a deliberate look at whether `selected`'s greedy sum
+should weight by probability, or exclude candidates below some floor,
+before this panel ships to a UI — not decided here.**
+
+**Still-open coverage gap, unchanged by this fix, restated here since the
+fix's own repro fixture leans directly on it:** Stage 3 covers 10 of the
+81 fans. CHANGE 1 (2026-08-07) deliberately dropped Pure Straight (fan 21)
+and Mixed Straight (fan 39) to make room for Big Three Dragons, reasoning
+that a player can see a straight forming unaided more easily than the
+harder-to-eyeball fans kept instead. Knitted shapes (Knitted Straight,
+Lesser/Greater Honors and Knitted Tiles) were never added at all — named
+as "real but rarer" in the original design notes and never revisited.
+Nothing about this pass's fix changes that scope decision; it only makes
+the panel honest about a hand reaching 8 through one of the fans Stage 3
+doesn't model (exactly what this fix's own repro fixture demonstrates via
+Mixed Triple Chow, a fan outside the 10 families for a different reason —
+never in the candidate list at all, dropped or otherwise). Whoever revisits
+Stage 3's family coverage next should decide whether Pure/Mixed Straight
+belong back in, and whether knitted shapes are worth a v2 family, rather
+than this being silently forgotten.
+
 ## Explicitly NOT in this phase (any stage)
 
 - Defense/safety integration into the discard ranking (Tile safety tab

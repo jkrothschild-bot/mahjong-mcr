@@ -197,6 +197,30 @@ Do not restate these here; follow the link.
   **Open, recorded 2026-08-08, not yet fixed:** `computeRouteToPoints` undercounts Dragon
   Pung (fan 59) — a locked-in partial pung silently blocks a legitimate further unit's
   candidate. See the KICKOFF doc's own note for the confirmed repro and proposed handling.
+  **Fixed 2026-08-16, `code-verified`, on `feat/phase10-stage3` (still not merged):** the
+  CHANGE 3 contract's `warning`/`reachesMinimum` booleans were derived ONLY from the 10-family
+  greedy approximation, never from `computeHandPlan`'s tenpai-exact `bestCaseReachesMinimum` —
+  `warning: true` could assert "cannot reach 8 points" on a hand that genuinely could (e.g.
+  tenpai on a fan outside the 10 families). Replaced with an explicit
+  `minimumPointsStatus: 'reachable' | 'currentWaitsFallShort' | 'unknown'` tri-state.
+  **Review pass, same day, caught the first version's own precedence bug before merge:** it
+  checked the inflated family estimate (`bestCaseTotal`) BEFORE the grounded tenpai-exact
+  answer, so `||` short-circuited past a real `bestCaseReachesMinimum === false` and reported
+  `'reachable'` anyway — coupled directly to the `bestCaseTotal`-inflation defect noted below.
+  Corrected to exact-beats-estimate precedence (tenpai-exact answer checked first and treated
+  as final whenever it exists; the family estimate is consulted only pre-tenpai). The negative
+  state was also renamed from `'unreachable'` to `'currentWaitsFallShort'` — the field is
+  derived from the hand's CURRENT waits only, and a tenpai hand can always be broken and
+  rebuilt toward something bigger, so `'unreachable'` overclaimed a permanence it can't
+  support. Five fixtures now cover all three states, including a dedicated precedence
+  regression guard. Full account: see the KICKOFF doc's own state-of-play notes, dated
+  2026-08-16 (two entries: the original fix, then the same-day review correction). Full engine
+  suite green (562 tests), typecheck clean, `scoring/`/`win-detection.ts`/`exclusions.ts`
+  untouched throughout.
+  **Still open, `doc-only`, restated 2026-08-16 (unchanged by the fix above):** Stage 3 covers
+  10 of 81 fans — Pure Straight/Mixed Straight dropped in CHANGE 1, knitted shapes never added.
+  See the KICKOFF doc's own coverage-gap note for the reasoning; not decided whether either
+  belongs in a v2 pass.
   Still open: the UI panel that renders `computeRouteToPoints`'s output — engine-only so far.
   The 2000-seed self-play re-test remains parked.
 - **M7 Polish (ongoing)** — `PLAN.md §2`: tile art finalisation, iPad touch tuning,

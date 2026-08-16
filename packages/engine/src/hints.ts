@@ -473,6 +473,59 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
 // family stays independently fixtured and cited, per that file's own
 // comment); composing "locked-in fans + best candidates, together" into one
 // picture is this file's job instead.
+// CHANGE 3 (KICKOFF-phase10-strategy-coach.md, owner review 2026-08-07)
+// specified an explicit tri-state so a UI never has to infer this from an
+// empty candidates/selected array. The FIRST shipped version of this
+// contract (a plain `warning: boolean`, `reachesMinimum: boolean` pair)
+// violated its own spirit: `reachesMinimum` was silently only "does the
+// 10-family greedy approximation clear the bar," never the tenpai-exact
+// answer `computeHandPlan` already derives from real `computeWaits` output
+// (which covers every fan, including fan 43 Chicken Hand — outside all 10
+// Stage 3 families). That made `warning: true` assert "this hand cannot
+// reach 8 points" on hands that provably CAN — e.g. tenpai on a legal
+// Chicken Hand win, or on Pure/Mixed Straight (deliberately outside the 10
+// families per CHANGE 1).
+//
+// The SECOND version (still on this branch, before this comment) fixed that
+// but got the PRECEDENCE backwards: it checked `bestCaseTotal >=
+// MINIMUM_POINTS_TO_WIN` FIRST, so an inflated family estimate (see
+// bestCaseTotal's own doc comment on the estimator-generosity defect) could
+// short-circuit past a grounded tenpai-exact 'false' and report 'reachable'
+// anyway — confirmed via this file's own test fixtures below (tenpai,
+// bestCaseReachesMinimum false, bestCaseTotal >= 8 purely from estimator
+// noise). Exact must beat estimate, not the reverse: computeHandPlan's own
+// bestCaseReachesMinimum is checked FIRST whenever it exists (non-null,
+// i.e. tenpai), and the family estimate is consulted only when there is no
+// exact answer to defer to. Three genuinely different states, not two:
+export type MinimumPointsStatus =
+  // A concrete route to >=8 is identified — either computeHandPlan's own
+  // real-waits-derived bestCaseReachesMinimum says so directly (even when
+  // the winning fan sits outside all 10 Stage 3 families and so never
+  // appears in `selected`), or, pre-tenpai where no exact answer exists yet,
+  // the 10-family greedy sum (lockedInPoints + selected) clears
+  // MINIMUM_POINTS_TO_WIN on its own.
+  | 'reachable'
+  // Grounded ONLY in computeHandPlan's tenpai-exact bestCaseReachesMinimum
+  // being false (built from computeWaits over the real scoreHand, every
+  // wait, both win methods) — never inferred from the 10 families' own
+  // partial coverage falling short, since that only proves "these 10
+  // families don't reach it," not "nothing does."
+  //
+  // Deliberately NOT named 'unreachable': bestCaseReachesMinimum is derived
+  // from the hand's CURRENT waits only. A tenpai hand can always be broken
+  // and rebuilt toward a different, larger hand — this state says nothing
+  // about that possibility, only that finishing the CURRENT shape, on any
+  // of its CURRENT waits, tops out under the minimum. Name it for exactly
+  // what it claims; UI copy gets written directly off this name, and
+  // "unreachable" would overclaim a permanence this field cannot support.
+  | 'currentWaitsFallShort'
+  // The honest pre-tenpai default: no tenpai-exact answer exists yet, and
+  // the 10-family estimate hasn't found a route either. Partial family
+  // coverage this far from tenpai is not grounds to assert impossibility —
+  // this hand may well complete via a family Stage 3 never modeled, or one
+  // it modeled but hasn't reached shanten-0 progress on yet.
+  | 'unknown'
+
 export interface RouteToPointsResult {
   // Every applicable Stage 3 target for this hand, unfiltered —
   // estimateFanTargets(hand, context) verbatim, sorted by value descending.
@@ -491,21 +544,19 @@ export interface RouteToPointsResult {
   // lockedInFans — melds-only pre-tenpai, the stricter real-waits
   // intersection at tenpai, per that function's existing logic).
   lockedInPoints: number
-  // lockedInPoints + sum(selected fans' points). A CEILING this hand could
-  // plausibly reach if every selected target lands — not a forecast; each
-  // target's own completionProbability (and probabilityBasis tier) still
-  // applies and is not folded into this number.
+  // lockedInPoints + sum(selected fans' points). A CEILING from the 10
+  // Stage 3 families ALONE — not a forecast, and not the ground truth about
+  // whether ANY route reaches the minimum (see minimumPointsStatus for
+  // that): a tenpai hand winning via a fan outside the 10 families can
+  // clear MINIMUM_POINTS_TO_WIN for real while this number stays low. Each
+  // selected target's own completionProbability (and probabilityBasis tier)
+  // still applies on top of this and is not folded in here.
   bestCaseTotal: number
-  reachesMinimum: boolean
-  // CHANGE 3 (KICKOFF-phase10-strategy-coach.md, owner review 2026-08-07):
-  // explicit, not left for a UI to infer from an empty candidates/selected
-  // array. SPEC §6 names "whether the hand can reach the 8-point minimum" as
-  // the single most valuable thing this panel can say, so silence here is
-  // not an acceptable outcome. Always the exact negation of reachesMinimum —
-  // kept as its own field so a consumer never has to derive it (and risk the
-  // polarity) from the rest of this shape; a UI is REQUIRED to render this,
-  // not merely permitted to, when true.
-  warning: boolean
+  // SPEC §6 names "whether the hand can reach the 8-point minimum" as the
+  // single most valuable thing this panel can say — a UI is REQUIRED to
+  // render this, not merely permitted to. See MinimumPointsStatus's own
+  // comment for what grounds each of the three states.
+  minimumPointsStatus: MinimumPointsStatus
 }
 
 // scoring/exclusions.ts's table only ever needs a pair when two fans COULD
@@ -534,7 +585,8 @@ export interface RouteToPointsResult {
 // fan-target-compatibility.test.ts for a constructed hand per compatible
 // pair where both real detectors actually fire together.
 export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext = {}): RouteToPointsResult {
-  const lockedInFans = computeHandPlan(hand, context).lockedInFans
+  const handPlan = computeHandPlan(hand, context)
+  const lockedInFans = handPlan.lockedInFans
   const lockedInPoints = lockedInFans.reduce((sum, f) => sum + (FAN_REGISTRY[f.fanId]?.points ?? 0) * f.count, 0)
 
   const candidates = estimateFanTargets(hand, context)
@@ -603,6 +655,24 @@ export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext
   }
 
   const bestCaseTotal = lockedInPoints + selected.reduce((sum, c) => sum + c.points, 0)
-  const reachesMinimum = bestCaseTotal >= MINIMUM_POINTS_TO_WIN
-  return { candidates, selected, lockedInPoints, bestCaseTotal, reachesMinimum, warning: !reachesMinimum }
+
+  // Exact beats estimate, estimate only speaks when exact is silent.
+  // handPlan.bestCaseReachesMinimum is non-null only at tenpai, where it's
+  // the real computeWaits-derived answer — checked FIRST and taken as final
+  // either way (true -> 'reachable', false -> 'currentWaitsFallShort'),
+  // never overridden by bestCaseTotal. The family estimate is consulted
+  // only pre-tenpai, where there is no exact answer yet, and even then only
+  // to raise 'unknown' to 'reachable' — it can never downgrade a tenpai-exact
+  // 'true'. See MinimumPointsStatus's own doc comment for why the earlier
+  // version of this branch (bestCaseTotal checked first) was backwards.
+  const minimumPointsStatus: MinimumPointsStatus =
+    handPlan.bestCaseReachesMinimum !== null
+      ? handPlan.bestCaseReachesMinimum
+        ? 'reachable'
+        : 'currentWaitsFallShort'
+      : bestCaseTotal >= MINIMUM_POINTS_TO_WIN
+        ? 'reachable'
+        : 'unknown'
+
+  return { candidates, selected, lockedInPoints, bestCaseTotal, minimumPointsStatus }
 }
