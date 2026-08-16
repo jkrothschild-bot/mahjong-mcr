@@ -1432,7 +1432,11 @@ corrected to match. See each item's status.
     sampled decision point, which caps how much precision lift ANY estimate-based signal can
     show against this ground truth. The clean, low-noise evidence the fix works is the
     reachable-rate correction (93.3% -> 46.6%, no longer near-universal); the precision numbers
-    are corroborating, not the headline claim.
+    are corroborating, not the headline claim. The precision figures are also built from
+    non-independent samples — every hand contributes multiple decision points, all sharing that
+    one hand's single outcome label — so the effective sample size is ~2,010 hands, not the raw
+    sample count, and the shanten-1 5.4-point gap carries no error bar; the `{1,1,1}` threshold
+    rests on the reachable-rate correction above, not on that gap.
 
     **Recorded, explicitly NOT addressed this pass (scoped instruction: gate three families,
     not ten):** of pre-tenpai samples still `crediblePointsTotal`-'reachable' after the `{1,1,1}`
