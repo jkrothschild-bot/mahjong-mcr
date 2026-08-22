@@ -2,7 +2,9 @@ import { useState } from 'react'
 import type { GameState, Hand, Seat, TileTypeId, Wind } from '@mahjong-mcr/engine'
 import { BestMoveTab } from './BestMoveTab.js'
 import { HandPlanTab } from './HandPlanTab.js'
+import { RouteToPointsTab } from './RouteToPointsTab.js'
 import { TileSafetyTab } from './TileSafetyTab.js'
+import { HUMAN_SEAT } from '../game/humanSeat.js'
 
 export interface HintPanelProps {
   hand: Hand
@@ -15,17 +17,20 @@ export interface HintPanelProps {
   onOpenEncyclopedia: () => void
 }
 
-type HintTab = 'bestMove' | 'handPlan' | 'tileSafety'
+type HintTab = 'bestMove' | 'handPlan' | 'routeToPoints' | 'tileSafety'
 
 const TABS: { id: HintTab; label: string }[] = [
   { id: 'bestMove', label: 'Best move' },
   { id: 'handPlan', label: 'Hand plan' },
+  { id: 'routeToPoints', label: '8-point route' },
   { id: 'tileSafety', label: 'Tile safety' },
 ]
 
 // SPEC.md §6's Strategy Coach: on-demand only, hidden until the player taps
-// Hint (CLAUDE.md — never automatic, never shown for bots). The three tabs
-// map onto the original nudge/options/tutor depth levels.
+// Hint (CLAUDE.md — never automatic, never shown for bots). The original
+// three tabs map onto nudge/options/tutor; the space-driven fourth route tab
+// is the owner-reviewed exception tracked in OPEN-WORK.md §A13 until the
+// governing docs are reconciled.
 //
 // Rendered as a modal overlay (same pattern as TileCountGrid/ScoreScreen),
 // not inline in the board's normal flow — an inline panel here pushed the
@@ -36,6 +41,8 @@ const TABS: { id: HintTab; label: string }[] = [
 // later phases add to these tabs.
 export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, selectedTypeId, onClose, onOpenEncyclopedia }: HintPanelProps) {
   const [tab, setTab] = useState<HintTab>('bestMove')
+
+  if (forSeat !== HUMAN_SEAT) return null
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50" onClick={onClose}>
@@ -66,7 +73,7 @@ export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, sele
           </div>
         </div>
 
-        <div role="tablist" aria-label="Hint depth" className="flex gap-1">
+        <div role="tablist" aria-label="Strategy Coach views" className="grid grid-cols-2 gap-1 sm:grid-cols-4">
           {TABS.map(({ id, label }) => (
             <button
               key={id}
@@ -86,6 +93,7 @@ export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, sele
         <div role="tabpanel">
           {tab === 'bestMove' && <BestMoveTab hand={hand} />}
           {tab === 'handPlan' && <HandPlanTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />}
+          {tab === 'routeToPoints' && <RouteToPointsTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />}
           {tab === 'tileSafety' && <TileSafetyTab state={state} forSeat={forSeat} selectedTypeId={selectedTypeId} />}
         </div>
       </div>

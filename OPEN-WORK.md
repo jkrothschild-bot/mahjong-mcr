@@ -182,6 +182,15 @@ removing or correcting; not done here — same convention as §C (docs corrected
 once actually verified), but recorded here rather than edited directly per this pass's own
 instruction not to touch `SPEC.md`.
 
+### A13. Strategy Coach now has a fourth tab, so the three-depth mapping docs are stale  `[code-verified 2026-08-22]`
+The owner-reviewed Route to Eight Points implementation adds an **8-point route** tab alongside
+Best move / Hand plan / Tile safety. Two governing claims now need owner reconciliation in lane A:
+`CLAUDE.md` says the Strategy Coach's three tabs map to the original nudge/options/tutor depth
+levels, and `SPEC.md §6` likewise defines exactly three tabs as that mapping. The new tab is a
+space/clarity decision rather than a fourth depth level, so neither claim accurately describes
+the shipped tab shell. This implementation is not authorised to rewrite either governing file;
+update both together once the owner chooses how the depth model should describe the fourth view.
+
 ---
 
 ## B. Tracked elsewhere — pointers only

@@ -25,7 +25,7 @@ describe('HintPanel', () => {
     expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('switches to the Hand plan and Tile safety tabs on click', () => {
+  it('switches among all four tabs with correct selection state', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
     render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
 
@@ -36,6 +36,11 @@ describe('HintPanel', () => {
     // /shanten/ text query is ambiguous — just assert the Hand plan tab's
     // own content rendered.
     expect(screen.getByRole('list', { name: 'Route table' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: '8-point route' }))
+    expect(screen.getByRole('tab', { name: '8-point route' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Hand plan' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByTestId('route-to-points-panel')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tile safety' }))
     expect(screen.getByRole('tab', { name: 'Tile safety' })).toHaveAttribute('aria-selected', 'true')
@@ -76,5 +81,12 @@ describe('HintPanel', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Fan encyclopedia' }))
     expect(onOpenEncyclopedia).toHaveBeenCalledOnce()
+  })
+
+  it('does not render the Strategy Coach for a bot seat', () => {
+    const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="south" state={state} forSeat={1} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
+    expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '8-point route' })).not.toBeInTheDocument()
   })
 })
