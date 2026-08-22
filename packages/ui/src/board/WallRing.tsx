@@ -1,94 +1,135 @@
 import type { CSSProperties } from 'react'
+import type { Seat, Wall } from '@mahjong-mcr/engine'
 import { Positioned } from '../stage/Positioned.js'
 import { useStageMetrics } from '../stage/StageMetricsContext.js'
-import { getBoardRegions } from '../stage/stageLayout.js'
+import { getBoardRegions, type Rect } from '../stage/stageLayout.js'
+import { CompactTileBack, COMPACT_TILE_BODY_STYLE } from '../tiles/CompactTileBack.js'
+import { buildPhysicalWall, type PhysicalWallSide, type PhysicalWallTile, type WallEdge } from './physicalWall.js'
+import { wallTileLayerOffsetRatio, wallTileLongSizeFromSideRegion, WALL_TILE_LAYER_SIZE_RATIO } from './wallTilePresentation.js'
 
-// Phase 7 (KICKOFF-phase7-board-rebuild.md): a thin decorative ring around
-// the discard field's own four sides — replaces the old single WallSegment
-// strip (a "next 7 tiles" indicator, still shown separately by WallCounter/
-// WallSegment... actually retired in this rebuild, see Board.tsx) with a
-// purely spatial frame matching the field it now wraps. No per-tile
-// identity here (unlike the old WallSegment, which used real wall
-// TileInstanceIds for animation continuity) — this is table furniture, not
-// game state; WallCounter's own text is still the authoritative "N left."
-//
-// Reads designWidth via useStageMetrics() itself, rather than taking
-// `regions` as a prop computed by a parent — this component is rendered
-// INSIDE <GameStage>'s children, so it sits inside the StageMetricsContext
-// Provider boundary; a parent computing getBoardRegions(designWidth)
-// itself (Board.tsx, which RENDERS GameStage and is therefore *outside*
-// that boundary) would silently read the context's default value
-// (MIN_DESIGN_WIDTH) instead of the live one — the exact bug this
-// component's own first version had, caught from a live screenshot: the
-// field/wall rendered at ~39% of board width (matching designWidth=1024)
-// at every viewport, while Seat.tsx's regions (correctly read from inside
-// the boundary) resized normally.
-const TILE_COURSE_BASE: CSSProperties = {
-  backgroundColor: '#e8cf9a',
-  border: '1px solid rgba(73, 42, 20, 0.72)',
-  boxShadow:
-    'inset 0 2px 1px rgba(255,255,235,0.9), inset 0 -3px 3px rgba(92,49,20,0.38), 0 2px 3px rgba(0,0,0,0.42)',
+export interface WallRingProps {
+  wall: Wall
+  dealerSeat: Seat
 }
 
-// A single slim course frames the playing field without consuming the edge
-// space needed by the side racks. It retains the ivory face, bevelled edges
-// and dark grout lines that make the strip read as individual wall tiles.
-function WallSegment({ orientation, edge }: { orientation: 'horizontal' | 'vertical'; edge: string }) {
-  const horizontal = orientation === 'horizontal'
-  const courseStyle: CSSProperties = {
-    ...TILE_COURSE_BASE,
-    backgroundImage: horizontal
-      ? 'repeating-linear-gradient(90deg, transparent 0 20px, rgba(78,43,20,0.78) 20px 22px)'
-      : 'repeating-linear-gradient(0deg, transparent 0 20px, rgba(78,43,20,0.78) 20px 22px)',
+function WallTile({
+  tile,
+  edge,
+  stackIndex,
+  horizontalLongSize,
+}: {
+  tile: PhysicalWallTile
+  edge: WallEdge
+  stackIndex: number
+  horizontalLongSize: number
+}) {
+  const horizontal = edge === 'top' || edge === 'bottom'
+  const layerOffset = wallTileLayerOffsetRatio(edge, tile.layer) * 100
+  const style: CSSProperties = {
+    ...(horizontal
+      ? {
+          left: '50%',
+          width: horizontalLongSize,
+          marginLeft: -horizontalLongSize / 2,
+          height: `${WALL_TILE_LAYER_SIZE_RATIO * 100}%`,
+          top: `${layerOffset}%`,
+        }
+      : { insetBlock: '4%', width: `${WALL_TILE_LAYER_SIZE_RATIO * 100}%`, left: `${layerOffset}%` }),
+    zIndex: tile.layer === 'top' ? 2 : 1,
   }
-
   return (
     <div
-      data-testid={`wall-segment-${edge}`}
-      className="flex h-full w-full overflow-hidden rounded-[3px] bg-amber-950/80 p-px shadow-[0_3px_5px_rgba(0,0,0,0.5)]"
+      data-wall-layer={tile.layer}
+      data-wall-position={`${edge}:${stackIndex}:${tile.layer}`}
+      data-wall-tile-id={tile.tileId}
+      className="absolute"
+      style={style}
     >
-      <div data-testid={`wall-course-${edge}`} className="h-full w-full min-h-0 min-w-0" style={courseStyle} />
+      <CompactTileBack
+        className="absolute inset-0 overflow-hidden rounded-[3px]"
+        style={{ boxShadow: COMPACT_TILE_BODY_STYLE.boxShadow }}
+      />
     </div>
   )
 }
 
-export function WallRing() {
+function WallSide({
+  side,
+  region,
+  horizontalLongSize,
+}: {
+  side: PhysicalWallSide
+  region: Rect
+  horizontalLongSize: number
+}) {
+  const horizontal = side.edge === 'top' || side.edge === 'bottom'
+  const reverse = side.edge === 'top' || side.edge === 'right'
+  return (
+    <Positioned
+      x={region.x + region.width / 2}
+      y={region.y + region.height / 2}
+      naturalWidth={region.width}
+      naturalHeight={region.height}
+    >
+      <div
+        data-testid={`wall-side-${side.edge}`}
+        className={`flex h-full w-full ${horizontal ? 'flex-row' : 'flex-col'}`}
+        style={{
+          ...(horizontal ? { width: horizontalLongSize * 18, marginInline: 'auto' } : undefined),
+          ...(reverse ? { flexDirection: horizontal ? 'row-reverse' : 'column-reverse' } : undefined),
+        }}
+      >
+        {side.stacks.map((stack) => (
+          <div key={stack.stackIndex} data-testid="wall-stack" className="relative min-h-0 min-w-0 flex-1">
+            {stack.bottom && (
+              <WallTile
+                tile={stack.bottom}
+                edge={side.edge}
+                stackIndex={stack.stackIndex}
+                horizontalLongSize={horizontalLongSize}
+              />
+            )}
+            {stack.top && (
+              <WallTile
+                tile={stack.top}
+                edge={side.edge}
+                stackIndex={stack.stackIndex}
+                horizontalLongSize={horizontalLongSize}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </Positioned>
+  )
+}
+
+// A state-backed physical wall: four dealer-anchored sides, each retaining
+// all 18 two-high stack positions. Missing front/back tiles are omitted from
+// their exact slots, so partial stacks and corner crossings follow the same
+// authoritative pointers used by the engine. The dealer anchor is the
+// documented Phase 8 rendering convention, not a simulated dice break.
+export function WallRing({ wall, dealerSeat }: WallRingProps) {
   const { designWidth } = useStageMetrics()
   const regions = getBoardRegions(designWidth).wall
+  const regionForEdge: Record<WallEdge, Rect> = {
+    top: regions.top,
+    right: regions.right,
+    bottom: regions.bottom,
+    left: regions.left,
+  }
+  const sides = buildPhysicalWall(wall, dealerSeat)
+  const horizontalLongSize = wallTileLongSizeFromSideRegion(regions.left)
   return (
     <div aria-hidden="true" data-testid="wall-ring">
-      <Positioned
-        x={regions.top.x + regions.top.width / 2}
-        y={regions.top.y + regions.top.height / 2}
-        naturalWidth={regions.top.width}
-        naturalHeight={regions.top.height}
-      >
-        <WallSegment orientation="horizontal" edge="top" />
-      </Positioned>
-      <Positioned
-        x={regions.bottom.x + regions.bottom.width / 2}
-        y={regions.bottom.y + regions.bottom.height / 2}
-        naturalWidth={regions.bottom.width}
-        naturalHeight={regions.bottom.height}
-      >
-        <WallSegment orientation="horizontal" edge="bottom" />
-      </Positioned>
-      <Positioned
-        x={regions.left.x + regions.left.width / 2}
-        y={regions.left.y + regions.left.height / 2}
-        naturalWidth={regions.left.width}
-        naturalHeight={regions.left.height}
-      >
-        <WallSegment orientation="vertical" edge="left" />
-      </Positioned>
-      <Positioned
-        x={regions.right.x + regions.right.width / 2}
-        y={regions.right.y + regions.right.height / 2}
-        naturalWidth={regions.right.width}
-        naturalHeight={regions.right.height}
-      >
-        <WallSegment orientation="vertical" edge="right" />
-      </Positioned>
+      {sides.map((side) => (
+        <WallSide
+          key={side.edge}
+          side={side}
+          region={regionForEdge[side.edge]}
+          horizontalLongSize={horizontalLongSize}
+        />
+      ))}
     </div>
   )
 }

@@ -6,7 +6,7 @@
 // which the dev occupancy harness benefits from. Both stay fully tested.
 // Delete only alongside a decision that contrived hands aren't needed.
 
-import { dealHandFromWall, type GameState, type StartHandParams } from './game-state.js'
+import { dealHandFromWall, initialPrimaryDealGroups, type GameState, type StartHandParams } from './game-state.js'
 import type { Seat } from './meld.js'
 import { mulberry32, shuffle } from './rng.js'
 import { buildDeck, typeIdOfInstance, type TileInstanceId, type TileTypeId, type Wind } from './tiles.js'
@@ -101,11 +101,10 @@ function buildScenarioWall(preset: ScenarioPreset, seed: number, forSeat: Seat, 
   const shuffledRemainder = shuffle(remainingStandard, rng)
   const shuffledBonusTiles = shuffle(buildDeck().slice(STANDARD_INSTANCE_COUNT), rng)
 
-  const dealOrder: Seat[] = []
-  for (let round = 0; round < 13; round++) {
-    for (let i = 0; i < 4; i++) dealOrder.push(((dealerSeat + i) % 4) as Seat)
-  }
-  dealOrder.push(dealerSeat)
+  // Share the canonical §3.5.7 group order with dealHandFromWall. Scenario
+  // construction chooses WHICH tile ids occupy those slots; it must never
+  // carry a second, stale definition of who receives each slot.
+  const dealOrder = initialPrimaryDealGroups(dealerSeat).flatMap(({ seat, count }) => new Array<Seat>(count).fill(seat))
 
   const tiles: TileInstanceId[] = new Array(144)
   let presetIndex = 0

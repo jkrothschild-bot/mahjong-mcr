@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MotionConfig, useReducedMotion } from 'motion/react'
 import { typeIdOfInstance, type TileTypeId } from '@mahjong-mcr/engine'
 import { Board } from './board/Board.js'
@@ -28,6 +28,7 @@ import { trackSafely } from './analytics/AnalyticsService.js'
 import { HomeIcon } from './components/HomeIcon.js'
 import { LogoutIcon } from './components/LogoutIcon.js'
 import { MAHJONG_ANNOUNCEMENT_MS } from './game/gameEventPresentation.js'
+import { buildInitialDealFrames } from './game/initialDealPresentation.js'
 
 export interface AppProps {
   config?: GameConfig
@@ -37,9 +38,12 @@ export interface AppProps {
   onRestart?: () => void | Promise<void>
   onHome?: (snapshot: LoopState) => void | Promise<void>
   onLogout?: (snapshot: LoopState) => void | Promise<void>
+  // GamePage enables this only for a genuinely new route-level game. A
+  // restored snapshot must reconstruct immediately and never replay deal.
+  animateInitialDeal?: boolean
 }
 
-function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, saveStatus = 'saved', onRestart, onHome, onLogout }: AppProps) {
+function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, saveStatus = 'saved', onRestart, onHome, onLogout, animateInitialDeal = false }: AppProps) {
   const capabilities = capabilitiesFor(config)
   const analytics = useAnalytics()
   const { settings, update } = useSettings()
@@ -60,6 +64,8 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
   const [boardPreviewOpen, setBoardPreviewOpen] = useState(false)
   const [homePending, setHomePending] = useState(false)
   const [logoutPending, setLogoutPending] = useState(false)
+  const [dealAnimationActive, setDealAnimationActive] = useState(animateInitialDeal && initialSnapshot === undefined)
+  const [dealFrameIndex, setDealFrameIndex] = useState(0)
   const { stats, recordHandResult } = useSessionStats()
   // A snapshot taken at the moment Replay opens (not the live matchMoveLogs
   // reference) — the live match keeps advancing in the background while
@@ -94,6 +100,7 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
     botSpeedMs: settings.botSpeedMs,
     initialSnapshot,
     onSnapshotChange,
+    paused: dealAnimationActive,
     // No `paused` any more: the "All discards" overlay was its only caller,
     // and it's gone (the discard field is readable in place now, so a
     // separate full-viewport view of the same tiles wasn't earning its
@@ -104,6 +111,44 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
     // problem and have never paused; if that's worth fixing, this is the
     // hook to fix it with.
   })
+  const dealFrames = useMemo(
+    () => buildInitialDealFrames(state.seed, state.dealerSeat),
+    [state.seed, state.dealerSeat],
+  )
+  useEffect(() => {
+    if (!dealAnimationActive) return
+    if (reducedMotion) {
+      setDealAnimationActive(false)
+      setDealFrameIndex(0)
+      return
+    }
+    const atLastFrame = dealFrameIndex >= dealFrames.length - 1
+    const delay = atLastFrame
+      ? 220
+      : dealFrameIndex === 0
+        ? 650
+        : dealFrames[dealFrameIndex + 1]?.phase === 'flower-replacement'
+          ? 180
+          : 130
+    const timeout = window.setTimeout(() => {
+      if (atLastFrame) {
+        setDealAnimationActive(false)
+        setDealFrameIndex(0)
+      } else {
+        setDealFrameIndex((index) => index + 1)
+      }
+    }, delay)
+    return () => window.clearTimeout(timeout)
+  }, [dealAnimationActive, dealFrameIndex, dealFrames, reducedMotion])
+  const initialDealFrame = dealAnimationActive ? dealFrames[Math.min(dealFrameIndex, dealFrames.length - 1)] : undefined
+
+  const beginNextHand = () => {
+    if (animateInitialDeal) {
+      setDealFrameIndex(0)
+      setDealAnimationActive(true)
+    }
+    startNextHand()
+  }
   // Dev-only worst-case occupancy override (KICKOFF-phase5-melds-backs.md's
   // prerequisite harness) — ?occupancy=worst, DEV builds only, read once at
   // mount (a reload picks up a changed param; this is a screenshot-capture
@@ -310,25 +355,36 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
           // Sort forced a second update.
           key={boardPreviewOpen ? 'full-board-preview' : 'live-board'}
           state={displayState}
-          enableSharedLayout={!boardPreviewOpen && devOccupancyMode === null}
+          // Initial dealing already advances in explicit, readable groups.
+          // Measuring every existing stage object for FLIP on each of those
+          // 16+ frames is disproportionately expensive on iPad; disable the
+          // board-wide registry only for this short sequence. It returns for
+          // live front/back draws, where one tile's travel is informative.
+          enableSharedLayout={!boardPreviewOpen && devOccupancyMode === null && !dealAnimationActive}
           matchState={matchState}
           matchScores={matchScores}
-          isHumanTurn={boardPreviewOpen ? false : isHumanTurn}
+          isHumanTurn={boardPreviewOpen || dealAnimationActive ? false : isHumanTurn}
           selectedTileId={selectedTileId}
           onTileClick={selectTile}
-          onRequestDiscardTile={!boardPreviewOpen && isHumanTurn ? requestDiscardTile : undefined}
+          onRequestDiscardTile={!boardPreviewOpen && !dealAnimationActive && isHumanTurn ? requestDiscardTile : undefined}
           selectedTypeId={selectedTypeId}
           onInspectTile={inspectTile}
           showDiscardHint={capabilities.showStrategyCoach && !hasHumanDiscarded}
+          initialDealFrame={boardPreviewOpen ? undefined : initialDealFrame}
         />
 
-        <ClaimPrompt state={state} pendingClaim={humanPendingClaim} onDeclare={submitHumanMove} />
+        <ClaimPrompt
+          state={state}
+          pendingClaim={humanPendingClaim}
+          obscured={hintOpen}
+          onDeclare={submitHumanMove}
+        />
 
         {/* The human's own-turn declarations (self-drawn win, concealed and
             added kongs). Without this they are computed as legal by the
             engine and usable by every bot, but unreachable for the player —
             see TurnActionPrompt.tsx. */}
-        <TurnActionPrompt state={state} isHumanTurn={isHumanTurn} onDeclare={submitHumanMove} />
+        <TurnActionPrompt state={state} isHumanTurn={!dealAnimationActive && isHumanTurn} onDeclare={submitHumanMove} />
 
         {capabilities.showStrategyCoach && hintOpen && (
           <HintPanel
@@ -354,7 +410,7 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
       {resultPresentationReady && <ScoreScreen
         state={state}
         matchScores={matchScores}
-        onNextHand={startNextHand}
+        onNextHand={beginNextHand}
         onFanClick={capabilities.showScoringHelp ? openEncyclopedia : undefined}
         onReviewHand={openReplay}
         matchCompleted={matchState.completed}
@@ -383,8 +439,16 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
         open={restartConfirmOpen}
         onConfirm={() => {
           setRestartConfirmOpen(false)
-          if (!onRestart) { resetMatch(); setHasHumanDiscarded(false); return }
-          void Promise.resolve(onRestart()).catch(() => {}).finally(() => { resetMatch(); setHasHumanDiscarded(false) })
+          const restartWithDeal = () => {
+            if (animateInitialDeal) {
+              setDealFrameIndex(0)
+              setDealAnimationActive(true)
+            }
+            resetMatch()
+            setHasHumanDiscarded(false)
+          }
+          if (!onRestart) { restartWithDeal(); return }
+          void Promise.resolve(onRestart()).catch(() => {}).finally(restartWithDeal)
         }}
         onCancel={() => setRestartConfirmOpen(false)}
       />

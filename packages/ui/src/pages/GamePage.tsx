@@ -102,5 +102,5 @@ export function GamePage() {
   storeCurrentGameConfig(config)
   sessionRef.current ??= restored ? { id: restored.id, startedAt: restored.startedAt } : { id: createSessionId(), startedAt: new Date().toISOString() }
 
-  return <App config={config} initialSnapshot={restored?.game} onSnapshotChange={onSnapshotChange} saveStatus={saveStatus} onRestart={onRestart} onHome={onHome} onLogout={auth.user ? onLogout : undefined} />
+  return <App config={config} initialSnapshot={restored?.game} animateInitialDeal={!restored} onSnapshotChange={onSnapshotChange} saveStatus={saveStatus} onRestart={onRestart} onHome={onHome} onLogout={auth.user ? onLogout : undefined} />
 }

@@ -66,6 +66,29 @@ describe('ClaimPrompt', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('temporarily hides an obscured claim without resolving it, then restores the same decision', () => {
+    const [discardedTile] = idsFor('C5', 1)
+    const pendingClaim: PendingClaim = {
+      tile: discardedTile!,
+      fromSeat: 3,
+      kind: 'discard',
+      eligibleSeats: [0],
+      declarations: {},
+    }
+    const state = stateWithPendingClaim(emptyHand(), pendingClaim)
+    const onDeclare = vi.fn()
+    const { rerender } = render(
+      <ClaimPrompt state={state} pendingClaim={pendingClaim} obscured onDeclare={onDeclare} />,
+    )
+
+    expect(screen.queryByRole('dialog', { name: 'Claim this discard' })).not.toBeInTheDocument()
+    expect(onDeclare).not.toHaveBeenCalled()
+
+    rerender(<ClaimPrompt state={state} pendingClaim={pendingClaim} onDeclare={onDeclare} />)
+    expect(screen.getByRole('dialog', { name: 'Claim this discard' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pass' })).toBeInTheDocument()
+  })
+
   it('renders a button for every legal option, including pass', () => {
     // Seat 0 holds 2 C5s — can pung (or win) the discarded 3rd. Two dragon
     // pungs (rather than one dragon pung + a plain chow) so this clears

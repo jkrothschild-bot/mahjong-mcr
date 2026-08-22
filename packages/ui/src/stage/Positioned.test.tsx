@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { WallDrawMotionContext } from '../board/WallDrawMotion.js'
 import { Positioned } from './Positioned.js'
 
 function boxStyle(rotation: number, scale = 1) {
@@ -64,5 +65,33 @@ describe('Positioned', () => {
     )
     const el = container.firstElementChild as HTMLElement
     expect(el.style.transform).toBe('rotate(90deg)')
+  })
+
+  it('registers and temporarily hides a wall-draw destination without rendering a proxy itself', () => {
+    const registerDestination = vi.fn(() => () => {})
+    const { container } = render(
+      <WallDrawMotionContext.Provider value={{
+        transitions: new Map([['tile-1', {
+          id: 'draw:1:1',
+          tileId: 1,
+          source: { x: 10, y: 20, width: 12, height: 18 },
+        }]]),
+        registerDestination,
+      }}>
+        <Positioned layoutId="tile-1" x={100} y={200} naturalWidth={30} naturalHeight={50}>
+          <span>tile</span>
+        </Positioned>
+      </WallDrawMotionContext.Provider>,
+    )
+
+    expect(container.firstElementChild).toHaveStyle({ visibility: 'hidden' })
+    expect(registerDestination).toHaveBeenCalledWith('tile-1', {
+      x: 100,
+      y: 200,
+      width: 30,
+      height: 50,
+      rotation: 0,
+    })
+    expect(container.querySelector('[data-wall-draw-overlay]')).not.toBeInTheDocument()
   })
 })

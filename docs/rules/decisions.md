@@ -1367,6 +1367,22 @@ corrected to match. See each item's status.
     The tell that separated it from a genuine tie was the points column, not the fan-name diff:
     a benign tie has `ours == pmgb` totals, these had `ours == pmgb - 1`.
 
+37. **Initial deal order and physical wall mapping corrected (2026-08-16).**
+    The engine previously handed out 13 rounds of one tile to each seat, and
+    performed each Flower replacement immediately. That produced the right
+    final tile *counts* but not the official physical deal. **Status:
+    CONFIRMED, §3.5.7 items 4-6 (p.10-11)**: every player builds 18 two-high
+    stacks (144 tiles total); the dealer takes the first four tiles, followed
+    by South/West/North, repeated three times; East then takes the upper tiles
+    of the first and third stacks ("one and three"), the other seats take one
+    each, and only after the 53 primary tiles are distributed are Flowers
+    exposed and replaced from the back, dealer first. `performInitialDeal`
+    now owns that sequence and supplies deterministic presentation steps, so
+    engine allocation and animation cannot drift. The shuffled array remains
+    draw order; UI physical slots 48-53 map as `[48,52,49,50,51,53]` to show
+    the one-and-three removal without changing wall order. The exact break is
+    still item #17's dealer-anchored rendering convention, not dice metadata.
+
 ## Open follow-up work
 
 - ~~**Highest priority, a live scoring regression:** revert `exclusions.ts`'s `[4,56]`/`[6,56]`/

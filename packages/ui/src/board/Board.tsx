@@ -23,6 +23,7 @@ import { SharedLayoutEnabledContext } from '../stage/Positioned.js'
 import type { SeatRole } from '../stage/stageLayout.js'
 import { GameEventAnnouncement } from '../game/GameEventAnnouncement.js'
 import { useGameEventPresentation } from '../game/useGameEventPresentation.js'
+import type { InitialDealFrame } from '../game/initialDealPresentation.js'
 import { useSettingsContext } from '../settings/SettingsContext.js'
 import { DiscardField } from './DiscardField.js'
 import { Seat } from './Seat.js'
@@ -32,6 +33,8 @@ import { computeUnseenCounts } from './unseenCounts.js'
 import { WallCounter } from './WallCounter.js'
 import { WallRing } from './WallRing.js'
 import { WindIndicator } from './WindIndicator.js'
+import { InitialDealHands } from './InitialDealHands.js'
+import { WallDrawMotionProvider } from './WallDrawMotion.js'
 
 export interface BoardProps {
   state: GameState
@@ -63,6 +66,10 @@ export interface BoardProps {
   // Synthetic occupancy previews reuse tile ids, so their tile positions
   // cannot safely participate in Motion's shared-layout registry.
   enableSharedLayout?: boolean
+  // Present only during a fresh-hand deal. Its wall/hands are deterministic
+  // projections of performInitialDeal; authoritative GameState remains
+  // untouched and resumed games omit this prop entirely.
+  initialDealFrame?: InitialDealFrame
 }
 
 // Physical seat position never changes hand-to-hand (unlike wind labels,
@@ -90,6 +97,7 @@ export function Board({
   onInspectTile,
   showDiscardHint,
   enableSharedLayout = true,
+  initialDealFrame,
 }: BoardProps) {
   const { soundEffects } = useSettingsContext()
   const { announcement, recentMeldId } = useGameEventPresentation(state, soundEffects)
@@ -245,11 +253,13 @@ export function Board({
     <div
       data-testid="game-board"
       data-shared-layout={enableSharedLayout ? 'enabled' : 'disabled'}
+      data-initial-deal={initialDealFrame ? initialDealFrame.phase : undefined}
+      aria-busy={initialDealFrame ? 'true' : undefined}
       className="flex w-full min-h-0 flex-1 flex-col items-center gap-1"
     >
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <WindIndicator matchState={matchState} />
-        <WallCounter wall={state.wall} />
+        <WallCounter wall={initialDealFrame?.wall ?? state.wall} />
         <TileInspector selectedTypeId={selectedTypeId} unseenCounts={unseenCounts} />
         {/* Moved down here (was its own full-width row above <main> in
             App.tsx) to reclaim a whole row of page height for GameStage's
@@ -272,52 +282,62 @@ export function Board({
         }}
       >
         <GameStage>
-          <TableSurface />
-          <WallRing />
-          <DiscardField
-            state={state}
-            selectedTypeId={selectedTypeId ?? undefined}
-            onTileClick={onInspectTile}
-            omitTileId={claimedWinningTile}
-            latestDiscardId={latestDiscardId}
-          />
-          {state.players.map((player) => {
-            const offset = (player.seat - HUMAN_SEAT + 4) % 4
-            const role = OFFSET_ROLE[offset]!
-            const isHuman = player.seat === HUMAN_SEAT
-            return (
-              <Seat
-                key={player.seat}
-                seat={player.seat}
-                role={role}
-                player={player}
-                isDealer={player.seat === state.dealerSeat}
-                isCurrentTurn={player.seat === state.currentSeat}
-                isHuman={isHuman}
-                matchScore={matchScores[player.seat]}
-                selectedTypeId={selectedTypeId ?? undefined}
-                handOrder={isHuman ? order : undefined}
-                selectedTileId={isHuman ? selectedTileId : undefined}
-                onTileClick={isHuman ? handleHumanHandTileClick : undefined}
-                onRequestDiscardTile={isHuman ? onRequestDiscardTile : undefined}
-                activeId={isHuman ? activeId : undefined}
-                overId={isHuman ? overId : undefined}
-                onSort={isHuman ? sort : undefined}
-                showDiscardHint={isHuman ? showDiscardHint : undefined}
-                justDrawnTileId={isHuman ? justDrawnTileId : undefined}
-                onInspectTile={onInspectTile}
-                revealConcealed={revealConcealed}
-                revealOrder={revealOrders[player.seat]}
-                revealExtraTiles={
-                  winInfo && player.seat === winInfo.winnerSeat && claimedWinningTile !== null
-                    ? [claimedWinningTile]
-                    : undefined
-                }
-                revealWinningTileId={winInfo && player.seat === winInfo.winnerSeat ? markedWinningTile : undefined}
-                recentMeldId={recentMeldId ?? undefined}
-              />
-            )
-          })}
+          <WallDrawMotionProvider
+            actions={state.actionLog}
+            wall={state.wall}
+            dealerSeat={state.dealerSeat}
+            handKey={`${state.seed}:${state.handNumber}`}
+            enabled={enableSharedLayout && !initialDealFrame}
+          >
+            <TableSurface />
+            <WallRing wall={initialDealFrame?.wall ?? state.wall} dealerSeat={state.dealerSeat} />
+            {initialDealFrame ? <InitialDealHands frame={initialDealFrame} /> : <>
+            <DiscardField
+              state={state}
+              selectedTypeId={selectedTypeId ?? undefined}
+              onTileClick={onInspectTile}
+              omitTileId={claimedWinningTile}
+              latestDiscardId={latestDiscardId}
+            />
+            {state.players.map((player) => {
+              const offset = (player.seat - HUMAN_SEAT + 4) % 4
+              const role = OFFSET_ROLE[offset]!
+              const isHuman = player.seat === HUMAN_SEAT
+              return (
+                <Seat
+                  key={player.seat}
+                  seat={player.seat}
+                  role={role}
+                  player={player}
+                  isDealer={player.seat === state.dealerSeat}
+                  isCurrentTurn={player.seat === state.currentSeat}
+                  isHuman={isHuman}
+                  matchScore={matchScores[player.seat]}
+                  selectedTypeId={selectedTypeId ?? undefined}
+                  handOrder={isHuman ? order : undefined}
+                  selectedTileId={isHuman ? selectedTileId : undefined}
+                  onTileClick={isHuman ? handleHumanHandTileClick : undefined}
+                  onRequestDiscardTile={isHuman ? onRequestDiscardTile : undefined}
+                  activeId={isHuman ? activeId : undefined}
+                  overId={isHuman ? overId : undefined}
+                  onSort={isHuman ? sort : undefined}
+                  showDiscardHint={isHuman ? showDiscardHint : undefined}
+                  justDrawnTileId={isHuman ? justDrawnTileId : undefined}
+                  onInspectTile={onInspectTile}
+                  revealConcealed={revealConcealed}
+                  revealOrder={revealOrders[player.seat]}
+                  revealExtraTiles={
+                    winInfo && player.seat === winInfo.winnerSeat && claimedWinningTile !== null
+                      ? [claimedWinningTile]
+                      : undefined
+                  }
+                  revealWinningTileId={winInfo && player.seat === winInfo.winnerSeat ? markedWinningTile : undefined}
+                  recentMeldId={recentMeldId ?? undefined}
+                />
+              )
+            })}
+            </>}
+          </WallDrawMotionProvider>
         </GameStage>
       </DndContext>
 

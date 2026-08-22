@@ -126,7 +126,7 @@ describe('placeGroup', () => {
   })
 })
 
-// The approved single-course-wall geometry — a byte-exact snapshot at
+// The approved physical-wall geometry — a byte-exact snapshot at
 // designWidth=1768 (the original board rebuild's reference point), hand-derived
 // from the layout constants, NOT computed by calling the function under test
 // (asserting a function against its own output is tautological and would
@@ -137,10 +137,10 @@ const GOLDEN_BOARD_1768: BoardRegions = {
     header: { x: 0, y: 782, width: 1768, height: 14 },
   },
   north: {
-    header: { x: 193, y: 0, width: 1382, height: 14 },
+    header: { x: 209, y: 0, width: 1350, height: 14 },
     headerRotation: 0,
-    line: { x: 193, y: 14, width: 1382, height: 80 },
-    flowers: { x: 193, y: 14, width: 1382, height: 80 },
+    line: { x: 209, y: 14, width: 1350, height: 80 },
+    flowers: { x: 209, y: 14, width: 1350, height: 80 },
   },
   // west/east headers are the left/right wood rail, full stage height,
   // rotated — see stageLayout.ts's SIDE HEADER PLACEMENT comment and the
@@ -148,31 +148,31 @@ const GOLDEN_BOARD_1768: BoardRegions = {
   west: {
     header: { x: 0, y: 0, width: 14, height: 796 },
     headerRotation: -90,
-    line: { x: 16, y: 5, width: 161, height: 625 },
+    line: { x: 16, y: 5, width: 161, height: 613 },
     flowers: { x: 16, y: 572, width: 161, height: 188 },
   },
   east: {
     header: { x: 1754, y: 0, width: 14, height: 796 },
     headerRotation: 90,
-    line: { x: 1591, y: 5, width: 161, height: 625 },
+    line: { x: 1591, y: 5, width: 161, height: 613 },
     flowers: { x: 1591, y: 572, width: 161, height: 188 },
   },
   discards: {
-    west: { x: 193, y: 106, width: 345.5, height: 524 },
-    you: { x: 538.5, y: 368, width: 691, height: 262 },
-    north: { x: 538.5, y: 106, width: 691, height: 262 },
-    east: { x: 1229.5, y: 106, width: 345.5, height: 524 },
+    west: { x: 209, y: 118, width: 337.5, height: 500 },
+    you: { x: 546.5, y: 368, width: 675, height: 250 },
+    north: { x: 546.5, y: 118, width: 675, height: 250 },
+    east: { x: 1221.5, y: 118, width: 337.5, height: 500 },
   },
   wall: {
-    top: { x: 193, y: 94, width: 1382, height: 12 },
-    bottom: { x: 193, y: 630, width: 1382, height: 12 },
-    left: { x: 181, y: 106, width: 12, height: 524 },
-    right: { x: 1575, y: 106, width: 12, height: 524 },
+    top: { x: 209, y: 94, width: 1350, height: 24 },
+    bottom: { x: 209, y: 618, width: 1350, height: 24 },
+    left: { x: 181, y: 118, width: 28, height: 500 },
+    right: { x: 1559, y: 118, width: 28, height: 500 },
   },
 }
 
 describe('Phase 7 board rebuild: getBoardRegions', () => {
-  it('matches the approved single-course wall geometry at designWidth=1768', () => {
+  it('matches the approved physical-wall geometry at designWidth=1768', () => {
     expect(getBoardRegions(1768)).toEqual(GOLDEN_BOARD_1768)
   })
 
@@ -274,7 +274,7 @@ describe('seat identity bands ride the table rail', () => {
 })
 
 describe('compact side bot rack', () => {
-  it.each(WIDTHS)('uses the reclaimed single-wall course to clear both outer rails, at designWidth=%i', (designWidth) => {
+  it.each(WIDTHS)('keeps the widened physical wall clear of both side racks and outer rails, at designWidth=%i', (designWidth) => {
     const b = getBoardRegions(designWidth)
     // SeatLine adds 2px of wooden-rack padding beyond the line region, so
     // 2px here places the visible holder exactly inside the felt boundary.
@@ -283,8 +283,8 @@ describe('compact side bot rack', () => {
 
     expect(westClearance).toBe(2)
     expect(eastClearance).toBe(2)
-    expect(b.wall.left.width).toBe(12)
-    expect(b.wall.right.width).toBe(12)
+    expect(b.wall.left.width).toBe(28)
+    expect(b.wall.right.width).toBe(28)
     expect(b.west.line.x + b.west.line.width).toBeLessThan(b.wall.left.x)
     expect(b.east.line.x).toBeGreaterThan(b.wall.right.x + b.wall.right.width)
   })

@@ -11,6 +11,10 @@ export interface ClaimPromptProps {
   // undefined unless HUMAN_SEAT itself must declare right now (see
   // useGameLoop's humanPendingClaim) — the component renders nothing then.
   pendingClaim: PendingClaim | undefined
+  // A foreground learning surface can temporarily hide this card without
+  // resolving or mutating the authoritative pending claim. When that surface
+  // closes, the same decision and legal options are rendered again.
+  obscured?: boolean
   onDeclare: (move: Move) => void
 }
 
@@ -46,7 +50,7 @@ function windowKey(pendingClaim: PendingClaim | undefined): string | null {
 // §8 lists a claim timer as a settings item, but the owner asked for it to
 // be removed entirely — it forced a decision under time pressure rather
 // than letting a learner actually think through their options).
-export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps) {
+export function ClaimPrompt({ state, pendingClaim, obscured = false, onDeclare }: ClaimPromptProps) {
   const declaredRef = useRef(false)
   const key = windowKey(pendingClaim)
 
@@ -57,7 +61,7 @@ export function ClaimPrompt({ state, pendingClaim, onDeclare }: ClaimPromptProps
     declaredRef.current = false
   }, [key])
 
-  if (!pendingClaim) return null
+  if (!pendingClaim || obscured) return null
 
   function declare(move: Move) {
     if (declaredRef.current) return

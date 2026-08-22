@@ -521,13 +521,11 @@ export function HandTiles({
           {flowers.map((id, index) => {
             const p = flowerPlaced[index]!
             const typeId = typeIdOfInstance(id)
-            // Flowers never move between rendered zones after replacement,
-            // so they do not need shared-layout identity. Preview mode
-            // reuses the eight physical flower ids across four hands;
-            // giving those duplicates one layoutId makes Motion merge them
-            // and leaves some trays invisible until another render.
+            // The id connects a live Flower's back-wall draw to this tray.
+            // Synthetic preview mode safely reuses ids because Board turns
+            // shared layout off for that entire tree.
             return (
-              <Positioned key={id} x={p.x} y={p.y} naturalWidth={flowerWidth} naturalHeight={flowerHeight}>
+              <Positioned key={id} layoutId={String(id)} x={p.x} y={p.y} naturalWidth={flowerWidth} naturalHeight={flowerHeight}>
                 <div
                   data-tile-id={id}
                   data-testid={`flower-tile-${id}`}

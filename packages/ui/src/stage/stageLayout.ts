@@ -479,7 +479,7 @@ export interface BoardRegions {
 }
 
 // Vertical bands (top to bottom), fixed regardless of designWidth — sum to
-// STAGE_HEIGHT exactly: 14 + 80 + 12 + 524 + 12 + 140 + 14 = 796.
+// STAGE_HEIGHT exactly: 14 + 80 + 24 + 500 + 24 + 140 + 14 = 796.
 // North reserves exactly one 80px playing-tile row. Its uncommon flowers
 // are an overlay below the wall, so an empty flower tray never steals a
 // permanent row from the discard field.
@@ -495,20 +495,24 @@ export const RAIL_PX = 14
 
 const HEADER_H = RAIL_PX
 const NORTH_LINE_H = 80
-// One physical tile course is enough to frame the discard field. The old
-// 24px/two-course wall spent scarce edge space on decoration and left the
-// side racks almost touching the outer table rail, especially on iPad.
-const WALL_H = 12
-// Reclaim the two removed horizontal courses for the playing field while
-// keeping the human and north bands, and the stage height, unchanged.
-const FIELD_H = 524
+// WallRing overlaps its top/bottom layers in depth rather than allocating
+// two full tile-face rows. Twenty-four design pixels is enough to expose the
+// cream body and the second tile without materially reducing the field.
+const WALL_HORIZONTAL_DEPTH = 24
+// East/west need slightly more depth because their short 18-stack run made
+// a 12px band read as a line. This grows inward only; the side racks and
+// outer rail stay exactly where they are.
+const WALL_SIDE_DEPTH = 28
+// The human/north bands and total stage height remain fixed. The extra 12px
+// on each horizontal wall comes only from the central playing field.
+const FIELD_H = 500
 const HUMAN_ROW_H = 140
 const NORTH_HEADER_Y = 0
 const NORTH_LINE_Y = NORTH_HEADER_Y + HEADER_H
 const WALL_TOP_Y = NORTH_LINE_Y + NORTH_LINE_H
-const FIELD_Y = WALL_TOP_Y + WALL_H
+const FIELD_Y = WALL_TOP_Y + WALL_HORIZONTAL_DEPTH
 const WALL_BOTTOM_Y = FIELD_Y + FIELD_H
-const HUMAN_ROW_Y = WALL_BOTTOM_Y + WALL_H
+const HUMAN_ROW_Y = WALL_BOTTOM_Y + WALL_HORIZONTAL_DEPTH
 const HUMAN_HEADER_Y = HUMAN_ROW_Y + HUMAN_ROW_H
 
 // West/east seat lines run independently of the header/north/wall/field/
@@ -521,10 +525,9 @@ const HUMAN_HEADER_Y = HUMAN_ROW_Y + HUMAN_ROW_H
 // Two rotated columns hold the 18-tile main-hand maximum at 161px
 // (2*80+1). Flowers share this same footprint at the bottom, so they add no
 // third column. The playing width stays fixed; only its edge inset changes.
-// Keep the discard field's horizontal boundaries stable, but spend the
-// 12px recovered from each side wall on rail clearance for the side racks.
-// The rack therefore moves inward from 4px to 16px without losing any of
-// its 161px two-column tile capacity.
+// The side racks keep their established 16px rail clearance and full 161px
+// two-column capacity. The physical wall grows inward from SIDE_WIDTH, so
+// widening it cannot disturb the rack or the outer table rail.
 const SIDE_WIDTH = 181
 const SIDE_OUTER_INSET = 16
 const SIDE_MAIN_WIDTH = 161
@@ -567,8 +570,8 @@ export const DISCARD_ZONE_GRID_COLUMNS = 5
 export const DISCARD_CENTER_GRID_COLUMNS = 9
 
 function centerFieldGeometry(designWidth: number) {
-  const x = SIDE_WIDTH + WALL_H
-  const width = designWidth - 2 * (SIDE_WIDTH + WALL_H)
+  const x = SIDE_WIDTH + WALL_SIDE_DEPTH
+  const width = designWidth - 2 * (SIDE_WIDTH + WALL_SIDE_DEPTH)
   return { x, width }
 }
 
@@ -631,10 +634,10 @@ export function getBoardRegions(designWidth: number): BoardRegions {
       east: { x: fieldX + sideZoneWidth * 3, y: FIELD_Y, width: sideZoneWidth, height: FIELD_H },
     },
     wall: {
-      top: { x: fieldX, y: WALL_TOP_Y, width: fieldWidth, height: WALL_H },
-      bottom: { x: fieldX, y: WALL_BOTTOM_Y, width: fieldWidth, height: WALL_H },
-      left: { x: SIDE_WIDTH, y: FIELD_Y, width: WALL_H, height: FIELD_H },
-      right: { x: designWidth - SIDE_WIDTH - WALL_H, y: FIELD_Y, width: WALL_H, height: FIELD_H },
+      top: { x: fieldX, y: WALL_TOP_Y, width: fieldWidth, height: WALL_HORIZONTAL_DEPTH },
+      bottom: { x: fieldX, y: WALL_BOTTOM_Y, width: fieldWidth, height: WALL_HORIZONTAL_DEPTH },
+      left: { x: SIDE_WIDTH, y: FIELD_Y, width: WALL_SIDE_DEPTH, height: FIELD_H },
+      right: { x: designWidth - SIDE_WIDTH - WALL_SIDE_DEPTH, y: FIELD_Y, width: WALL_SIDE_DEPTH, height: FIELD_H },
     },
   }
   boardRegionsCache.set(designWidth, result)

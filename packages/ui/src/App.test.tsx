@@ -253,6 +253,37 @@ describe('App', () => {
     expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
   })
 
+  it('puts Strategy Coach in the foreground during a pending claim and restores the claim when it closes', () => {
+    const initialSnapshot = initLoopState(42)
+    const claimTile = initialSnapshot.gameState.wall.tiles[initialSnapshot.gameState.wall.frontIndex]!
+    const pendingClaim = {
+      tile: claimTile,
+      fromSeat: 3 as const,
+      kind: 'discard' as const,
+      eligibleSeats: [0 as const],
+      declarations: {},
+    }
+    const snapshot: LoopState = {
+      ...initialSnapshot,
+      gameState: {
+        ...initialSnapshot.gameState,
+        currentSeat: 3,
+        phase: 'awaitingClaims',
+        pendingClaim,
+      },
+    }
+    render(<App initialSnapshot={snapshot} />)
+
+    expect(screen.getByRole('dialog', { name: 'Claim this discard' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }))
+    expect(screen.getByRole('dialog', { name: 'Strategy Coach' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Claim this discard' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Strategy Coach' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Claim this discard' })).toBeInTheDocument()
+  })
+
   it('hides strategic assistance in Play Without Help while keeping legal discards playable', () => {
     render(<App config={{ variant: 'mcr', mode: 'solo', assistance: 'none' }} />)
     expect(screen.queryByRole('button', { name: 'Hint' })).not.toBeInTheDocument()

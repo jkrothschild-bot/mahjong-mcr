@@ -566,11 +566,10 @@ export function SeatLine({
         return (
           <Positioned
             key={id}
-            // A flower is replaced directly into this permanent tray and
-            // never needs a cross-zone FLIP animation. Omitting layoutId is
-            // also essential for the synthetic full-board preview, where
-            // the finite eight flower ids are reused across seats; Motion
-            // otherwise merges matching flowers and hides all but one.
+            // Connect a live Flower's back-wall draw to this tray. Synthetic
+            // preview mode disables shared layout for its tree, so repeated
+            // preview ids cannot collide.
+            layoutId={String(id)}
             x={p.x}
             y={p.y}
             naturalWidth={flowerSize.width}

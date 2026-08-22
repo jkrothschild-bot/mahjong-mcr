@@ -4,6 +4,7 @@ import { startHand, startMatch, typeIdOfInstance, type GameState } from '@mahjon
 import { sortByMode } from '../hand/handOrder.js'
 import { HUMAN_SEAT } from '../game/humanSeat.js'
 import { Board } from './Board.js'
+import { buildInitialDealFrames } from '../game/initialDealPresentation.js'
 
 const ZERO_SCORES = { 0: 0, 1: 0, 2: 0, 3: 0 } as const
 
@@ -14,6 +15,30 @@ function stateWithLastDrawnTile(): { state: GameState; drawnTile: number } {
 }
 
 describe('Board', () => {
+  it('shows the complete wall and empty hands in the first fresh-deal frame', () => {
+    const state = startHand({ seed: 42, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
+    const firstFrame = buildInitialDealFrames(state.seed, state.dealerSeat)[0]!
+    const { container } = render(
+      <Board
+        state={state}
+        initialDealFrame={firstFrame}
+        matchState={startMatch(1)}
+        matchScores={ZERO_SCORES}
+        isHumanTurn={false}
+        selectedTileId={null}
+        onTileClick={() => {}}
+        selectedTypeId={null}
+        onInspectTile={() => {}}
+      />,
+    )
+
+    expect(screen.getByTestId('game-board')).toHaveAttribute('data-initial-deal', 'wall-built')
+    expect(screen.getByText('144')).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-wall-layer]')).toHaveLength(144)
+    expect(screen.queryAllByTestId(/^hand-tile-/)).toHaveLength(0)
+    for (const seat of [1, 2, 3]) expect(screen.queryAllByTestId(new RegExp(`^seat-${seat}-back-`))).toHaveLength(0)
+  })
+
   it('marks the active seat with a non-colour border state and a visible turn label', () => {
     const state = startHand({ seed: 42, handNumber: 1, prevailingWind: 'east', dealerSeat: 0 })
     render(

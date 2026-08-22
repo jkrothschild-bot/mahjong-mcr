@@ -1,5 +1,6 @@
-import { motion } from 'motion/react'
-import { createContext, useContext, type ReactNode } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
+import { createContext, useContext, useLayoutEffect, type ReactNode } from 'react'
+import { WallDrawMotionContext } from '../board/WallDrawMotion.js'
 
 // Synthetic full-board previews intentionally reuse the finite set of
 // physical tile ids across several display-only zones. Shared-layout ids
@@ -30,10 +31,11 @@ export interface PositionedProps {
   // in entirely different component trees — a hand tile unmounting from
   // HandTiles while a Discards tile with the same id mounts) that share a
   // layoutId animate a smooth transition between their positions instead
-  // of the tile just appearing at its new spot. Every real tile group
-  // (hand/discards/melds/concealed backs/wall) passes one, keyed to the
-  // engine's own TileInstanceId; Seat's own identity header — which never
-  // changes zones — doesn't need one.
+  // of the tile just appearing at its new spot. Real hand, discard, meld,
+  // and concealed-back tiles pass one, keyed to the engine's own
+  // TileInstanceId. The physical wall is deliberately the exception:
+  // WallRing renders stable authoritative slots without layoutIds, while
+  // WallDrawMotion owns a separately-namespaced temporary travel overlay.
   layoutId?: string
   className?: string
   children: ReactNode
@@ -67,14 +69,35 @@ export function Positioned({
   children,
 }: PositionedProps) {
   const sharedLayoutEnabled = useContext(SharedLayoutEnabledContext)
+  const wallDrawMotion = useContext(WallDrawMotionContext)
+  const reducedMotion = useReducedMotion()
   const swapped = (((rotation % 180) + 180) % 180) === 90
   const boxWidth = (swapped ? naturalHeight : naturalWidth) * scale
   const boxHeight = (swapped ? naturalWidth : naturalHeight) * scale
+  const wallDrawTransition = layoutId === undefined ? undefined : wallDrawMotion.transitions.get(layoutId)
+  const isWallDraw = sharedLayoutEnabled && !reducedMotion && wallDrawTransition !== undefined
+  const content = scale === 1 ? (
+    children
+  ) : (
+    <div style={{ width: naturalWidth, height: naturalHeight, transform: `scale(${scale})` }}>{children}</div>
+  )
+
+  useLayoutEffect(() => {
+    if (!isWallDraw || layoutId === undefined) return
+    return wallDrawMotion.registerDestination(layoutId, {
+      x,
+      y,
+      width: boxWidth,
+      height: boxHeight,
+      rotation,
+    })
+  }, [boxHeight, boxWidth, isWallDraw, layoutId, rotation, wallDrawMotion, x, y])
 
   return (
     <motion.div
       layout={sharedLayoutEnabled}
       layoutId={sharedLayoutEnabled ? layoutId : undefined}
+      initial={false}
       transition={sharedLayoutEnabled ? { duration: 0.35, ease: 'easeInOut' } : { duration: 0 }}
       className={`absolute flex items-center justify-center ${className ?? ''}`}
       style={{
@@ -85,13 +108,10 @@ export function Positioned({
         marginLeft: -boxWidth / 2,
         marginTop: -boxHeight / 2,
         rotate: rotation,
+        visibility: isWallDraw ? 'hidden' : undefined,
       }}
     >
-      {scale === 1 ? (
-        children
-      ) : (
-        <div style={{ width: naturalWidth, height: naturalHeight, transform: `scale(${scale})` }}>{children}</div>
-      )}
+      {content}
     </motion.div>
   )
 }

@@ -9,10 +9,9 @@ export interface WallCounterProps {
 // chrome pills here were part of what pushed the board past the iPad
 // viewport's height budget, SPEC.md §5a's hard no-scroll rule).
 //
-// Plain text again as of M8 Step 1 — the decorative tile-back strip a
-// previous pass added here moved into the stage itself (WallSegment.tsx),
-// now that a real stage exists to give the wall an actual position rather
-// than squeezing a stand-in into this header pill.
+// The precise number complements the physical, state-backed WallRing in the
+// stage: the ring teaches depletion spatially while this stays instantly
+// readable at every responsive scale.
 export function WallCounter({ wall }: WallCounterProps) {
   return (
     <div className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm">

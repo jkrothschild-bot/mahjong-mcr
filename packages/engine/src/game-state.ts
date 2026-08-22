@@ -2,8 +2,8 @@ import type { Action } from './actions.js'
 import { addFlower, addToConcealed, emptyHand, type Hand } from './hand.js'
 import type { MeldId, Seat } from './meld.js'
 import type { Move } from './moves.js'
-import { drawWithFlowerReplacement, buildWall, type Wall, INITIAL_DEAL_COUNT } from './wall.js'
-import type { TileInstanceId, Wind } from './tiles.js'
+import { drawTile, buildWall, type Wall, type WallEnd, INITIAL_DEAL_COUNT } from './wall.js'
+import { isFlowerOrSeason, type TileInstanceId, type Wind } from './tiles.js'
 
 export type GamePhase =
   | 'awaitingDraw'
@@ -73,42 +73,105 @@ export interface StartHandParams {
   dealerSeat: Seat
 }
 
-// Deals a fresh hand from an already-built wall: 13 tiles to each seat in
-// turn order starting from the dealer, then the dealer's 14th tile folded
-// into the deal itself (so the dealer's first move is a discard, not a
-// draw). Every logical tile dealt goes through drawWithFlowerReplacement,
-// so a flower dealt out during the deal is correctly replaced and bucketed
-// rather than silently ending up in the concealed hand. Exported (not just
-// used by startHand below) so scenario.ts's practice-mode hand builder can
-// deal from a purpose-built wall (a specific hand for one seat, the rest
-// shuffled) without duplicating this loop.
-export function dealHandFromWall(wall: Wall, params: StartHandParams): GameState {
-  const { seed, handNumber, prevailingWind, dealerSeat } = params
+export interface InitialDealStep {
+  kind: 'four-tile-group' | 'dealer-final-two' | 'final-single' | 'flower-replacement'
+  seat: Seat
+  source: WallEnd
+  tiles: readonly TileInstanceId[]
+  wallAfter: Wall
+}
+
+export interface InitialDealResult {
+  wall: Wall
+  hands: [Hand, Hand, Hand, Hand]
+  dealtHandsForLog: Record<Seat, TileInstanceId[]>
+  steps: readonly InitialDealStep[]
+}
+
+function seatsFromDealer(dealerSeat: Seat): [Seat, Seat, Seat, Seat] {
+  return [0, 1, 2, 3].map((offset) => ((dealerSeat + offset) % 4) as Seat) as [Seat, Seat, Seat, Seat]
+}
+
+export interface InitialPrimaryDealGroup {
+  kind: 'four-tile-group' | 'dealer-final-two' | 'final-single'
+  seat: Seat
+  count: number
+}
+
+export function initialPrimaryDealGroups(dealerSeat: Seat): readonly InitialPrimaryDealGroup[] {
+  const seats = seatsFromDealer(dealerSeat)
+  const groups: InitialPrimaryDealGroup[] = []
+  for (let pass = 0; pass < 3; pass++) {
+    for (const seat of seats) groups.push({ kind: 'four-tile-group', seat, count: 4 })
+  }
+  groups.push({ kind: 'dealer-final-two', seat: dealerSeat, count: 2 })
+  for (const seat of seats.slice(1)) groups.push({ kind: 'final-single', seat, count: 1 })
+  return groups
+}
+
+// Official MCR deal order (§3.5.7.5-6): three passes of four tiles per
+// player, East's separated "one and three" pair, then one tile for each
+// other seat. Only after all 53 primary tiles have left the FRONT are
+// Flowers exposed and replaced, dealer first, from the BACK (§3.4.20).
+//
+// Returning the steps keeps the animation a projection of this exact
+// engine operation. The UI never invents its own deal cursor or decides
+// which tiles are Flowers.
+export function performInitialDeal(initialWall: Wall, dealerSeat: Seat): InitialDealResult {
+  let wall = initialWall
   const hands: [Hand, Hand, Hand, Hand] = [emptyHand(), emptyHand(), emptyHand(), emptyHand()]
   const dealtHandsForLog: Record<Seat, TileInstanceId[]> = { 0: [], 1: [], 2: [], 3: [] }
+  const steps: InitialDealStep[] = []
+  const seats = seatsFromDealer(dealerSeat)
 
-  const dealOrder: Seat[] = []
-  for (let round = 0; round < 13; round++) {
-    for (let i = 0; i < 4; i++) dealOrder.push(((dealerSeat + i) % 4) as Seat)
-  }
-  dealOrder.push(dealerSeat) // the dealer's folded-in 14th tile
-  if (dealOrder.length !== INITIAL_DEAL_COUNT) {
-    throw new Error(`Deal order length ${dealOrder.length} does not match INITIAL_DEAL_COUNT`)
+  const takePrimary = (seat: Seat, count: number, kind: InitialDealStep['kind']) => {
+    const tiles: TileInstanceId[] = []
+    for (let i = 0; i < count; i++) {
+      const draw = drawTile(wall, 'front')
+      wall = draw.wall
+      tiles.push(draw.tile)
+      dealtHandsForLog[seat]!.push(draw.tile)
+      hands[seat] = isFlowerOrSeason(draw.tile)
+        ? addFlower(hands[seat], draw.tile)
+        : addToConcealed(hands[seat], draw.tile)
+    }
+    steps.push({ kind, seat, source: 'front', tiles, wallAfter: wall })
   }
 
-  for (const seat of dealOrder) {
-    const draw = drawWithFlowerReplacement(wall, 'front')
-    wall = draw.wall
-    for (const flower of draw.flowersDrawn) {
-      hands[seat] = addFlower(hands[seat], flower)
-      dealtHandsForLog[seat]!.push(flower)
-    }
-    if (draw.finalTile === undefined) {
-      throw new Error('Wall exhausted during the initial deal — should never happen with a fresh 144-tile wall')
-    }
-    hands[seat] = addToConcealed(hands[seat], draw.finalTile)
-    dealtHandsForLog[seat]!.push(draw.finalTile)
+  for (const group of initialPrimaryDealGroups(dealerSeat)) takePrimary(group.seat, group.count, group.kind)
+
+  if (wall.frontIndex !== INITIAL_DEAL_COUNT) {
+    throw new Error(`Initial deal consumed ${wall.frontIndex - initialWall.frontIndex} primary tiles instead of ${INITIAL_DEAL_COUNT}`)
   }
+
+  for (const seat of seats) {
+    let replacementsNeeded = hands[seat].flowers.length
+    while (replacementsNeeded > 0) {
+      const draw = drawTile(wall, 'back')
+      wall = draw.wall
+      dealtHandsForLog[seat]!.push(draw.tile)
+      if (isFlowerOrSeason(draw.tile)) {
+        hands[seat] = addFlower(hands[seat], draw.tile)
+      } else {
+        hands[seat] = addToConcealed(hands[seat], draw.tile)
+        replacementsNeeded--
+      }
+      steps.push({ kind: 'flower-replacement', seat, source: 'back', tiles: [draw.tile], wallAfter: wall })
+    }
+  }
+
+  return { wall, hands, dealtHandsForLog, steps }
+}
+
+// Deals a fresh hand from an already-built wall using performInitialDeal's
+// rulebook-ordered groups and post-deal Flower replacement. Exported (not
+// just used by startHand below) so scenario.ts's practice-mode hand builder
+// can deal from a purpose-built wall without duplicating this operation.
+export function dealHandFromWall(wall: Wall, params: StartHandParams): GameState {
+  const { seed, handNumber, prevailingWind, dealerSeat } = params
+  const dealt = performInitialDeal(wall, dealerSeat)
+  wall = dealt.wall
+  const { hands, dealtHandsForLog } = dealt
 
   const players = ([0, 1, 2, 3] as const).map(
     (seat): PlayerState => ({
