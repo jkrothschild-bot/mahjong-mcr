@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { RouteToPointsPanel } from './RouteToPointsTab.js'
 import {
   currentWaitsFallShortFixture,
@@ -48,6 +48,17 @@ describe('RouteToPointsPanel', () => {
     const locked = screen.getByRole('list', { name: 'Route locked-in fans' })
     expect(locked).toHaveTextContent('Seat Wind')
     expect(locked).toHaveTextContent('2 pts')
+  })
+
+  it('opens fan explanations from candidate and locked-in fan names', () => {
+    const onFanClick = vi.fn()
+    render(<RouteToPointsPanel result={sharpDisagreementFixture} lockedInFans={[{ fanId: 61, count: 1 }]} onFanClick={onFanClick} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Seven Pairs' }))
+    expect(onFanClick).toHaveBeenLastCalledWith(19)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Seat Wind' }))
+    expect(onFanClick).toHaveBeenLastCalledWith(61)
   })
 
   it('renders a useful neutral state when no candidate stands out', () => {

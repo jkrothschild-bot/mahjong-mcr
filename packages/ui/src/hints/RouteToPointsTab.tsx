@@ -15,11 +15,13 @@ export interface RouteToPointsTabProps {
   hand: Hand
   prevailingWind: Wind
   seatWind: Wind
+  onFanClick?: (fanId: number) => void
 }
 
 interface RouteToPointsPanelProps {
   result: RouteToPointsResult
   lockedInFans: readonly FanProgress[]
+  onFanClick?: (fanId: number) => void
 }
 
 const STATUS_COPY: Record<MinimumPointsStatus, { headline: string; detail: string; className: string; icon: string }> = {
@@ -51,7 +53,21 @@ function routeRole(candidate: FanTargetEstimate, result: RouteToPointsResult): s
   return 'Alternative'
 }
 
-function CandidateRow({ candidate, result }: { candidate: FanTargetEstimate; result: RouteToPointsResult }) {
+function FanName({ fanId, name, onFanClick }: { fanId: number; name: string; onFanClick?: (fanId: number) => void }) {
+  return onFanClick ? (
+    <button
+      type="button"
+      onClick={() => onFanClick(fanId)}
+      className="text-left underline decoration-dotted underline-offset-2 hover:text-amber-300"
+    >
+      {name}
+    </button>
+  ) : (
+    <span>{name}</span>
+  )
+}
+
+function CandidateRow({ candidate, result, onFanClick }: { candidate: FanTargetEstimate; result: RouteToPointsResult; onFanClick?: (fanId: number) => void }) {
   const meta = FAN_REGISTRY[candidate.fanId]!
   const locked = candidate.status === 'locked'
   const measured = !locked && candidate.probabilityBasis === 'shanten'
@@ -68,7 +84,9 @@ function CandidateRow({ candidate, result }: { candidate: FanTargetEstimate; res
     <li data-testid={testId} className={`rounded-lg border p-3 shadow-sm ${treatment}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-neutral-100">{meta.name}</p>
+          <p className="font-semibold text-neutral-100">
+            <FanName fanId={candidate.fanId} name={meta.name} onFanClick={onFanClick} />
+          </p>
           <p className={`text-xs font-semibold uppercase tracking-wide ${tierClass}`}>{tierLabel}</p>
         </div>
         <div className="shrink-0 text-right">
@@ -88,7 +106,7 @@ function CandidateRow({ candidate, result }: { candidate: FanTargetEstimate; res
 // Presentational seam kept separate from the live engine calls so the panel's
 // three status states and mixed-basis rows can be tested against the brief's
 // reference-identity-preserving fixtures.
-export function RouteToPointsPanel({ result, lockedInFans }: RouteToPointsPanelProps) {
+export function RouteToPointsPanel({ result, lockedInFans, onFanClick }: RouteToPointsPanelProps) {
   const status = STATUS_COPY[result.minimumPointsStatus]
   const confirmedFanIds = new Set(lockedInFans.map((fan) => fan.fanId))
   const candidates = result.candidates
@@ -131,7 +149,10 @@ export function RouteToPointsPanel({ result, lockedInFans }: RouteToPointsPanelP
               const meta = FAN_REGISTRY[fan.fanId]!
               return (
                 <li key={fan.fanId} className="flex items-center justify-between rounded-md border border-emerald-800 bg-emerald-950/25 px-3 py-2 text-sm shadow-sm">
-                  <span className="text-emerald-100">✓ {meta.name}{fan.count > 1 ? ` x${fan.count}` : ''}</span>
+                  <span className="text-emerald-100">
+                    ✓ <FanName fanId={fan.fanId} name={meta.name} onFanClick={onFanClick} />
+                    {fan.count > 1 ? ` x${fan.count}` : ''}
+                  </span>
                   <span className="font-mono text-emerald-300">{meta.points * fan.count} pts</span>
                 </li>
               )
@@ -146,7 +167,7 @@ export function RouteToPointsPanel({ result, lockedInFans }: RouteToPointsPanelP
         <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Ways the hand could develop</h4>
         {candidates.length > 0 ? (
           <ul role="list" aria-label="Route candidates" className="mt-1 flex flex-col gap-2">
-            {candidates.map((candidate) => <CandidateRow key={candidate.fanId} candidate={candidate} result={result} />)}
+            {candidates.map((candidate) => <CandidateRow key={candidate.fanId} candidate={candidate} result={result} onFanClick={onFanClick} />)}
           </ul>
         ) : (
           <div data-testid="route-candidates-empty" className="mt-1 rounded-lg border border-neutral-700 bg-neutral-800/50 p-3 text-sm text-neutral-300 shadow-sm">
@@ -159,10 +180,10 @@ export function RouteToPointsPanel({ result, lockedInFans }: RouteToPointsPanelP
   )
 }
 
-export function RouteToPointsTab({ hand, prevailingWind, seatWind }: RouteToPointsTabProps) {
+export function RouteToPointsTab({ hand, prevailingWind, seatWind, onFanClick }: RouteToPointsTabProps) {
   const context = { prevailingWind, seatWind }
   const result = computeRouteToPoints(hand, context)
   const { lockedInFans } = computeHandPlan(hand, context)
 
-  return <RouteToPointsPanel result={result} lockedInFans={lockedInFans} />
+  return <RouteToPointsPanel result={result} lockedInFans={lockedInFans} onFanClick={onFanClick} />
 }

@@ -404,7 +404,7 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, matchSeed, onSnaps
             forSeat={HUMAN_SEAT}
             selectedTypeId={selectedTypeId}
             onClose={() => setHintOpen(false)}
-            onOpenEncyclopedia={() => openEncyclopedia()}
+            onOpenEncyclopedia={openEncyclopedia}
           />
         )}
 

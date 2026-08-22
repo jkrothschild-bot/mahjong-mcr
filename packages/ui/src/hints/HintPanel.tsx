@@ -14,7 +14,7 @@ export interface HintPanelProps {
   forSeat: Seat
   selectedTypeId: TileTypeId | null
   onClose: () => void
-  onOpenEncyclopedia: () => void
+  onOpenEncyclopedia: (fanId?: number) => void
 }
 
 type HintTab = 'bestMove' | 'handPlan' | 'routeToPoints' | 'tileSafety'
@@ -150,7 +150,7 @@ export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, sele
             <span id="strategy-coach-move-help" className="sr-only">Drag to move this window, or use the arrow keys. Press Home to recenter it.</span>
             <button
               type="button"
-              onClick={onOpenEncyclopedia}
+              onClick={() => onOpenEncyclopedia()}
               className="min-h-11 rounded-md border border-neutral-600 px-3 text-sm hover:bg-neutral-800"
             >
               Fan encyclopedia
@@ -185,7 +185,9 @@ export function HintPanel({ hand, prevailingWind, seatWind, state, forSeat, sele
         <div role="tabpanel">
           {tab === 'bestMove' && <BestMoveTab hand={hand} />}
           {tab === 'handPlan' && <HandPlanTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />}
-          {tab === 'routeToPoints' && <RouteToPointsTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} />}
+          {tab === 'routeToPoints' && (
+            <RouteToPointsTab hand={hand} prevailingWind={prevailingWind} seatWind={seatWind} onFanClick={onOpenEncyclopedia} />
+          )}
           {tab === 'tileSafety' && <TileSafetyTab state={state} forSeat={forSeat} selectedTypeId={selectedTypeId} />}
         </div>
       </div>
