@@ -83,6 +83,37 @@ describe('HintPanel', () => {
     expect(onOpenEncyclopedia).toHaveBeenCalledOnce()
   })
 
+  it('moves by pointer drag while leaving the surrounding board layer interactive', () => {
+    const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
+
+    const layer = screen.getByTestId('hint-window-layer')
+    const panel = screen.getByTestId('hint-panel')
+    const move = screen.getByRole('button', { name: 'Move Strategy Coach window' })
+    expect(layer).toHaveClass('pointer-events-none')
+    expect(panel).toHaveClass('pointer-events-auto')
+    expect(layer).not.toHaveClass('bg-black/50')
+
+    fireEvent.pointerDown(move, { button: 0, pointerId: 7, clientX: 100, clientY: 100 })
+    fireEvent.pointerMove(move, { pointerId: 7, clientX: 160, clientY: 140 })
+    fireEvent.pointerUp(move, { pointerId: 7, clientX: 160, clientY: 140 })
+    expect(panel).toHaveStyle({ transform: 'translate3d(60px, 40px, 0)' })
+  })
+
+  it('supports keyboard movement and Home to recenter', () => {
+    const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
+    render(<HintPanel hand={hand} prevailingWind="east" seatWind="east" state={state} forSeat={0} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
+
+    const panel = screen.getByTestId('hint-panel')
+    const move = screen.getByRole('button', { name: 'Move Strategy Coach window' })
+    fireEvent.keyDown(move, { key: 'ArrowRight' })
+    fireEvent.keyDown(move, { key: 'ArrowDown', shiftKey: true })
+    expect(panel).toHaveStyle({ transform: 'translate3d(24px, 48px, 0)' })
+
+    fireEvent.keyDown(move, { key: 'Home' })
+    expect(panel).toHaveStyle({ transform: 'translate3d(0px, 0px, 0)' })
+  })
+
   it('does not render the Strategy Coach for a bot seat', () => {
     const hand = handWith([...idsFor('C1', 1), ...idsFor('C4', 1), ...idsFor('C7', 1)])
     render(<HintPanel hand={hand} prevailingWind="east" seatWind="south" state={state} forSeat={1} selectedTypeId={null} onClose={() => {}} onOpenEncyclopedia={() => {}} />)
