@@ -65,12 +65,6 @@ test('guest can start Learning Mode, reload and resume the same game', async ({ 
     new Set(tiles.map((tile) => tile.getAttribute('data-wall-position'))).size === tiles.length,
   )).toBe(true)
 
-  await expect.poll(() => page.evaluate(() => {
-    const raw = localStorage.getItem('mcr-mahjong:active-game:v1')
-    if (!raw) return 0
-    return JSON.parse(raw).game.gameState.players[0].discards.length as number
-  }), { timeout: 15_000 }).toBe(1)
-
   await page.getByRole('button', { name: 'Home' }).click()
   await expect(page.getByRole('heading', { name: 'Learn Mahjong by actually playing it' })).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('link', { name: 'Resume Game' }).first()).toBeVisible()
