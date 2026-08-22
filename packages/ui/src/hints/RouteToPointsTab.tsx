@@ -114,8 +114,8 @@ export function RouteToPointsPanel({ result, lockedInFans }: RouteToPointsPanelP
 
       <section className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 rounded-lg border border-neutral-700 bg-neutral-800/80 p-3 shadow-md">
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Current modeled route</h4>
-          <p className="text-xs text-neutral-400">Fans this planner can credibly name now</p>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Current best route</h4>
+          <p className="text-xs text-neutral-400">Fans this coach can credibly name now; exact waits can add others</p>
         </div>
         <p className="row-span-2 self-center font-mono text-xl font-bold text-indigo-200">{result.crediblePointsTotal} pts</p>
         <p className="col-span-2 mt-1 text-xs text-neutral-400">

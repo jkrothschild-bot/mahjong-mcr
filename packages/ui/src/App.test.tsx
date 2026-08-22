@@ -244,10 +244,12 @@ describe('App', () => {
     render(<App matchSeed={42} />)
 
     expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '8-point route' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Hint' }))
     expect(screen.getByTestId('hint-panel')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Best move' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: '8-point route' })).toHaveAttribute('aria-selected', 'false')
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
