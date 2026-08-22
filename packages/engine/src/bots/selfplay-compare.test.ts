@@ -8,6 +8,7 @@ import { typeIdOfInstance } from '../tiles.js'
 import { isHonorTypeId, isTerminalTypeId } from '../scoring/set-helpers.js'
 import { ORDERED_STANDARD_TYPE_IDS } from '../win-detection.js'
 import { BOT_PRESETS, chooseClaimMove, rankDiscards, type BotPolicyConfig } from './policy.js'
+import type { WinCircumstanceContext } from '../waits.js'
 
 // packages/engine's tsconfig deliberately has no "node"/"dom" lib (the
 // package stays pure, environment-agnostic TS) — this file is test-only
@@ -40,7 +41,10 @@ const SEED_COUNT = RUN ? Number(process.env.SELFPLAY_SEEDS ?? 300) : 0
 // which now only has the regret-aware version) — this is deliberately an
 // independent copy, not a call into today's code, so the comparison is
 // actually "new vs. old," not "new vs. itself under a different name."
-function oldRankDiscards(evaluations: DiscardEvaluation[]): DiscardEvaluation[] {
+// `hand`/`context` are accepted only to match today's real rankDiscards
+// signature (decisions.md #39's route-aware tie-break) — this frozen
+// historical copy never used them and still doesn't.
+function oldRankDiscards(evaluations: DiscardEvaluation[], _hand: Hand, _context?: WinCircumstanceContext): DiscardEvaluation[] {
   const minShanten = Math.min(...evaluations.map((e) => e.resultingShanten))
   const atMin = evaluations.filter((e) => e.resultingShanten === minShanten)
   atMin.sort((a, b) => {
@@ -55,10 +59,10 @@ function oldRankDiscards(evaluations: DiscardEvaluation[]): DiscardEvaluation[] 
   return atMin
 }
 
-type RankFn = (evaluations: DiscardEvaluation[]) => DiscardEvaluation[]
+type RankFn = (evaluations: DiscardEvaluation[], hand: Hand, context?: WinCircumstanceContext) => DiscardEvaluation[]
 
-function chooseDiscardWith(rank: RankFn, hand: Hand) {
-  return rank(evaluateDiscards(hand))[0]!.tile
+function chooseDiscardWith(rank: RankFn, hand: Hand, context: WinCircumstanceContext) {
+  return rank(evaluateDiscards(hand), hand, context)[0]!.tile
 }
 
 // Mirrors policy.ts's own chooseMove exactly, parameterized on which
@@ -73,8 +77,10 @@ function chooseMoveWith(rank: RankFn, state: GameState, seat: Seat, config: BotP
   switch (state.phase) {
     case 'awaitingDraw':
       return moves[0]!
-    case 'awaitingDiscard':
-      return { kind: 'discard', tile: chooseDiscardWith(rank, state.players[seat].hand) }
+    case 'awaitingDiscard': {
+      const context: WinCircumstanceContext = { prevailingWind: state.prevailingWind, seatWind: state.players[seat].seatWind }
+      return { kind: 'discard', tile: chooseDiscardWith(rank, state.players[seat].hand, context) }
+    }
     case 'awaitingClaims':
     case 'awaitingRobKongClaims':
       return chooseClaimMove(state, seat, config)

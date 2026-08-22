@@ -191,6 +191,17 @@ space/clarity decision rather than a fourth depth level, so neither claim accura
 the shipped tab shell. This implementation is not authorised to rewrite either governing file;
 update both together once the owner chooses how the depth model should describe the fourth view.
 
+### A14. "Route" is overloaded between Best Move's shanten table and the 8-point tab's fan combinations — logged for lane C  `[code-verified 2026-08-22]`
+Found during the same 2026-08-22 playtesting pass as A13/§F's Best-Move-vs-route-tab defect.
+`BestMoveTab.tsx`'s "Routes" section (`<h4>Routes</h4>`, `aria-label="Route table"`, `hint.routeTable`)
+lists **shanten SHAPES** (Standard / Seven Pairs / Thirteen Orphans — `computeBestMoveHint`'s
+per-shape shanten/outs). The new 8-point route tab's routes are **FAN COMBINATIONS**
+(`RouteToPointsResult`'s `candidates`/`selected`/`credibleSelected`). Same word, two genuinely
+different concepts, both visible in the same Strategy Coach modal — reads as the same thing when
+it isn't. Rename Best Move's section to something that doesn't collide, e.g. "Hand shapes."
+**Lane C (Codex), not done here** — this was found mid-lane-A engine work (the tie-break
+measurement in §F) and `packages/ui/src/hints/**` is explicitly Codex's territory this phase.
+
 ---
 
 ## B. Tracked elsewhere — pointers only
@@ -504,6 +515,19 @@ surfacing); the 2000-seed self-play re-test (only if Stage 2 reopens the questio
 Append here and keep going. Nothing in this section gets fixed during the cleanup pass; it is
 triaged after §E completes. An empty section means the pass stayed in scope.
 
+- ~~**Best Move contradicts the 8-point route tab in the same modal**~~ ✅ done, 2026-08-22.
+  `computeBestMoveHint` was points-blind (`rankDiscards` tie-broke purely on ukeire/honor-
+  flexibility/fixed type order, never consulting `estimateFanTargets`/`computeRouteToPoints`) —
+  found live via a hand whose 8-point tab named All Pungs current with 7 Dots among its helpful
+  tiles, while Best Move recommended discarding 7 Dots. Fixed with a route-aware tie-break
+  (`routeAwareTieBreakValues`, `hints.ts`) inside `rankDiscards`' already-efficiency-tied group —
+  efficiency still decides which discards are IN the group; a `minimumPointsStatus === 'unknown'`
+  guard falls back to the old efficiency-only order rather than steering toward a route the
+  engine won't vouch for. The justification-text half (`flexibilityFeature`'s "Keeps X alive"
+  prose citing a route the recommended discard had itself fallen behind on) was fixed separately
+  in the same session. **Full account — the two measurement passes, the disproven "wrong
+  criterion at tenpai" hypothesis, the worst-case-vs-live-outs correction, and the by-product
+  numbers from the shipped code — is `docs/rules/decisions.md` item #39; not duplicated here.**
 - **`computeRouteToPoints` undercounts Dragon Pung** (found 2026-08-08, during Phase 2's
   compatibility-table fix — two other bugs found the same pass were fixed because they blocked
   the work in hand; this one wasn't and is deliberately deferred). Full account, confirmed

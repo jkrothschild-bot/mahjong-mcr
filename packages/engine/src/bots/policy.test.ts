@@ -206,7 +206,15 @@ describe('chooseMove — full headless simulation', () => {
     // this sweep (was ~24s before), close enough to the old 30s bound to be
     // flaky rather than actually correctness-affected. Bumped with margin
     // rather than shrinking SEED_COUNT (see the comment above it).
-    45_000,
+    //
+    // decisions.md #39's route-aware discard tie-break adds a
+    // computeRouteToPoints/computeWaits call per genuinely-tied discard
+    // candidate, for EVERY seat's own discard decision now (not just the one
+    // human seat a hint request would cover) — measured ~46-49s for this
+    // sweep against the same 20 seeds, pushing past the 45s bound. Bumped
+    // with real margin again, same "widen the budget, don't shrink the
+    // sweep" call as above.
+    90_000,
   )
 
   it(

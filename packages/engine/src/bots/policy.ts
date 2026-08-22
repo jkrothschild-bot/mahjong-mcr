@@ -1,5 +1,6 @@
 import type { GameState } from '../game-state.js'
 import type { Hand } from '../hand.js'
+import { routeAwareTieBreakValues } from '../hints.js'
 import type { Seat } from '../meld.js'
 import { applyMove, legalMoves, type Move } from '../moves.js'
 import { calculateShanten } from '../shanten.js'
@@ -7,6 +8,7 @@ import { evaluateDiscards, type DiscardEvaluation } from '../tile-efficiency.js'
 import { typeIdOfInstance, type TileInstanceId } from '../tiles.js'
 import { isHonorTypeId, isTerminalTypeId } from '../scoring/set-helpers.js'
 import { ORDERED_STANDARD_TYPE_IDS } from '../win-detection.js'
+import type { WinCircumstanceContext } from '../waits.js'
 
 // One well-understood, implementable axis real MCR players differ along —
 // claim eagerness. Deliberately does NOT touch defense/danger-tile
@@ -29,7 +31,7 @@ export const BOT_PRESETS: Record<'efficient' | 'balanced' | 'conservative', BotP
   conservative: { claimThreshold: 'onlyImproving', declineMarginalChows: true },
 }
 
-// The whole ranking rule (reverted to this, 2026-08-06, after three
+// The efficiency ranking (reverted to this, 2026-08-06, after three
 // same-direction self-play runs never showed the Stage 1 regret-aware
 // ranking helping — see docs/rules/decisions.md #18 and
 // KICKOFF-phase10-strategy-coach.md's own decision tree, which named this
@@ -44,6 +46,13 @@ export const BOT_PRESETS: Record<'efficient' | 'balanced' | 'conservative', BotP
 // now SHOWS a player which routes stay alive and their real cost, so the
 // bot doesn't need to auto-commit to the flexible choice for the fix to
 // have worked.
+//
+// This is now the FINAL tie-break, not the only one — rankDiscards below
+// applies it first (establishing which candidate is "today's baseline"),
+// then a route-aware pass (decisions.md #39) may reorder the efficiency-tied
+// group before falling back to this comparator for whatever it still can't
+// distinguish. Unchanged in behavior when route-awareness has nothing to
+// say (an untied group, or the 'unknown' guard firing).
 function legacyDiscardCompare(a: DiscardEvaluation, b: DiscardEvaluation): number {
   if (a.ukeire.totalCount !== b.ukeire.totalCount) return b.ukeire.totalCount - a.ukeire.totalCount
   const aType = typeIdOfInstance(a.tile)
@@ -56,16 +65,34 @@ function legacyDiscardCompare(a: DiscardEvaluation, b: DiscardEvaluation): numbe
 
 // Shared by chooseDiscard (bots, below) and computeBestMoveHint (hints.ts)
 // so the hint's "recommended discard" and "other reasonable choices" can
-// never disagree with what a bot would actually do with the same hand.
-export function rankDiscards(evaluations: DiscardEvaluation[]): DiscardEvaluation[] {
+// never disagree with what a bot would actually do with the same hand
+// (SPEC.md §6: "Hint engine and bot AI share the same evaluation core") —
+// this is exactly why routeAwareTieBreakValues (hints.ts, decisions.md #39)
+// is applied HERE rather than only inside computeBestMoveHint: a bot-only
+// or hint-only route-aware ordering would let the two disagree.
+//
+// `hand`/`context` exist ONLY to feed the route-aware pass below — the
+// efficiency filter/sort above them still runs on `evaluations` alone,
+// unchanged from before this pass. Efficiency decides which discards are IN
+// the tied group; route-awareness only orders WITHIN it.
+export function rankDiscards(evaluations: DiscardEvaluation[], hand: Hand, context: WinCircumstanceContext = {}): DiscardEvaluation[] {
   const minShanten = Math.min(...evaluations.map((e) => e.resultingShanten))
   const atMin = evaluations.filter((e) => e.resultingShanten === minShanten)
-  atMin.sort(legacyDiscardCompare)
+  atMin.sort(legacyDiscardCompare) // baseline order — routeAwareTieBreakValues' 'unknown' guard reads candidates[0] from THIS order
+
+  const routeValues = routeAwareTieBreakValues(hand, atMin, context)
+  if (!routeValues) return atMin // guard fired, or nothing to rank — stay efficiency-only
+
+  atMin.sort((a, b) => {
+    const diff = routeValues.get(b.tile)! - routeValues.get(a.tile)!
+    if (diff !== 0) return diff
+    return legacyDiscardCompare(a, b) // still the final tie-break once route-awareness also ties
+  })
   return atMin
 }
 
-export function chooseDiscard(hand: Hand): TileInstanceId {
-  return rankDiscards(evaluateDiscards(hand))[0]!.tile
+export function chooseDiscard(hand: Hand, context: WinCircumstanceContext = {}): TileInstanceId {
+  return rankDiscards(evaluateDiscards(hand), hand, context)[0]!.tile
 }
 
 // Evaluates every non-pass claim option (never a kong — see below) by
@@ -123,7 +150,10 @@ export function chooseMove(state: GameState, seat: Seat, config: BotPolicyConfig
     case 'awaitingDraw':
       return moves[0]!
     case 'awaitingDiscard':
-      return { kind: 'discard', tile: chooseDiscard(state.players[seat].hand) }
+      return {
+        kind: 'discard',
+        tile: chooseDiscard(state.players[seat].hand, { prevailingWind: state.prevailingWind, seatWind: state.players[seat].seatWind }),
+      }
     case 'awaitingClaims':
     case 'awaitingRobKongClaims':
       return chooseClaimMove(state, seat, config)

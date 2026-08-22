@@ -192,7 +192,7 @@ describe('computeBestMoveHint', () => {
   it('alternatives lists exactly rankDiscards(evaluateDiscards(hand)) minus the top pick, same order, each with a relativeScore in [0,1]', () => {
     const hand = handWith(tenpaiPlusIsolated())
     const hint = computeBestMoveHint(hand)!
-    const ranked = rankDiscards(evaluateDiscards(hand))
+    const ranked = rankDiscards(evaluateDiscards(hand), hand)
     expect(hint.recommendedDiscard).toBe(ranked[0]!.tile)
     expect(hint.alternatives.map((a) => a.tile)).toEqual(ranked.slice(1).map((e) => e.tile))
     expect(hint.alternatives.some((a) => a.tile === hint.recommendedDiscard)).toBe(false)

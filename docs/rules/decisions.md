@@ -1492,6 +1492,130 @@ corrected to match. See each item's status.
     draw order; UI physical slots 48-53 map as `[48,52,49,50,51,53]` to show
     the one-and-three removal without changing wall order. The exact break is
     still item #17's dealer-anchored rendering convention, not dice metadata.
+39. **`rankDiscards`' route-aware tie-break, and the tenpai ranking criterion it needed
+    (2026-08-22) — a non-rulebook calibration ruling, same class as item #37.** `mcr_EN.pdf` has
+    nothing to say about how a coach or bot should order discards that are already efficiency-
+    equivalent; this is a design decision, backed by measurement, not a rulebook citation — same
+    posture as items #16, #35, and #37.
+
+    **The defect:** `computeBestMoveHint` was points-blind. `rankDiscards` (`bots/policy.ts`)
+    narrows every discard decision to the best-`resultingShanten` (efficiency-tied) group via
+    `evaluateDiscards`, then tie-broke purely on `legacyDiscardCompare` (ukeire, then honor/
+    terminal flexibility, then a fixed type order) — never consulting `estimateFanTargets` or
+    `computeRouteToPoints` at all. Found live, playtesting the new Route to Eight Points tab: a
+    hand whose 8-point tab named All Pungs as the current route with 7 Dots among its helpful
+    tiles, while Best Move recommended discarding 7 Dots — the two tabs contradicting each other
+    in the same Strategy Coach modal.
+
+    **Explicit scope constraint (owner instruction): not a points-aware discard SEARCH.**
+    Efficiency still decides which discards are in the tied group (`rankDiscards`' own
+    `resultingShanten` filter, unchanged) — route-awareness only orders WITHIN an already
+    efficiency-tied group, as an additional tie-break layered onto `legacyDiscardCompare`, not a
+    replacement for it.
+
+    **First measurement (`validation/src/selfplay/tiebreak-measure.ts`, 200 hands, seeds
+    5000-5199, production `chooseMove` on every seat, decisions ONLY observed — no bot behavior
+    changed yet): ranked tied candidates by post-discard `crediblePointsTotal` at EVERY shanten,
+    including tenpai.** 2,659 genuine tie-break decisions (2+ distinct tied types). Today's
+    (pre-fix) top pick differed from that route-aware pick, and actively forwent credible points
+    a same-efficiency alternative would have kept, on 27.5% of decisions overall — spiking to
+    46.2% at tenpai (shanten 0). Not rare.
+
+    **Owner review flagged the tenpai bucket's criterion as wrong, and — separately — asked
+    whether that alone explained the 46.2% figure. It mostly didn't; the hypothesis was measured,
+    not assumed, and the answer surprised both directions of the guess.** `crediblePointsTotal`
+    is an estimate; at tenpai an EXACT answer already exists
+    (`computeHandPlan`'s `bestCaseReachesMinimum`, built from real `computeWaits` + `scoreHand`
+    over every wait and both win methods) — `minimumPointsStatus` itself already refuses to let
+    the estimate outrank that exact answer (item #37), so ranking tenpai ties by the estimate
+    was inconsistent with the engine's own precedence rule. A SECOND measurement, using a
+    candidate corrected criterion (worst-case real score across the resulting waits — the same
+    `allBasicPoints` `worstCaseReachesMinimum` already computes, taken as a value), found the
+    tenpai divergence rate barely moved: 46.2% -> 44.3%, a real but modest 1.9-point drop, on the
+    SAME 200 hands/seeds. **The "wrong criterion" hypothesis was measured and largely DISPROVED,
+    not confirmed** — most of the tenpai divergence is a genuine property of the ukeire/flex
+    tie-break at tenpai, not a measurement artifact. Recorded here explicitly so this correction
+    doesn't get re-litigated from the discarded hypothesis later.
+
+    **A second, independent correction followed immediately: worst-case-across-waits is itself
+    the wrong AGGREGATION for a ranking, even though it's the right philosophy for a WARNING.**
+    `worstCaseReachesMinimum`'s own doc comment frames that number as a caution ("some of your
+    waits wouldn't reach the 8-point minimum") — a fundamentally different job from ranking
+    candidates by value. `scoreHand` floors every winning hand at >=8 via Chicken Hand's own
+    zero-fan minimum, so a wait scoring 1-7 is a DEAD wait — it can never legally be declared,
+    not a "cheap" one. Averaging over or flooring against dead waits ranks a hand whose waits
+    score {6, 6} (unwinnable on EITHER) ABOVE one scoring {4, 20} (winnable) — exactly backwards.
+
+    **Final, shipped tenpai criterion: rank by the number of LIVE accepting tiles — waits whose
+    resulting hand clears `MINIMUM_POINTS_TO_WIN` on at least one win method — tie-broken by the
+    best real score among those live tiles. Dead waits are ignored entirely, never averaged in or
+    floored against.** Pre-tenpai criterion is unchanged: post-discard `crediblePointsTotal`, the
+    same gated/calibrated total `minimumPointsStatus`'s own pre-tenpai fallback already trusts,
+    never `bestCaseTotal`'s inflated ceiling.
+
+    **Guard (owner instruction): route-aware ordering is skipped entirely — falling back to the
+    existing efficiency-only `legacyDiscardCompare` — whenever the baseline (pre-route-aware) top
+    candidate's own resulting `minimumPointsStatus` is `'unknown'`.** Steering a beginner's
+    discards toward a route the engine itself won't vouch for is worse than staying efficiency-
+    neutral. `'unknown'` is reachable only pre-tenpai (`bestCaseReachesMinimum` is non-null
+    exactly at tenpai — item #37), so this guard can never fire on the tenpai branch; there is
+    always an exact answer there.
+
+    **Implementation:** `routeAwareTieBreakValues` (`hints.ts`) computes the per-candidate value
+    map (range-appropriate criterion + guard) and is exported; `rankDiscards` (`bots/policy.ts`)
+    sorts by `legacyDiscardCompare` first (establishing the baseline the guard reads), applies
+    the route-aware values as a primary key when non-null, and falls back to
+    `legacyDiscardCompare` as the final tie-break either way. `chooseDiscard`/`chooseMove` and
+    `computeBestMoveHint` both gained an optional `context: WinCircumstanceContext` parameter and
+    now share this identical path (SPEC.md §6: "Hint engine and bot AI share the same evaluation
+    core") — a bot's actual discard and Best Move's recommendation can no longer disagree, which
+    is what a `hints.ts` <-> `bots/policy.ts` module cycle now exists to guarantee (function-level
+    only — no top-level eager evaluation depends on it; verified safe via typecheck + the full
+    suite, not assumed). `computeBestMoveHint`'s new `context` parameter is optional and defaults
+    to `{}` — `BestMoveTab.tsx` does not thread `prevailingWind`/`seatWind` through yet (a small,
+    independent lane-C follow-up: OPEN-WORK.md §A), so Prevalent/Seat Wind (fanId 60/61) simply
+    never appear as route-aware candidates from that call site, same undefined-safe posture
+    `estimateWindTargets` already has elsewhere.
+
+    **By-product measurement of the FINAL, shipped behavior** (same script, rewritten to call the
+    real exported `routeAwareTieBreakValues`/`rankDiscards` directly rather than a parallel
+    reimplementation, so it cannot drift from production; same seed range, but now genuinely
+    replayed — the fix changes actual bot play, so this is a different self-play population than
+    the observe-only runs above, not a re-measurement of the same trajectories): 2,517 genuine
+    tie-break decisions across the same 200 hands. Guard fires (falls back to efficiency-only) on
+    37.8% of decisions overall — 0% at tenpai (as designed — `'unknown'` cannot occur there), 35-
+    64% pre-tenpai depending on shanten. Production's actual pick differs from what a pre-fix,
+    efficiency-only ranking would have chosen on 9.3% of decisions overall (234/2,517) — far
+    lower than the first pass's 27.5%/46.2% headline figures, because those numbers were measuring
+    a criterion that has since been shown wrong on two separate counts (crediblePointsTotal at
+    tenpai; then worst-case-across-waits) — a more conservative, non-noisy criterion agrees with
+    the old ranking far more often than either superseded approximation suggested. By shanten:
+    0->9.6%, 1->5.5%, 2->8.7%, 3->10.6%, 4->21.0%, 5->50.0% (n=20 at shanten 5 — noisy, same
+    non-independence caveat as below). This is reported as a by-product sanity check, not a gate
+    — the decision to build was already made and measured (above); this only confirms the shipped
+    code behaves as designed.
+
+    **Non-independence (same posture as item #37's own precision-figures note): every measurement
+    above comes from a handful of hundred-hand self-play runs, many decisions per hand, correlated
+    within a hand's own trajectory — none of the rates in this item carry an error bar.**
+
+    **Validation:** full engine suite green (570 tests, 1 pre-existing skip) and full UI suite
+    green (487 tests) after the change; `policy.test.ts`'s headless-simulation timeout bumped
+    45s -> 90s with a comment explaining why (every seat's discard decisions now pay the
+    route-aware cost, not just a hint request for one seat) — measured, not guessed, same
+    discipline as that test's own prior bump. `hints.test.ts` gained a fixture built from a real
+    self-played hand reproducing the original justification-text bug (see the separate,
+    independent fix below) rather than hand-constructed.
+
+    **A separate, independently-fixed defect found alongside this one, same session:**
+    `flexibilityFeature`'s "Keeps X alive" prose used to gate on `RouteRow.viable` alone — a
+    GROUP-wide signal ("could SOME tied candidate still reach this shape") that stayed true even
+    when the RECOMMENDED discard's own number for that shape was nowhere close, producing e.g.
+    "Keeps Seven Pairs alive" on a hand whose own table showed Seven Pairs 3-shanten against
+    Standard's 1 — a route the 8-point tab had independently flagged ceiling-only. Fixed by also
+    requiring the recommended discard's own `route.shanten` stay within margin of its own
+    `resultingShanten`; `RouteRow.viable` itself (the table's own display) is unchanged — still
+    group-wide, per `kickoffLiveHand`'s existing, deliberately-preserved fixture.
 
 ## Open follow-up work
 

@@ -278,11 +278,23 @@ function clamp01(value: number): number {
 // Null only when there's genuinely no discard decision to make (an empty
 // hand — shouldn't occur mid-game, but keeps this total rather than
 // throwing on a malformed caller).
-export function computeBestMoveHint(hand: Hand): BestMoveHint | null {
+//
+// `context` (added for the route-aware tie-break, decisions.md #39) is
+// OPTIONAL and defaults to `{}` — a caller that omits prevailingWind/
+// seatWind still gets a fully correct hint, just without Prevalent/Seat
+// Wind (fanId 60/61) counted toward the tie-break's route-awareness (they
+// simply never appear as candidates without a wind context — same
+// undefined-safe posture estimateWindTargets already has). As of this
+// commit `BestMoveTab.tsx` still calls this with no context at all
+// (pre-existing — Best Move's own routeTable never needed wind context
+// before, since shanten shapes don't depend on it); passing context through
+// there is a small, independent lane-C follow-up, not required for this fix
+// to be correct.
+export function computeBestMoveHint(hand: Hand, context: WinCircumstanceContext = {}): BestMoveHint | null {
   const evaluations = evaluateDiscards(hand)
   if (evaluations.length === 0) return null
 
-  const ranked = rankDiscards(evaluations) // already just the best-resultingShanten group, ordered
+  const ranked = rankDiscards(evaluations, hand, context) // already just the best-resultingShanten group, ordered
   const top = ranked[0]!
   const regretByTile = computeRouteRegret(evaluations)
 
@@ -799,4 +811,116 @@ export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext
         : 'unknown'
 
   return { candidates, selected, lockedInPoints, bestCaseTotal, credibleSelected, crediblePointsTotal, minimumPointsStatus }
+}
+
+// Tenpai tie-break: liveCount dominates bestLiveScore in every comparison
+// (real MCR totals never come remotely close to this multiplier) — primary
+// key is the count of live accepting tiles, secondary is the best real score
+// among them, exactly the lexicographic rule decisions.md #39 specifies.
+const TENPAI_LIVE_COUNT_WEIGHT = 1_000_000
+
+// Route-aware TIE-BREAK value for rankDiscards' own tied (best-resultingShanten)
+// group — SHARED by bots/policy.ts's chooseDiscard AND this file's own
+// computeBestMoveHint (SPEC.md §6: "Hint engine and bot AI share the same
+// evaluation core"), so a route-aware discard choice can never differ
+// between what a bot actually plays and what Best Move recommends. This is
+// a TIE-BREAK ONLY — efficiency still decides which discards are IN the
+// tied group (rankDiscards' own resultingShanten filter, unchanged); this
+// only orders WITHIN it.
+//
+// docs/rules/decisions.md #39 records the full reasoning (a non-rulebook
+// calibration ruling, same class as #37 — mcr_EN.pdf has nothing to say
+// about how a coach should order equally-efficient discards). Short form:
+//
+//   TENPAI (shanten 0): an EXACT answer already exists (computeWaits +
+//   scoreHand, every wait, both win methods), so this ranks by the number
+//   of LIVE accepting tiles — waits whose resulting hand clears
+//   MINIMUM_POINTS_TO_WIN on at least one win method — tie-broken by the
+//   best real score among those live tiles. NOT crediblePointsTotal (an
+//   estimate that should never outrank an exact answer once one exists —
+//   the same precedence minimumPointsStatus itself already applies,
+//   decisions.md #37). NOT the worst score across every wait either:
+//   scoreHand floors every winning hand at >=8 via Chicken Hand's own
+//   zero-fan minimum, so a wait scoring 1-7 is a DEAD wait (can never
+//   legally be declared), not a cheap one — a worst-case/average aggregate
+//   would rank a hand whose waits score {6,6} (unwinnable on EITHER) above
+//   one scoring {4,20} (winnable), exactly backwards. Dead waits are
+//   ignored entirely here, never averaged in or floored against.
+//
+//   PRE-TENPAI (shanten > 0): unchanged from the first measurement pass —
+//   post-discard crediblePointsTotal, the same gated/calibrated total
+//   minimumPointsStatus's own pre-tenpai fallback already trusts
+//   (decisions.md #37), never bestCaseTotal's inflated ceiling.
+//
+// GUARD: returns null (no route-aware ordering at all; caller falls back to
+// its existing efficiency-only tie-break) whenever the BASELINE candidate's
+// own resulting minimumPointsStatus is 'unknown' — steering a beginner's
+// discards toward a route the engine itself won't vouch for is worse than
+// staying efficiency-neutral (owner instruction). "Baseline" means
+// `candidates[0]` as the caller hands it in — rankDiscards always sorts by
+// its existing legacyDiscardCompare FIRST, so this checks what today's
+// (non-route-aware) pick would itself resolve to. 'unknown' is reachable
+// only pre-tenpai (computeRouteToPoints' own doc comment: bestCaseReachesMinimum
+// is non-null exactly at tenpai), so this guard can never fire on the
+// tenpai branch above — there is always an exact answer there.
+export function routeAwareTieBreakValues(
+  hand: Hand,
+  candidates: readonly DiscardEvaluation[],
+  context: WinCircumstanceContext,
+): Map<TileInstanceId, number> | null {
+  if (candidates.length === 0) return null
+  const shanten = candidates[0]!.resultingShanten
+
+  // Same-type tiles evaluate identically (tile-efficiency.ts's own doc) —
+  // dedupe before the expensive per-candidate route/waits computation below,
+  // then broadcast the same value back to every physical tile of that type.
+  const representativeTileByType = new Map<TileTypeId, TileInstanceId>()
+  for (const c of candidates) {
+    const typeId = typeIdOfInstance(c.tile)
+    if (!representativeTileByType.has(typeId)) representativeTileByType.set(typeId, c.tile)
+  }
+  // Nothing to reorder when every tied candidate is the same type (a bare
+  // duplicate-copy tie, not a genuine choice) — every value below would come
+  // out identical anyway, so skip the computeRouteToPoints/computeWaits cost
+  // entirely rather than paying it for a result that can't change anything.
+  // This is the common case on most turns (most decisions aren't a genuine
+  // multi-type tie at all), so it matters for real per-move cost, not just
+  // the pathological case.
+  if (representativeTileByType.size <= 1) return null
+
+  function resultHandFor(tile: TileInstanceId): Hand {
+    return { concealedTiles: hand.concealedTiles.filter((t) => t !== tile), melds: hand.melds, flowers: hand.flowers }
+  }
+
+  const valueByType = new Map<TileTypeId, number>()
+
+  if (shanten === 0) {
+    for (const [typeId, tile] of representativeTileByType) {
+      const resultHand = resultHandFor(tile)
+      const waits = computeWaits(resultHand.concealedTiles, resultHand.melds, context)
+      let liveCount = 0
+      let bestLiveScore = 0
+      for (const w of waits) {
+        const best = Math.max(w.discardScore.basicPoints, w.selfDrawScore.basicPoints)
+        if (best < MINIMUM_POINTS_TO_WIN) continue // dead wait — ignored, never averaged in or floored against
+        liveCount++
+        if (best > bestLiveScore) bestLiveScore = best
+      }
+      valueByType.set(typeId, liveCount * TENPAI_LIVE_COUNT_WEIGHT + bestLiveScore)
+    }
+  } else {
+    const baselineTypeId = typeIdOfInstance(candidates[0]!.tile)
+    const baseline = computeRouteToPoints(resultHandFor(representativeTileByType.get(baselineTypeId)!), context)
+    if (baseline.minimumPointsStatus === 'unknown') return null
+
+    valueByType.set(baselineTypeId, baseline.crediblePointsTotal)
+    for (const [typeId, tile] of representativeTileByType) {
+      if (typeId === baselineTypeId) continue
+      valueByType.set(typeId, computeRouteToPoints(resultHandFor(tile), context).crediblePointsTotal)
+    }
+  }
+
+  const values = new Map<TileInstanceId, number>()
+  for (const c of candidates) values.set(c.tile, valueByType.get(typeIdOfInstance(c.tile))!)
+  return values
 }
