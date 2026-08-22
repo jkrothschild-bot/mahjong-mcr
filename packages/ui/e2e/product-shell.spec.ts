@@ -17,7 +17,10 @@ test('a fresh hand shows the complete physical wall, deals it, and restores with
   await expect(page.getByText('144', { exact: true })).toBeVisible()
 
   await expect(board).not.toHaveAttribute('aria-busy', 'true', { timeout: 60_000 })
-  await expect(page.getByRole('list', { name: 'Your hand' }).getByRole('listitem')).toHaveCount(14)
+  // Flowers remain visible bonus tiles but are not part of the dealer's
+  // 14-tile playable hand. Fresh games now use random seeds, so count only
+  // concealed hand tiles instead of every list item in the hand region.
+  await expect(page.locator('[data-testid^="hand-tile-"]')).toHaveCount(14)
   for (const seat of [1, 2, 3]) await expect(page.locator(`[data-testid^="seat-${seat}-back-"]`)).toHaveCount(13)
 
   const remaining = Number(await page.getByTestId('wall-count').textContent())
@@ -37,7 +40,7 @@ test('guest can start Learning Mode, reload and resume the same game', async ({ 
   await expect(page.getByTestId('game-board')).not.toHaveAttribute('aria-busy', 'true', { timeout: 60_000 })
 
   const wallBeforeTurn = Number(await page.getByTestId('wall-count').textContent())
-  const firstTile = page.getByRole('list', { name: 'Your hand' }).getByRole('listitem').first()
+  const firstTile = page.locator('[data-testid^="hand-tile-"]').first()
   await firstTile.dblclick()
   await expect(page.getByRole('list', { name: 'You discards' }).getByRole('listitem')).toHaveCount(1)
 
@@ -66,7 +69,7 @@ test('guest can start Learning Mode, reload and resume the same game', async ({ 
     const raw = localStorage.getItem('mcr-mahjong:active-game:v1')
     if (!raw) return 0
     return JSON.parse(raw).game.gameState.players[0].discards.length as number
-  })).toBe(1)
+  }), { timeout: 15_000 }).toBe(1)
 
   await page.getByRole('button', { name: 'Home' }).click()
   await expect(page.getByRole('heading', { name: 'Learn Mahjong by actually playing it' })).toBeVisible({ timeout: 15_000 })

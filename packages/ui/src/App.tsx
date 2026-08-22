@@ -33,6 +33,11 @@ import { buildInitialDealFrames } from './game/initialDealPresentation.js'
 export interface AppProps {
   config?: GameConfig
   initialSnapshot?: LoopState
+  // Seed for a brand-new match (ignored once initialSnapshot restores a game
+  // already in progress). Left undefined in production so every fresh game
+  // deals a genuinely random wall — pass a fixed value only to pin the deal
+  // for tests.
+  matchSeed?: number
   onSnapshotChange?: (snapshot: LoopState) => void
   saveStatus?: 'saved' | 'saving' | 'local-only'
   onRestart?: () => void | Promise<void>
@@ -43,7 +48,7 @@ export interface AppProps {
   animateInitialDeal?: boolean
 }
 
-function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, saveStatus = 'saved', onRestart, onHome, onLogout, animateInitialDeal = false }: AppProps) {
+function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, matchSeed, onSnapshotChange, saveStatus = 'saved', onRestart, onHome, onLogout, animateInitialDeal = false }: AppProps) {
   const capabilities = capabilitiesFor(config)
   const analytics = useAnalytics()
   const { settings, update } = useSettings()
@@ -85,6 +90,10 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
   // Hint panel's Tile Safety tab (M5) can share the exact same selection.
   const [selectedTypeId, setSelectedTypeId] = useState<TileTypeId | null>(null)
   const inspectTile = (id: number) => setSelectedTypeId(typeIdOfInstance(id))
+  // A fresh random seed per mount, used only when the caller doesn't pin one
+  // (tests) and there's no initialSnapshot to restore from — see
+  // useGameLoop's resetMatch for why this range matches nextSeed's uint32.
+  const [randomMatchSeed] = useState(() => Math.floor(Math.random() * 4294967296))
   const {
     state,
     matchState,
@@ -96,7 +105,7 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, onSnapshotChange, 
     startNextHand,
     resetMatch,
   } = useGameLoop({
-    matchSeed: 42,
+    matchSeed: matchSeed ?? randomMatchSeed,
     botSpeedMs: settings.botSpeedMs,
     initialSnapshot,
     onSnapshotChange,

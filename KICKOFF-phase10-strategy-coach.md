@@ -628,22 +628,90 @@ re-run needed (same posture as the two bugs recorded above). Full engine
 suite green (562 tests, 1 pre-existing skip) after the review-pass fix,
 typecheck clean.
 
-**A separate, pre-existing defect surfaced while hunting for these
+~~**A separate, pre-existing defect surfaced while hunting for these
 fixtures, NOT fixed here (out of scope — touching `fan-targets.ts`'s
 estimators was excluded from this pass): the family estimators' own
 "ceiling, not forecast" design (`RouteToPointsResult.bestCaseTotal` sums
 FULL raw points for any candidate with `completionProbability > 0`,
 however small, per that field's own doc comment) makes `bestCaseTotal`
-reach 8+ almost trivially for most non-degenerate hands — e.g. Half/Full
-Flush's heuristic returns a nonzero candidate for nearly any hand with at
-least one suited tile of the majority suit, and Seven Pairs similarly for
-any hand with so much as one pair-forming type, each contributing their
-FULL 6-24 points regardless of how small the probability actually is. This
-is precisely what the precedence bug above let leak into
-`minimumPointsStatus` before the review-pass fix — the two are coupled, not
-coincidental. Worth a deliberate look at whether `selected`'s greedy sum
-should weight by probability, or exclude candidates below some floor,
-before this panel ships to a UI — not decided here.**
+reach 8+ almost trivially for most non-degenerate hands...**~~ **Fixed
+2026-08-16, own session, on a fresh branch off `main` (`feat/phase10-
+route-credibility`) — see the dated section below for the measured
+before/after and `docs/rules/decisions.md` item #37 for the full ruling.**
+
+**`crediblePointsTotal` fix (2026-08-16) — the `bestCaseTotal`-inflation
+defect above, measured and fixed via a calibration harness, not fixed by
+guesswork.** Confirmed via `validation/src/selfplay/`'s new self-play
+calibration harness (own commit, 2,000 hands, before any production code
+changed): `bestCaseTotal >= MINIMUM_POINTS_TO_WIN` on 93.3% of PRE-TENPAI
+decision points, making `minimumPointsStatus` 'reachable' almost
+unconditionally before tenpai — three families (Seven Pairs 19, Half/Full
+Flush 22/50, All Simples/No Honors 68/76) alone carried ~93% of that
+inflation, exactly as the earlier investigation pass's smaller-sample
+estimate had suggested. `'unknown'` occurred on only 6.7% of pre-tenpai
+samples, and 95.2% of THOSE were melded hands (not, as might be guessed,
+merely early-game ones) — a declared meld structurally kills all three
+loose families at once.
+
+Fixed per the owner's (c)+(d) decision from the investigation pass:
+`bestCaseTotal` itself is UNTOUCHED (still the un-gated ceiling its own doc
+comment describes); a NEW `crediblePointsTotal` field drives
+`minimumPointsStatus`'s pre-tenpai fallback instead, computed via a
+per-family gate on each family's own NATIVE distance metric (shanten steps
+for Seven Pairs via `sevenPairsShantenFromCounts`; offending-tile count for
+the rest via `tilesNeeded.length`) — never a shared probability number
+across `probabilityBasis` values, which would repeat the exact mixed-basis
+mistake `fan-targets.ts` (decisions.md item #35) already forbids elsewhere.
+Thresholds (`SEVEN_PAIRS_CREDIBLE_SHANTEN_MAX` / `FLUSH_CREDIBLE_TILES_
+NEEDED_MAX` / `SIMPLES_HONORS_CREDIBLE_TILES_NEEDED_MAX`, all `= 1`) were
+picked by sweeping `{1,1,1}`/`{2,2,2}`/`{3,3,3}` against the SAME dataset
+and measuring which moved precision — P(hand eventually finishes |
+`'reachable'`) vs. P(... | not) — not by which looked most sensible.
+`{1,1,1}` won on both the reachable-rate correction (93.3% → 46.6%, the
+largest of the three) and precision at shanten 1-3 (e.g. shanten 1: 22.4%
+vs. 17.0%, the widest gap of the three tried).
+
+**Read honestly, not as a clean win:** ground truth is "did seat 0
+eventually win" (seat 0 played by the same efficiency-only bot policy as
+every other seat, not a coached human), and P(seat 0 eventually wins) sits
+nearly flat (~18-20%) across shanten 1-5 regardless of prediction — most of
+the outcome variance is 4-player race/wall-exhaustion noise, not hand
+quality at the sampled decision point, capping how much precision lift ANY
+estimate-based signal can show against this ground truth. The clean
+evidence is the reachable-rate correction; the precision numbers corroborate
+without being the headline claim. Full account, the sweep table, and both
+follow-ups below: `docs/rules/decisions.md` item #37.
+
+**Two findings recorded, deliberately NOT fixed this pass:**
+1. Of pre-tenpai samples still `crediblePointsTotal`-'reachable' after the
+   `{1,1,1}` gate, 95.2% would flip to non-reachable if the other 7
+   families (All Pungs 49, Dragon Pung 59, Big Three Dragons 2,
+   Prevalent/Seat Wind 60/61) were excluded entirely too — they were
+   comparatively invisible against the original inflation but dominate what
+   is left once the worst three are fixed. A follow-up gating pass on those
+   seven is very likely warranted, scoped out of this pass on explicit
+   instruction ("gate only three families... do not build ten gates on
+   spec") — not built, not measured beyond this one sensitivity check.
+2. A SEPARATE, higher-priority gap, found investigating why 39% of
+   shanten=-1 samples (a hand already structurally complete but under the
+   8-point minimum — confirmed via real captured hands, e.g. 4 exposed
+   melds + a genuine concealed pair) returned `'unknown'`: `computeWaits`
+   (`waits.ts`) only computes anything at exactly `shanten === 0`, so an
+   ALREADY-complete-but-under-minimum hand falls through to `null` even
+   though its current score is trivially, exactly computable — no
+   draw-simulation needed, the hand is sitting there fully formed. This is
+   precisely the "1-7 point dead zone" trap SPEC §6 names as the panel's
+   single most valuable thing to say, caught live: a real bot was forced to
+   break an already-formed hand because it didn't meet the minimum, and the
+   coach's own behavior at that exact moment was still nearly as
+   uninformative as before this whole pass. Needs its own design decision
+   (what win-method context to assume for a hand never actually completed
+   by a real draw/claim event) — touches `waits.ts`, out of THIS pass's
+   scope, not fixed here.
+
+No changes to `scoring/`, `win-detection.ts`, or `exclusions.ts`. Full
+engine suite green (567 tests, 1 pre-existing skip), typecheck clean across
+all three workspaces (`engine`, `ui`, `validation`).
 
 **Still-open coverage gap, unchanged by this fix, restated here since the
 fix's own repro fixture leans directly on it:** Stage 3 covers 10 of the

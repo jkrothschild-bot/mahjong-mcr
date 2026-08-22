@@ -71,7 +71,7 @@ describe('SeatLine concealed kongs', () => {
       render(<SeatLine seat={1} hand={hand} region={TEST_REGION} grid={{ columns: 3, rows: 9 }} onTileClick={onTileClick} selectedTypeId="C1" />)
 
       const backTile = screen.getByTestId('meld-tile-k-0-0')
-      expect(backTile.className).toContain('ring-2')
+      expect(backTile.className).toContain('ring-4')
       fireEvent.click(backTile)
       expect(onTileClick).toHaveBeenCalledWith(t0)
     },

@@ -169,6 +169,19 @@ gone. Whoever picks this up should also decide whether a `data-testid="board"` a
 keeping for e2e stability independent of internal rewrites, given this is the second time a
 testid rename has silently broken a consumer.
 
+### A12. `SPEC.md §8` names "tile size / zoom" as a player setting — no longer true  `[code-verified 2026-08-22]`
+`SPEC.md §8` (Settings) still lists: "Bot speed; hint level; claim-timer on/off and duration;
+sound on/off; color-blind-safe palette; **tile size / zoom**." As of the housekeeping pass that
+hard-fixed tile scale, this is stale: `SettingsPanel.tsx` no longer renders a tile-size control
+(the `Tile size` radiogroup and its `TILE_SCALE_LABELS` were removed), `useSettings.ts`'s
+`DEFAULT_SETTINGS.tileScale` is fixed to `'large'`, and `loadSettings` now normalizes any
+legacy persisted value — including a previously-valid `'normal'` — to `'large'` rather than
+honoring it. `TileScale` survives only as an internal type consumed by tile-rendering code
+(`tileStyles.ts`), never as user-configurable state. §8's "tile size / zoom" clause needs
+removing or correcting; not done here — same convention as §C (docs corrected in place, dated,
+once actually verified), but recorded here rather than edited directly per this pass's own
+instruction not to touch `SPEC.md`.
+
 ---
 
 ## B. Tracked elsewhere — pointers only
@@ -217,6 +230,24 @@ Do not restate these here; follow the link.
   2026-08-16 (two entries: the original fix, then the same-day review correction). Full engine
   suite green (562 tests), typecheck clean, `scoring/`/`win-detection.ts`/`exclusions.ts`
   untouched throughout.
+  **`bestCaseTotal`-inflation defect (referenced above) fixed 2026-08-16, `code-verified`, own
+  session, fresh branch off `main` (`feat/phase10-route-credibility`), docs/rules/decisions.md
+  item #37.** Measured first via a NEW, committed self-play calibration harness
+  (`validation/src/selfplay/`, its own commit before any production code changed, 2,000 hands):
+  `bestCaseTotal >= 8` on 93.3% of pre-tenpai decision points, driven ~93% by three families
+  (Seven Pairs 19, Half/Full Flush 22/50, All Simples/No Honors 68/76). Fixed via the owner's
+  (c)+(d) decision — `bestCaseTotal` itself untouched; a new `crediblePointsTotal` field
+  (per-family native-distance gate, thresholds picked by measured precision movement, not by
+  feel) now drives `minimumPointsStatus` pre-tenpai instead. Reachable-rate corrected 93.3% ->
+  46.6%. **Two follow-ups recorded, not fixed this pass:** the other 7 families still carry
+  95.2% of what stays 'reachable' post-gate (not gated this pass, per explicit scope); and a
+  separate, higher-priority gap in `computeWaits`/`waits.ts` — a hand already structurally
+  complete but under the 8-point minimum (shanten -1) gets no exact answer at all, since
+  `computeWaits` only computes anything at exactly shanten 0, so it falls back to the same
+  fuzzy pre-tenpai estimate as any earlier-game hand for precisely SPEC §6's named "1-7 point
+  dead zone" trap. Full account: KICKOFF doc's own dated section, decisions.md item #37. Full
+  engine suite green (567 tests), typecheck clean across `engine`/`ui`/`validation`,
+  `scoring/`/`win-detection.ts`/`exclusions.ts` untouched.
   **Still open, `doc-only`, restated 2026-08-16 (unchanged by the fix above):** Stage 3 covers
   10 of 81 fans — Pure Straight/Mixed Straight dropped in CHANGE 1, knitted shapes never added.
   See the KICKOFF doc's own coverage-gap note for the reasoning; not decided whether either

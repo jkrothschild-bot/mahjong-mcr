@@ -1367,7 +1367,117 @@ corrected to match. See each item's status.
     The tell that separated it from a genuine tie was the points column, not the fan-name diff:
     a benign tie has `ours == pmgb` totals, these had `ours == pmgb - 1`.
 
-37. **Initial deal order and physical wall mapping corrected (2026-08-16).**
+37. **`computeRouteToPoints`'s `crediblePointsTotal` — a second, per-family-distance-gated
+    selection, separate from `bestCaseTotal`, driving `minimumPointsStatus`'s pre-tenpai
+    fallback (Phase 10 Stage 3, `packages/engine/src/hints.ts`) — deliberately NOT sourced from
+    `mcr_EN.pdf`, same posture as item #16's `defense.ts` and item #35's `fan-targets.ts`
+    `probabilityBasis`.** `mcr_EN.pdf` has nothing to say about how a coach should represent
+    uncertainty about an incomplete hand; this is a calibration-driven design decision, backed
+    by measurement, not a rulebook citation.
+
+    **The defect, measured before any fix (`validation/src/selfplay/`'s calibration harness,
+    2,000 self-played hands, `bots/policy.ts`'s production `chooseMove` on every seat):**
+    `bestCaseTotal` sums FULL raw points for any `estimateFanTargets` candidate with merely
+    nonzero `completionProbability`. Three families — Seven Pairs (19), Half/Full Flush
+    (22/50), All Simples/No Honors (68/76) — return a nonzero candidate on almost any concealed
+    hand regardless of actual distance, and are mutually route-compatible, so they routinely
+    stack. Measured result: `bestCaseTotal >= MINIMUM_POINTS_TO_WIN` on 93.3% of PRE-TENPAI
+    decision points (19,762+ sampled), making `minimumPointsStatus` 'reachable' almost
+    unconditionally before tenpai — a coach that says "you can reach 8" on nearly every hand,
+    which is not informative and was the original complaint that started this work. `'unknown'`
+    occurred on only 6.7% of pre-tenpai samples, and 95.2% of those were melded hands where a
+    declared meld structurally kills all three loose families at once — not, as might be
+    guessed, hands merely far from tenpai.
+
+    **Options considered** (full write-up: this session's own investigation transcript, not
+    duplicated here — the short form): (a) weight the sum by `completionProbability` — rejected,
+    since it numerically blends `'shanten'`- and `'heuristic'`-basis probabilities into one
+    currency, exactly what `FanTargetEstimate.probabilityBasis`'s own comment (item #35)
+    forbids, and stops answering "can this hand reach 8" at all. (b) a shared probability floor
+    — workable but reintroduces a milder version of the same cross-basis tension (one threshold
+    value implicitly treated as equally meaningful on both probability scales) and has no
+    existing calibration anchor. (d) alone (gate `bestCaseTotal` itself) was rejected in favor
+    of (c)+(d) together: **leave `bestCaseTotal` exactly as its own doc comment already
+    describes it — an un-gated ceiling, still useful as an aspirational number — and drive
+    `minimumPointsStatus` from a NEW, separate `crediblePointsTotal` instead**, computed via a
+    per-family gate on each family's own NATIVE distance metric (shanten steps for Seven Pairs,
+    via `sevenPairsShantenFromCounts` — the same function the estimator itself already calls —
+    offending-tile count for the rest, via the candidate's own `tilesNeeded.length`) rather than
+    a shared probability number. This sidesteps the mixed-basis problem entirely rather than
+    relocating it: no two families' numbers are ever compared against each other, each is judged
+    only against its own scale.
+
+    **Thresholds, justified by measured movement, not by looking sensible (explicit instruction
+    for this pass):** `SEVEN_PAIRS_CREDIBLE_SHANTEN_MAX` / `FLUSH_CREDIBLE_TILES_NEEDED_MAX` /
+    `SIMPLES_HONORS_CREDIBLE_TILES_NEEDED_MAX`, all `= 1`. Swept `{1,1,1}` / `{2,2,2}` / `{3,3,3}`
+    against the same 2,000-hand dataset, re-running `computeRouteToPoints`' own real
+    `areExclusive`/`isRouteCompatible`/`STAGE3_FAN_IDS` selection logic with only the admission
+    bar changed (so the sweep could never drift from what shipped). `{1,1,1}` won on both
+    measures: the largest correction to the near-universal pre-tenpai reachable-rate (93.3% ->
+    46.6%, vs. 53.5% at `{2,2,2}` and 62.2% at `{3,3,3}`), and the best precision — P(hand
+    eventually finishes | `'reachable'`) vs. P(hand eventually finishes | not) — at shanten 1-3,
+    the buckets that mattered (shanten 1: 22.4% vs. 17.0%, a 5.4-point gap, the widest of the
+    three thresholds tried; shanten 2: 22.0% vs. 18.3%; shanten 3: 19.8% vs. 18.3%).
+    Un-symmetric variants (e.g. `{1,2,2}`) were checked too and did not distinguish themselves
+    from the symmetric `{2,2,2}` — the improvement comes from tightening all three together, not
+    from any single family dominating.
+
+    **Read the precision numbers honestly, not as a clean win (explicit instruction for this
+    pass):** ground truth here is "did seat 0 eventually win the hand" (always >=8 points by
+    construction of the win-legality gate, confirmed by a sanity check every report run
+    performs). Seat 0 is always played by the same efficiency-only bot policy as every other
+    seat — not a coached human optimizing for the 8-point minimum — and P(seat 0 eventually
+    wins) sits nearly flat (~18-20%) across shanten 1 through 5 regardless of prediction. Most of
+    the outcome variance is 4-player race/wall-exhaustion noise unrelated to hand quality at the
+    sampled decision point, which caps how much precision lift ANY estimate-based signal can
+    show against this ground truth. The clean, low-noise evidence the fix works is the
+    reachable-rate correction (93.3% -> 46.6%, no longer near-universal); the precision numbers
+    are corroborating, not the headline claim. The precision figures are also built from
+    non-independent samples — every hand contributes multiple decision points, all sharing that
+    one hand's single outcome label — so the effective sample size is ~2,010 hands, not the raw
+    sample count, and the shanten-1 5.4-point gap carries no error bar; the `{1,1,1}` threshold
+    rests on the reachable-rate correction above, not on that gap.
+
+    **Recorded, explicitly NOT addressed this pass (scoped instruction: gate three families,
+    not ten):** of pre-tenpai samples still `crediblePointsTotal`-'reachable' after the `{1,1,1}`
+    gate, 95.2% would flip to non-reachable if the other 7 families (All Pungs 49, Dragon Pung
+    59, Big Three Dragons 2, Prevalent/Seat Wind 60/61) were excluded entirely too — they were
+    comparatively invisible against the original inflation but dominate what is left once the
+    worst three are fixed. A follow-up gating pass on those seven is very likely warranted;
+    deliberately not built this session pending its own measurement.
+
+    **A second, distinct, higher-priority gap found during this pass's shanten=-1 investigation,
+    also explicitly NOT fixed here:** `computeWaits` (`waits.ts`) only computes anything at
+    exactly `shanten === 0` — `if (calculateShanten(...).shanten !== 0) return []`. A hand that
+    is ALREADY structurally complete (shanten -1) but under the 8-point minimum — confirmed via
+    2 hand-decomposed real samples from the harness's own captured raw tile data, e.g. 4 exposed
+    melds + a genuine concealed pair, correctly complete by the shanten formula — falls through
+    `computeWaits` to `[]`, so `computeHandPlan`'s `bestCaseReachesMinimum` stays `null` even
+    though the CURRENT score is trivially and exactly computable (no draw-simulation needed —
+    the hand is sitting there, already formed). `minimumPointsStatus` then falls back to the
+    same estimate-based logic as any earlier-game hand, reporting `'unknown'` on 39% of these
+    samples (55/140 in the 2,000-hand dataset) for a position with a KNOWN, EXACT answer sitting
+    unused. This is precisely the "1-7 point dead zone" trap SPEC §6 names as the panel's single
+    most valuable thing to say, caught live and not hypothetically — a real bot was forced to
+    break an already-formed hand because it didn't meet the minimum, and the coach's own
+    behavior at that exact moment is nearly as uninformative as before this pass. Extending
+    `computeWaits`'/`computeHandPlan`'s domain to cover shanten <= -1 is a real, scoped fix (not
+    this pass — touches `waits.ts`, and needs its own design decision: what win-method context to
+    assume for a hand that was never actually completed by a real draw/claim event).
+
+    **Validation:** harness committed separately (`validation/src/selfplay/`, its own commit,
+    before any production code) so the calibration numbers above are reproducible from a
+    recorded seed range, not asserted from memory. No changes to `scoring/`, `win-detection.ts`,
+    or `exclusions.ts` — `bestCaseTotal`'s own selection loop is untouched; `crediblePointsTotal`
+    reuses the exact same compatibility functions via a shared `selectCompatibleRoute` helper so
+    the two can never drift apart on anything but admission. Full engine suite green (567 tests,
+    1 pre-existing skip), typecheck clean across all three workspaces (`engine`, `ui`,
+    `validation`). Two new fixtures in `hints.test.ts`, one built from a REAL self-played hand
+    (seed 0, turn 2 of the calibration dataset) rather than hand-constructed, pinning both the
+    flip (`bestCaseTotal` 50, unchanged; `crediblePointsTotal` 7, correctly gated) and that the
+    gate is a proximity requirement, not a blanket ban (a 5-pairs-plus-3-singles hand still
+    admits Seven Pairs into `credibleSelected` once genuinely close).
+38. **Initial deal order and physical wall mapping corrected (2026-08-16).**
     The engine previously handed out 13 rounds of one tile to each seat, and
     performed each Flower replacement immediately. That produced the right
     final tile *counts* but not the official physical deal. **Status:

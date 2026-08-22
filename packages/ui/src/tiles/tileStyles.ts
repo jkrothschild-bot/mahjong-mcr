@@ -74,7 +74,7 @@ export const TILE_FACE_CLASSES = 'border-neutral-500 bg-neutral-100 text-neutral
 export const TILE_BACK_CLASSES =
   'border-[#d6c28e] bg-[#0b4b50] text-teal-100 shadow-[inset_1px_1px_1px_rgba(255,255,255,0.22),inset_-1px_-2px_2px_rgba(0,18,20,0.5),2px_3px_4px_rgba(0,0,0,0.4)]'
 
-export const TILE_HIGHLIGHT_CLASSES = 'ring-2 ring-amber-400'
+export const TILE_HIGHLIGHT_CLASSES = 'ring-4 ring-amber-300 shadow-[0_0_18px_rgba(253,230,138,0.72)]'
 export const TILE_SELECTED_LIFT_CLASSES = '-translate-y-2 shadow-[2px_8px_10px_rgba(0,0,0,0.48)] transition-[transform,box-shadow]'
 
 // The tile the player just drew sits physically apart from the rest of a

@@ -7,7 +7,7 @@ import { initLoopState, type LoopState } from './game/useGameLoop.js'
 
 describe('App', () => {
   it('temporarily toggles a full-board occupancy preview', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
     const preview = screen.getByRole('button', { name: 'Preview full board' })
     fireEvent.click(preview)
     expect(screen.getByRole('button', { name: 'Exit full board' })).toHaveAttribute('aria-pressed', 'true')
@@ -25,7 +25,7 @@ describe('App', () => {
     expect(screen.getByTestId('game-board')).toHaveAttribute('data-shared-layout', 'enabled')
   })
   it('renders the header and all four seats', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.getByText('MCR Mahjong Mentor')).toBeInTheDocument()
     expect(screen.getByText('Learn while you play')).toBeInTheDocument()
@@ -37,7 +37,7 @@ describe('App', () => {
 
   it('sends the current match snapshot through the explicit Home control', async () => {
     const onHome = vi.fn(async (_snapshot: LoopState) => {})
-    render(<App onHome={onHome} />)
+    render(<App matchSeed={42} onHome={onHome} />)
 
     const home = screen.getByRole('button', { name: 'Home' })
     expect(home).toHaveAttribute('title', 'Home')
@@ -52,7 +52,7 @@ describe('App', () => {
 
   it('shows an icon-only Logout control when authenticated navigation is provided', async () => {
     const onLogout = vi.fn(async (_snapshot: LoopState) => {})
-    render(<App onLogout={onLogout} />)
+    render(<App matchSeed={42} onLogout={onLogout} />)
 
     const logout = screen.getByRole('button', { name: 'Log out' })
     expect(logout).toHaveAttribute('title', 'Log out')
@@ -68,7 +68,7 @@ describe('App', () => {
   // board mid-hand. They are now behind the "Hand info" button. This asserts
   // nothing puts them back in flow.
   it('keeps the fan tracker and waits out of the page flow until Hand info is opened', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.queryByRole('dialog', { name: 'Hand info' })).not.toBeInTheDocument()
     expect(screen.queryByText('Locked in')).not.toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('App', () => {
   // could make. Bots were unaffected (chooseBotMove reads legalMoves), which
   // is why it went unnoticed. This asserts the prompt is wired up at all.
   it('mounts the own-turn declaration prompt so self-drawn wins and kongs are reachable', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
     // Hand 1 opens on the human's own discard decision. The prompt renders
     // nothing for an ordinary hand, so this asserts the wiring rather than a
     // visible button — TurnActionPrompt.test.tsx covers the offers
@@ -95,7 +95,7 @@ describe('App', () => {
   })
 
   it('marks the dealer and current-turn seat identically for every seat (no human-only treatment)', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
     // Hand 1's dealer is seat 0 (== HUMAN_SEAT), and startHand's first
     // phase is the dealer's discard — so seat 0 opens as both dealer and
     // current turn.
@@ -108,7 +108,7 @@ describe('App', () => {
   })
 
   it('renders the player\'s real 14-tile hand and lets sorting reorder it without touching engine state', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     // Seat 0 is dealerSeat in App.tsx's demo match (matchSeed 42, hand 1),
@@ -132,7 +132,7 @@ describe('App', () => {
   })
 
   it('double-clicking a hand tile discards it, moving it into the discard pile', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
@@ -147,7 +147,7 @@ describe('App', () => {
   })
 
   it('Restart asks for confirmation, and canceling leaves the current match untouched', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Restart' }))
     const dialog = screen.getByRole('dialog', { name: 'Confirm restart' })
@@ -162,7 +162,7 @@ describe('App', () => {
   })
 
   it('confirming Restart abandons the current match — a discard made before restarting is gone afterward', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.getByTestId('discard-hint')).toBeInTheDocument()
     const hand = screen.getByRole('list', { name: 'Your hand' })
@@ -193,7 +193,7 @@ describe('App', () => {
       'mcr-mahjong:settings:v1',
       JSON.stringify({ botSpeedMs: 1500, confirmBeforeDiscard: true, stepMode: true }),
     )
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     const hand = screen.getByRole('list', { name: 'Your hand' })
     const [firstTile] = hand.querySelectorAll('[role="listitem"]')
@@ -205,7 +205,7 @@ describe('App', () => {
   })
 
   it('clicking a tile shows the tile inspector with its name and unseen count', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.queryByTestId('tile-inspector')).not.toBeInTheDocument()
 
@@ -216,11 +216,11 @@ describe('App', () => {
     const inspector = screen.getByTestId('tile-inspector')
     expect(inspector).toHaveTextContent('unseen of 4')
     // The clicked tile itself is one of the "visible copies" being inspected.
-    expect(firstTile!.className).toContain('ring-2')
+    expect(firstTile!.className).toContain('ring-4')
   })
 
   it('opens and closes the tile-count grid, reflecting real counts from the live hand', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.queryByRole('dialog', { name: 'Tile-count grid' })).not.toBeInTheDocument()
 
@@ -241,7 +241,7 @@ describe('App', () => {
   })
 
   it('opens and closes the Strategy Coach hint panel, on the Best move tab by default', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.queryByTestId('hint-panel')).not.toBeInTheDocument()
 
@@ -285,7 +285,7 @@ describe('App', () => {
   })
 
   it('hides strategic assistance in Play Without Help while keeping legal discards playable', () => {
-    render(<App config={{ variant: 'mcr', mode: 'solo', assistance: 'none' }} />)
+    render(<App matchSeed={42} config={{ variant: 'mcr', mode: 'solo', assistance: 'none' }} />)
     expect(screen.queryByRole('button', { name: 'Hint' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Hand info' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Tile counts' })).not.toBeInTheDocument()
@@ -296,7 +296,7 @@ describe('App', () => {
   })
 
   it('opens and closes the replay view, showing hand 1 with the initial deal at move 0', () => {
-    render(<App />)
+    render(<App matchSeed={42} />)
 
     expect(screen.queryByTestId('replay-view')).not.toBeInTheDocument()
 
@@ -315,12 +315,12 @@ describe('App', () => {
   // discard still inspects that tile, and it no longer opens anything.
   describe('discard interaction after the All-discards overlay was removed', () => {
     it('offers no All discards button', () => {
-      render(<App />)
+      render(<App matchSeed={42} />)
       expect(screen.queryByRole('button', { name: 'All discards' })).not.toBeInTheDocument()
     })
 
     it('clicking a discard inspects its type and opens no overlay', () => {
-      render(<App />)
+      render(<App matchSeed={42} />)
 
       const hand = screen.getByRole('list', { name: 'Your hand' })
       const [firstTile] = hand.querySelectorAll('[role="listitem"]')

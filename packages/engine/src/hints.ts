@@ -9,7 +9,7 @@ import { areExclusive } from './scoring/exclusions.js'
 import { FAN_REGISTRY } from './scoring/registry.js'
 import { isDragonTypeId, isWindTypeId, parseSuited } from './scoring/set-helpers.js'
 import type { FanMatch } from './scoring/types.js'
-import { calculateShantenFromCounts, type ShantenResult } from './shanten.js'
+import { calculateShantenFromCounts, sevenPairsShantenFromCounts, type ShantenResult } from './shanten.js'
 import { ALL_SHANTEN_SHAPES, evaluateDiscards, routeTableFor, type DiscardEvaluation, type RouteAssessment } from './tile-efficiency.js'
 import { typeIdOf, typeIdOfInstance, type TileInstanceId, type TileTypeId } from './tiles.js'
 import { computeWaits, type WaitOption, type WinCircumstanceContext } from './waits.js'
@@ -486,24 +486,43 @@ export function computeHandPlan(hand: Hand, context: WinCircumstanceContext = {}
 // Chicken Hand win, or on Pure/Mixed Straight (deliberately outside the 10
 // families per CHANGE 1).
 //
-// The SECOND version (still on this branch, before this comment) fixed that
-// but got the PRECEDENCE backwards: it checked `bestCaseTotal >=
-// MINIMUM_POINTS_TO_WIN` FIRST, so an inflated family estimate (see
-// bestCaseTotal's own doc comment on the estimator-generosity defect) could
+// The SECOND version fixed that but got the PRECEDENCE backwards: it
+// checked `bestCaseTotal >= MINIMUM_POINTS_TO_WIN` FIRST, so an inflated
+// family estimate (see `crediblePointsTotal`'s own doc comment below) could
 // short-circuit past a grounded tenpai-exact 'false' and report 'reachable'
-// anyway — confirmed via this file's own test fixtures below (tenpai,
-// bestCaseReachesMinimum false, bestCaseTotal >= 8 purely from estimator
-// noise). Exact must beat estimate, not the reverse: computeHandPlan's own
-// bestCaseReachesMinimum is checked FIRST whenever it exists (non-null,
-// i.e. tenpai), and the family estimate is consulted only when there is no
-// exact answer to defer to. Three genuinely different states, not two:
+// anyway. Fixed the same day: computeHandPlan's own bestCaseReachesMinimum
+// is checked FIRST whenever it exists (non-null, i.e. tenpai), and the
+// family estimate is consulted only when there is no exact answer to defer
+// to — this precedence rule is unchanged by the THIRD version below.
+//
+// The THIRD version (docs/rules/decisions.md item #37) fixed what the
+// estimate itself MEANS pre-tenpai. The precedence fix alone didn't touch
+// the estimate's own quality — `bestCaseTotal` sums FULL raw points for any
+// candidate with merely nonzero completionProbability, and three families
+// (Seven Pairs 19, Half/Full Flush 22/50, All Simples/No Honors 68/76)
+// return a nonzero candidate on almost any
+// concealed hand, regardless of how far off they actually are. Measured via
+// `validation/src/selfplay/`'s calibration harness across 2,000 self-played
+// hands: `bestCaseTotal >= MINIMUM_POINTS_TO_WIN` pre-tenpai 93.3% of the
+// time, meaning `minimumPointsStatus` was 'reachable' almost unconditionally
+// before tenpai — precisely the "coach that says yes to everything" failure
+// the original complaint was about. A per-family DISTANCE gate (each
+// family's own native metric — shanten steps for Seven Pairs, offending-tile
+// count for the rest — never a cross-basis probability number, since
+// FanTargetEstimate's own `probabilityBasis` field forbids treating
+// 'shanten' and 'heuristic' completionProbability as comparably precise)
+// dropped that to 46.6% while measurably IMPROVING how well 'reachable'
+// predicts a hand that goes on to actually finish, not just looking
+// stricter. `bestCaseTotal` itself is UNCHANGED by this — see
+// `crediblePointsTotal` below for why a new field, not a repurposed one.
+// Three genuinely different states, not two:
 export type MinimumPointsStatus =
   // A concrete route to >=8 is identified — either computeHandPlan's own
   // real-waits-derived bestCaseReachesMinimum says so directly (even when
   // the winning fan sits outside all 10 Stage 3 families and so never
   // appears in `selected`), or, pre-tenpai where no exact answer exists yet,
-  // the 10-family greedy sum (lockedInPoints + selected) clears
-  // MINIMUM_POINTS_TO_WIN on its own.
+  // `crediblePointsTotal` (NOT `bestCaseTotal` — see that field's own doc
+  // comment) clears MINIMUM_POINTS_TO_WIN on its own.
   | 'reachable'
   // Grounded ONLY in computeHandPlan's tenpai-exact bestCaseReachesMinimum
   // being false (built from computeWaits over the real scoreHand, every
@@ -520,10 +539,10 @@ export type MinimumPointsStatus =
   // "unreachable" would overclaim a permanence this field cannot support.
   | 'currentWaitsFallShort'
   // The honest pre-tenpai default: no tenpai-exact answer exists yet, and
-  // the 10-family estimate hasn't found a route either. Partial family
-  // coverage this far from tenpai is not grounds to assert impossibility —
-  // this hand may well complete via a family Stage 3 never modeled, or one
-  // it modeled but hasn't reached shanten-0 progress on yet.
+  // `crediblePointsTotal` hasn't found a credible route either. Partial
+  // family coverage this far from tenpai is not grounds to assert
+  // impossibility — this hand may well complete via a family Stage 3 never
+  // modeled, or one it modeled but hasn't reached credible progress on yet.
   | 'unknown'
 
 export interface RouteToPointsResult {
@@ -546,17 +565,87 @@ export interface RouteToPointsResult {
   lockedInPoints: number
   // lockedInPoints + sum(selected fans' points). A CEILING from the 10
   // Stage 3 families ALONE — not a forecast, and not the ground truth about
-  // whether ANY route reaches the minimum (see minimumPointsStatus for
-  // that): a tenpai hand winning via a fan outside the 10 families can
-  // clear MINIMUM_POINTS_TO_WIN for real while this number stays low. Each
-  // selected target's own completionProbability (and probabilityBasis tier)
-  // still applies on top of this and is not folded in here.
+  // whether ANY route reaches the minimum. Deliberately UNCHANGED by the
+  // credibility gate below (docs/rules/decisions.md item #37): this number
+  // answers "what's the absolute best this hand could ever show," which is
+  // still a legitimate thing to surface (e.g. an aspirational aside), and
+  // mixing a stricter admission bar into it would quietly break that
+  // meaning for any future caller.
+  // NEVER use this to answer "can this hand reach the minimum" — that's
+  // what minimumPointsStatus (driven by crediblePointsTotal pre-tenpai) is
+  // for. A tenpai hand winning via a fan outside the 10 families can clear
+  // MINIMUM_POINTS_TO_WIN for real while this number stays low, in either
+  // direction — see crediblePointsTotal below for the other one.
   bestCaseTotal: number
+  // The SAME greedy/compatibility walk as `selected`, but the three
+  // families found (via validation/src/selfplay/'s calibration harness) to
+  // carry ~93% of bestCaseTotal's over-inflation — Seven Pairs (19),
+  // Half/Full Flush (22/50), All Simples/No Honors (68/76) — are admitted
+  // only within passesCredibilityGate's own distance of their shape, not
+  // merely "completionProbability > 0." Each family is gated on its OWN
+  // NATIVE metric (shanten steps for Seven Pairs, via sevenPairsShantenFromCounts;
+  // offending-tile count for the rest, via tilesNeeded.length) — never a
+  // shared probability threshold, since FanTargetEstimate's own
+  // probabilityBasis field forbids treating 'shanten' and 'heuristic'
+  // completionProbability as comparably precise, and a shared threshold
+  // would do exactly that. The other 7 families are unchanged (still
+  // admitted at completionProbability > 0) — measured (same harness) to
+  // still carry the large majority of what stays 'reachable' after this
+  // gate, recorded honestly in docs/rules/decisions.md item #37 as NOT
+  // addressed this pass, not silently left out.
+  credibleSelected: FanTargetEstimate[]
+  // lockedInPoints + sum(credibleSelected fans' points). THIS is the number
+  // minimumPointsStatus's pre-tenpai fallback actually compares against
+  // MINIMUM_POINTS_TO_WIN — see that field's own doc comment.
+  crediblePointsTotal: number
   // SPEC §6 names "whether the hand can reach the 8-point minimum" as the
   // single most valuable thing this panel can say — a UI is REQUIRED to
   // render this, not merely permitted to. See MinimumPointsStatus's own
   // comment for what grounds each of the three states.
   minimumPointsStatus: MinimumPointsStatus
+}
+
+// Distance thresholds for crediblePointsTotal's per-family admission gate
+// (see that field's own doc comment on RouteToPointsResult). Picked by
+// measuring against validation/src/selfplay/'s calibration harness across
+// 2,000 self-played hands, NOT by looking sensible: (1,1,1) consistently
+// showed the best precision — P(hand eventually finishes | 'reachable') —
+// across shanten 1-3 among {1,1,1}/{2,2,2}/{3,3,3} swept, and the largest
+// correction to the pre-tenpai reachable-rate (93.3% -> 46.6%). Full sweep
+// table: docs/rules/decisions.md item #37. Same "pick constants against
+// real data, not by feel" discipline as EARLY_GAME_MIN_SHANTEN/
+// VIABLE_ROUTE_SHANTEN_MARGIN above.
+const SEVEN_PAIRS_CREDIBLE_SHANTEN_MAX = 1
+const FLUSH_CREDIBLE_TILES_NEEDED_MAX = 1
+const SIMPLES_HONORS_CREDIBLE_TILES_NEEDED_MAX = 1
+
+// Each family's OWN native distance metric, never a shared probability
+// number — see crediblePointsTotal's own comment for why a shared threshold
+// would repeat the exact mixed-basis mistake this pass exists to fix. Seven
+// Pairs recomputes its shanten directly (sevenPairsShantenFromCounts, the
+// SAME function estimateSevenPairs itself already calls) rather than
+// inverting completionProbability's own formula, which would silently break
+// if that formula ever changes; the other two families already carry their
+// distance on the candidate itself (tilesNeeded.length — same "offending
+// tiles remaining" count Half/Full Flush and All Simples/No Honors already
+// expose). Families outside the three targeted here always pass — the
+// original ">0" bar is unchanged for them. Measured (same harness) to still
+// carry the large majority of what stays 'reachable' after this gate fires
+// — recorded honestly in docs/rules/decisions.md item #37 as NOT addressed
+// this pass, not silently left out.
+function passesCredibilityGate(candidate: FanTargetEstimate, concealedCounts: Readonly<Record<TileTypeId, number>>, meldCount: number): boolean {
+  switch (candidate.fanId) {
+    case 19: // Seven Pairs
+      return sevenPairsShantenFromCounts(concealedCounts, meldCount) <= SEVEN_PAIRS_CREDIBLE_SHANTEN_MAX
+    case 22: // Full Flush
+    case 50: // Half Flush
+      return candidate.tilesNeeded.length <= FLUSH_CREDIBLE_TILES_NEEDED_MAX
+    case 68: // All Simples
+    case 76: // No Honors
+      return candidate.tilesNeeded.length <= SIMPLES_HONORS_CREDIBLE_TILES_NEEDED_MAX
+    default:
+      return true
+  }
 }
 
 // scoring/exclusions.ts's table only ever needs a pair when two fans COULD
@@ -584,65 +673,69 @@ export interface RouteToPointsResult {
 // definitions — see that module's own header for the full reasoning and
 // fan-target-compatibility.test.ts for a constructed hand per compatible
 // pair where both real detectors actually fire together.
-export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext = {}): RouteToPointsResult {
-  const handPlan = computeHandPlan(hand, context)
-  const lockedInFans = handPlan.lockedInFans
-  const lockedInPoints = lockedInFans.reduce((sum, f) => sum + (FAN_REGISTRY[f.fanId]?.points ?? 0) * f.count, 0)
-
-  const candidates = estimateFanTargets(hand, context)
-  const selected: FanTargetEstimate[] = []
+//
+// Shared by BOTH `selected`/`bestCaseTotal` and `credibleSelected`/
+// `crediblePointsTotal` — identical greedy/compatibility walk; only the
+// `admits` predicate differs, so the two can never drift apart on anything
+// but admission.
+//
+// A zero-probability candidate (this file's own linear shanten/heuristic
+// scales bottom out at exactly 0, not just "small") contributes nothing
+// real to a BEST case — counting its full raw points anyway would make
+// "reaches the minimum" trivially true for nearly any hand with 3+
+// compatible families in play, defeating the entire point of the CHANGE 3
+// warning (SPEC §6's trap). Excluded from both selections' totals only;
+// still present in `candidates` verbatim.
+//
+// KNOWN GAP, not fixed here (investigated and reported separately,
+// 2026-08-08): a fanId already in chosenFanIds via lockedInFans is always
+// skipped below, even when the candidate represents a legitimate FURTHER
+// unit of the same countable fan (Dragon Pung, fanId 59, is the only such
+// fan among the 10) — e.g. one melded dragon pung already locked in plus a
+// second dragon at 2 concealed copies produces a real +2-point candidate
+// that this loop silently drops. Tracked in OPEN-WORK.md; not folded into
+// this pass either.
+//
+// fan-target-compatibility.ts's table only classifies pairs among the 10
+// Stage 3 families and defaults an unknown pair to incompatible (safe
+// there, since the completeness test guarantees no pair among the 10 is
+// ever actually unknown) — WRONG for a locked-in fan from outside the 10
+// (e.g. Concealed Kong), where this module simply has no opinion. Caught
+// via hints.test.ts's "a locked-in fan outside the 10 Stage 3 families"
+// fixture while wiring this in, before it shipped: the `STAGE3_FAN_IDS`
+// guard below is what makes that case fall through to "compatible" instead
+// of being silently blocked.
+//
+// PRECONDITION for that fall-through to stay safe (reviewed 2026-08-08):
+// falling through to "compatible" for a locked-in fan outside the 10 relies
+// on `areExclusive` alone NOT being sufficient here — exclusions.ts
+// deliberately omits structurally-impossible pairs (its whole domain is
+// COMPLETE hands; see fan-target-compatibility.ts's own header) — so the
+// real safety net is that every one of fan-targets.ts's estimators already
+// reads `hand.melds` and refuses to propose a candidate the melds
+// structurally rule out. `estimateSimplesAndHonors`'s
+// `meldHasHonor`/`meldHasTerminal` check (fan-targets.ts:390-392) is the
+// LOAD-BEARING case: a melded pung of terminals or honors can lock in some
+// other real fan entirely outside the 10 (e.g. fan 73, Pung of Terminals or
+// Honors) that structurally forbids All Simples/No Honors, with no
+// `exclusions.ts` entry to catch it — this only stays safe because the
+// estimator itself sees those same meld tiles as offending and never emits
+// the conflicting candidate in the first place, not because anything in
+// this file checked. **If a future estimator is added that inspects only
+// `hand.concealedTiles` and ignores `hand.melds`, this precondition breaks
+// silently**: the fall-through below would then treat a locked-in
+// out-of-domain fan as compatible with a candidate the melds already ruled
+// out.
+function selectCompatibleRoute(
+  candidates: readonly FanTargetEstimate[],
+  lockedInFans: readonly FanProgress[],
+  admits: (candidate: FanTargetEstimate) => boolean,
+): FanTargetEstimate[] {
   const chosenFanIds: number[] = lockedInFans.map((f) => f.fanId)
-
-  // A zero-probability candidate (this file's own linear shanten/heuristic
-  // scales bottom out at exactly 0, not just "small") contributes nothing
-  // real to a BEST case — counting its full raw points anyway would make
-  // "reaches the minimum" trivially true for nearly any hand with 3+
-  // compatible families in play, defeating the entire point of the CHANGE 3
-  // warning (SPEC §6's trap). Excluded from `selected`/`bestCaseTotal` only;
-  // still present in `candidates` verbatim.
-  //
-  // KNOWN GAP, not fixed here (investigated and reported separately,
-  // 2026-08-08): a fanId already in chosenFanIds via lockedInFans is always
-  // skipped below, even when the candidate represents a legitimate FURTHER
-  // unit of the same countable fan (Dragon Pung, fanId 59, is the only such
-  // fan among the 10) — e.g. one melded dragon pung already locked in plus
-  // a second dragon at 2 concealed copies produces a real +2-point
-  // candidate that this loop silently drops. Tracked in OPEN-WORK.md; not
-  // folded into this pass, which is scoped to route COMPATIBILITY, not
-  // per-unit accounting.
-  //
-  // fan-target-compatibility.ts's table only classifies pairs among the 10
-  // Stage 3 families and defaults an unknown pair to incompatible (safe
-  // there, since the completeness test guarantees no pair among the 10 is
-  // ever actually unknown) — WRONG for a locked-in fan from outside the 10
-  // (e.g. Concealed Kong), where this module simply has no opinion. Caught
-  // via hints.test.ts's "a locked-in fan outside the 10 Stage 3 families"
-  // fixture while wiring this in, before it shipped: the `STAGE3_FAN_IDS`
-  // guard below is what makes that case fall through to "compatible"
-  // instead of being silently blocked.
-  //
-  // PRECONDITION for that fall-through to stay safe (reviewed 2026-08-08):
-  // falling through to "compatible" for a locked-in fan outside the 10
-  // relies on `areExclusive` alone NOT being sufficient here — exclusions.ts
-  // deliberately omits structurally-impossible pairs (its whole domain is
-  // COMPLETE hands; see fan-target-compatibility.ts's own header) — so the
-  // real safety net is that every one of fan-targets.ts's estimators
-  // already reads `hand.melds` and refuses to propose a candidate the
-  // melds structurally rule out. `estimateSimplesAndHonors`'s
-  // `meldHasHonor`/`meldHasTerminal` check (fan-targets.ts:390-392) is the
-  // LOAD-BEARING case: a melded pung of terminals or honors can lock in
-  // some other real fan entirely outside the 10 (e.g. fan 73, Pung of
-  // Terminals or Honors) that structurally forbids All Simples/No Honors,
-  // with no `exclusions.ts` entry to catch it — this only stays safe
-  // because the estimator itself sees those same meld tiles as offending
-  // and never emits the conflicting candidate in the first place, not
-  // because anything in this file checked. **If a future estimator is
-  // added that inspects only `hand.concealedTiles` and ignores
-  // `hand.melds`, this precondition breaks silently**: the fall-through
-  // below would then treat a locked-in out-of-domain fan as compatible
-  // with a candidate the melds already ruled out.
+  const selected: FanTargetEstimate[] = []
   for (const candidate of candidates) {
     if (candidate.completionProbability <= 0) continue
+    if (!admits(candidate)) continue
     if (chosenFanIds.includes(candidate.fanId)) continue
     if (
       chosenFanIds.some(
@@ -653,26 +746,42 @@ export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext
     selected.push(candidate)
     chosenFanIds.push(candidate.fanId)
   }
+  return selected
+}
 
+export function computeRouteToPoints(hand: Hand, context: WinCircumstanceContext = {}): RouteToPointsResult {
+  const handPlan = computeHandPlan(hand, context)
+  const lockedInFans = handPlan.lockedInFans
+  const lockedInPoints = lockedInFans.reduce((sum, f) => sum + (FAN_REGISTRY[f.fanId]?.points ?? 0) * f.count, 0)
+
+  const candidates = estimateFanTargets(hand, context)
+
+  const selected = selectCompatibleRoute(candidates, lockedInFans, () => true)
   const bestCaseTotal = lockedInPoints + selected.reduce((sum, c) => sum + c.points, 0)
+
+  const concealedCounts = groupConcealedByType(hand.concealedTiles)
+  const credibleSelected = selectCompatibleRoute(candidates, lockedInFans, (c) => passesCredibilityGate(c, concealedCounts, hand.melds.length))
+  const crediblePointsTotal = lockedInPoints + credibleSelected.reduce((sum, c) => sum + c.points, 0)
 
   // Exact beats estimate, estimate only speaks when exact is silent.
   // handPlan.bestCaseReachesMinimum is non-null only at tenpai, where it's
   // the real computeWaits-derived answer — checked FIRST and taken as final
   // either way (true -> 'reachable', false -> 'currentWaitsFallShort'),
-  // never overridden by bestCaseTotal. The family estimate is consulted
-  // only pre-tenpai, where there is no exact answer yet, and even then only
-  // to raise 'unknown' to 'reachable' — it can never downgrade a tenpai-exact
-  // 'true'. See MinimumPointsStatus's own doc comment for why the earlier
-  // version of this branch (bestCaseTotal checked first) was backwards.
+  // never overridden by the estimate. The family estimate is consulted only
+  // pre-tenpai, where there is no exact answer yet, and even then only to
+  // raise 'unknown' to 'reachable' — it can never downgrade a tenpai-exact
+  // 'true'. crediblePointsTotal, NOT bestCaseTotal, is what gets compared
+  // here — see MinimumPointsStatus's own doc comment for why (the earlier
+  // version of this branch used bestCaseTotal and was measurably
+  // near-constant 'reachable' pre-tenpai as a result).
   const minimumPointsStatus: MinimumPointsStatus =
     handPlan.bestCaseReachesMinimum !== null
       ? handPlan.bestCaseReachesMinimum
         ? 'reachable'
         : 'currentWaitsFallShort'
-      : bestCaseTotal >= MINIMUM_POINTS_TO_WIN
+      : crediblePointsTotal >= MINIMUM_POINTS_TO_WIN
         ? 'reachable'
         : 'unknown'
 
-  return { candidates, selected, lockedInPoints, bestCaseTotal, minimumPointsStatus }
+  return { candidates, selected, lockedInPoints, bestCaseTotal, credibleSelected, crediblePointsTotal, minimumPointsStatus }
 }
