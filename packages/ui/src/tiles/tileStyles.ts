@@ -166,6 +166,11 @@ export const MELD_BASELINE_OFFSET_PX: Record<TileScale, number> = {
   large: 6,
 }
 
+// Human-only separation between concealed tiles and the exposed-meld bay.
+// This is 12px wider than the previous 24px group gap, making room for the
+// rack joint without changing any tile box dimensions.
+export const HUMAN_MELD_GAP_PX = 36
+
 // Item 2: a recessed shelf behind each meld — darker fill, inner shadow,
 // sized to that meld's own tiles by the caller (HandTiles.tsx derives the
 // rect from meldPlaced, not from anything here). Background only, rendered

@@ -12,6 +12,7 @@ import { TileBackContent } from '../tiles/TileBackContent.js'
 import { TileFaceContent } from '../tiles/TileFaceContent.js'
 import {
   HAND_TILE_WIDTH_FLOOR,
+  HUMAN_MELD_GAP_PX,
   MELD_BASELINE_OFFSET_PX,
   MELD_SHELF_CLASSES,
   WINNING_TILE_RING_CLASSES,
@@ -85,7 +86,6 @@ const TILE_GAP = 4
 // concealed block and the melds that follow it — bigger than the uniform
 // intra-row tile gap, same "rhythm" role INTER_GAP plays elsewhere
 // (Discards' 6-tile groups, and the removed all-discards view's bands).
-const MELD_GAP = 24
 const FLOWER_GAP = 16
 // Deliberately much narrower than a real tile — see the end-zone placement
 // comment below for why a full tile-width drop slot risks overflowing the
@@ -101,6 +101,17 @@ const END_ZONE_WIDTH = 16
 // below the row.
 const MELD_SHELF_PAD_X = 4
 const MELD_SHELF_PAD_Y = 3
+const MELD_BAY_PAD_X = 8
+const MELD_BAY_PAD_Y = 5
+const MELD_DIVIDER_GAP = 5
+const MELD_DIVIDER_WIDTH = 3
+
+const HUMAN_MELD_BAY_CLASSES =
+  'overflow-hidden rounded-lg border border-[#2a1007] bg-[repeating-linear-gradient(7deg,rgba(222,160,100,0.045)_0_1px,transparent_1px_5px),linear-gradient(180deg,#4a2616_0%,#31160d_52%,#1d0b06_100%)] shadow-[inset_0_4px_7px_rgba(10,3,1,0.72),inset_0_1px_1px_rgba(205,143,87,0.2),0_1px_1px_rgba(164,95,48,0.18)]'
+const HUMAN_MELD_DIVIDER_CLASSES =
+  'rounded-full border-l border-[#704027]/60 bg-[#2a1209] shadow-[inset_-1px_0_rgba(12,4,2,0.75),1px_0_rgba(202,137,82,0.24)]'
+const HUMAN_MELD_SHELF_CLASSES =
+  'rounded-md border border-[#251007]/80 bg-[#180905]/35 shadow-[inset_0_2px_4px_rgba(5,2,1,0.56)]'
 
 interface SortableHandTileProps {
   id: TileInstanceId
@@ -233,7 +244,8 @@ export function HandTiles({
   // is no longer enough — melds now share this same row and need room too,
   // separated by MELD_GAP rather than the uniform intra-row gap, so that
   // extra width comes off the budget fitRowTileWidth solves against.
-  const meldReserve = meldTileCount > 0 ? MELD_GAP - TILE_GAP : 0
+  const interGroupGapCount = melds.length === 0 ? 0 : order.length > 0 ? melds.length : Math.max(0, melds.length - 1)
+  const meldReserve = interGroupGapCount * (HUMAN_MELD_GAP_PX - TILE_GAP)
   const { width: tileWidth, height: tileHeight } = fitRowTileWidth(
     order.length + meldTileCount,
     region.width - meldReserve - flowerReserve,
@@ -263,7 +275,7 @@ export function HandTiles({
   // a second gap-aware row layout.
   const groups = [...(order.length > 0 ? [order.length] : []), ...melds.map((meld) => meld.tiles.length)]
   const playingRegion = { ...region, width: region.width - flowerReserve }
-  const layout = packGroupsMajor(groups, 'horizontal', playingRegion, tileWidth, tileHeight, TILE_GAP, MELD_GAP, TILE_GAP)
+  const layout = packGroupsMajor(groups, 'horizontal', playingRegion, tileWidth, tileHeight, TILE_GAP, HUMAN_MELD_GAP_PX, TILE_GAP)
   const placed = placeGroup(layout, playingRegion, tileWidth, tileHeight)
   const concealedPlaced = placed.slice(0, order.length)
   const meldPlaced = placed.slice(order.length)
@@ -276,6 +288,27 @@ export function HandTiles({
     startIndex: melds.slice(0, meldIndex).reduce((sum, m) => sum + m.tiles.length, 0),
   }))
   const meldBaselineOffset = MELD_BASELINE_OFFSET_PX[tileScale]
+  const displayedTileWidth = tileWidth * layout.scale
+  const displayedTileHeight = tileHeight * layout.scale
+  const meldBayBands: { y: number; left: number; right: number }[] = []
+  for (const position of meldPlaced) {
+    const band = meldBayBands.find((candidate) => Math.abs(candidate.y - position.y) < 0.01)
+    const left = position.x - displayedTileWidth / 2
+    const right = position.x + displayedTileWidth / 2
+    if (band) {
+      band.left = Math.min(band.left, left)
+      band.right = Math.max(band.right, right)
+    } else {
+      meldBayBands.push({ y: position.y, left, right })
+    }
+  }
+  const meldBayRects = meldBayBands.map((band) => {
+    const left = band.left - MELD_BAY_PAD_X * layout.scale
+    const right = band.right + MELD_BAY_PAD_X * layout.scale
+    const top = band.y + meldBaselineOffset * layout.scale - displayedTileHeight / 2 - MELD_BAY_PAD_Y * layout.scale
+    const bottom = band.y + meldBaselineOffset * layout.scale + displayedTileHeight / 2 + MELD_BAY_PAD_Y * layout.scale
+    return { left, right, top, bottom }
+  })
 
   // The end zone's own rect is derived directly from the last real tile's
   // already-placed position (or, with an empty hand, from where a first
@@ -338,6 +371,12 @@ export function HandTiles({
       top: p.y - flowerHeight / 2,
       bottom: p.y + flowerHeight / 2,
     })),
+    ...meldBayRects.map((bay) => ({
+      left: bay.left - (MELD_DIVIDER_GAP + MELD_DIVIDER_WIDTH) * layout.scale,
+      right: bay.right,
+      top: bay.top,
+      bottom: bay.bottom,
+    })),
   ]
   const rackPad = 6
   const rackBounds = rackBoxes.length > 0
@@ -382,6 +421,28 @@ export function HandTiles({
           </div>
         </Positioned>
       )}
+      {meldBayRects.map((bay, index) => (
+        <Positioned
+          key={`human-meld-divider-${index}`}
+          x={bay.left - (MELD_DIVIDER_GAP + MELD_DIVIDER_WIDTH / 2) * layout.scale}
+          y={(bay.top + bay.bottom) / 2}
+          naturalWidth={MELD_DIVIDER_WIDTH * layout.scale}
+          naturalHeight={bay.bottom - bay.top}
+        >
+          <div aria-hidden data-testid={`human-meld-divider-${index}`} className={`h-full w-full ${HUMAN_MELD_DIVIDER_CLASSES}`} />
+        </Positioned>
+      ))}
+      {meldBayRects.map((bay, index) => (
+        <Positioned
+          key={`human-meld-bay-${index}`}
+          x={(bay.left + bay.right) / 2}
+          y={(bay.top + bay.bottom) / 2}
+          naturalWidth={bay.right - bay.left}
+          naturalHeight={bay.bottom - bay.top}
+        >
+          <div aria-hidden data-testid={`human-meld-bay-${index}`} className={`h-full w-full ${HUMAN_MELD_BAY_CLASSES}`} />
+        </Positioned>
+      ))}
       <SortableContext items={[...order]} strategy={rectSortingStrategy}>
         <div role="list" aria-label="Your hand">
           {order.map((id, index) => (
@@ -422,7 +483,7 @@ export function HandTiles({
                   aria-hidden
                   data-testid={`meld-shelf-${meld.id}`}
                   data-recent-meld={recentMeldId === meld.id || undefined}
-                  className={`h-full w-full ${MELD_SHELF_CLASSES} ${
+                  className={`h-full w-full ${HUMAN_MELD_SHELF_CLASSES} ${
                     recentMeldId === meld.id ? 'ring-2 ring-amber-200 shadow-[0_0_16px_rgba(253,230,138,0.55)]' : ''
                   }`}
                 />

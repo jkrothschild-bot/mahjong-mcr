@@ -2,10 +2,25 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TILE_TYPE_BY_ID, typeIdOfInstance, type Meld, type TileInstanceId, type TileTypeId } from '@mahjong-mcr/engine'
 import { fitRowTileWidth, type Rect } from '../stage/stageLayout.js'
-import { HAND_TILE_WIDTH_FLOOR, TILE_BOX_PX } from '../tiles/tileStyles.js'
+import { HAND_TILE_WIDTH_FLOOR, HUMAN_MELD_GAP_PX, TILE_BOX_PX } from '../tiles/tileStyles.js'
 import { HandTiles } from './HandTiles.js'
 
 const TEST_REGION: Rect = { x: 0, y: 0, width: 1000, height: 200 }
+
+function positionedRect(element: HTMLElement) {
+  const width = Number.parseFloat(element.style.width)
+  const height = Number.parseFloat(element.style.height)
+  const left = Number.parseFloat(element.style.left) + Number.parseFloat(element.style.marginLeft)
+  const top = Number.parseFloat(element.style.top) + Number.parseFloat(element.style.marginTop)
+  return { left, right: left + width, top, bottom: top + height }
+}
+
+function positionedWrapper(element: HTMLElement): HTMLElement {
+  let current = element.parentElement
+  while (current && !current.classList.contains('absolute')) current = current.parentElement
+  if (!current) throw new Error(`No Positioned wrapper found for ${element.dataset.testid ?? element.tagName}`)
+  return current
+}
 
 function idsFor(typeId: TileTypeId, count: number): TileInstanceId[] {
   const ids: TileInstanceId[] = []
@@ -39,6 +54,7 @@ describe('HandTiles', () => {
     expect(screen.getByTestId('human-rack-back-lip')).toBeInTheDocument()
     expect(screen.getByTestId('human-rack-groove')).toBeInTheDocument()
     expect(screen.getByTestId('human-rack-front-lip')).toBeInTheDocument()
+    expect(screen.queryByTestId(/human-meld-bay-/)).not.toBeInTheDocument()
     expect(items[0]).toHaveTextContent('C1')
     expect(items[1]).toHaveTextContent('WE')
   })
@@ -198,6 +214,82 @@ describe('HandTiles', () => {
     expect(shelf.compareDocumentPosition(tile0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('places a darker wooden meld bay and divider behind the human meld area', () => {
+    const order = idsFor('C1', 4)
+    const pung: Meld = { id: 'p-0', kind: 'pung', exposure: 'exposed', tiles: idsFor('C2', 3), ownerSeat: 0 }
+    render(<HandTiles order={order} activeId={null} overId={null} region={TEST_REGION} melds={[pung]} flowers={[]} />)
+
+    const bay = screen.getByTestId('human-meld-bay-0')
+    const divider = screen.getByTestId('human-meld-divider-0')
+    expect(bay.className).toContain('linear-gradient(180deg,#4a2616_0%,#31160d_52%,#1d0b06_100%)')
+    expect(bay.className).toContain('inset_0_4px_7px')
+    expect(divider).toHaveClass('w-full', 'bg-[#2a1209]')
+
+    const lastConcealed = screen.getByTestId(`hand-tile-${order.at(-1)}`).parentElement!
+    const firstMeld = screen.getByTestId('meld-tile-p-0-0').parentElement!
+    const concealedRight = Number.parseFloat(lastConcealed.style.left) + Number.parseFloat(lastConcealed.style.marginLeft) + Number.parseFloat(lastConcealed.style.width)
+    const meldLeft = Number.parseFloat(firstMeld.style.left) + Number.parseFloat(firstMeld.style.marginLeft)
+    expect(meldLeft - concealedRight).toBeCloseTo(HUMAN_MELD_GAP_PX)
+  })
+
+  it.each([1, 2, 3, 4])('renders the shared meld bay with %i melds', (meldCount) => {
+    const meldTypes = ['C1', 'C2', 'C3', 'C4'] as const
+    const melds = meldTypes.slice(0, meldCount).map((typeId, index): Meld => ({
+      id: `k-${index}`,
+      kind: 'kong',
+      exposure: 'exposed',
+      kongSource: 'exposedFromDiscard',
+      tiles: idsFor(typeId, 4),
+      ownerSeat: 0,
+    }))
+    const occupied = new Set(melds.flatMap((meld) => meld.tiles))
+    const order = Array.from({ length: TILE_TYPE_BY_ID.length }, (_, id) => id as TileInstanceId)
+      .filter((id) => !occupied.has(id))
+      .slice(0, Math.max(1, 13 - 3 * meldCount))
+    const { unmount } = render(
+      <HandTiles order={order} activeId={null} overId={null} region={{ ...TEST_REGION, width: 1800 }} melds={melds} flowers={[]} />,
+    )
+
+    expect(screen.getAllByTestId(/human-meld-bay-/)).toHaveLength(1)
+    expect(screen.getAllByTestId(/human-meld-divider-/)).toHaveLength(1)
+    unmount()
+  })
+
+  it.each([
+    ['desktop', 1618],
+    ['narrow desktop', 1216],
+    ['iPad landscape', 874],
+  ] as const)('keeps a four-meld bay contained and clear of concealed tiles at %s width', (_label, width) => {
+    const meldTypes = ['C1', 'C2', 'C3', 'C4'] as const
+    const melds = meldTypes.map((typeId, index): Meld => ({
+      id: `k-${index}`,
+      kind: 'kong',
+      exposure: 'exposed',
+      kongSource: 'exposedFromDiscard',
+      tiles: idsFor(typeId, 4),
+      ownerSeat: 0,
+    }))
+    const occupied = new Set(melds.flatMap((meld) => meld.tiles))
+    const order = Array.from({ length: TILE_TYPE_BY_ID.length }, (_, id) => id as TileInstanceId)
+      .filter((id) => !occupied.has(id))
+      .slice(0, 1)
+    render(<HandTiles order={order} activeId={null} overId={null} region={{ x: 0, y: 0, width, height: 140 }} melds={melds} flowers={[]} />)
+
+    const rack = positionedRect(positionedWrapper(screen.getByTestId('human-wooden-rack')))
+    const concealed = positionedRect(positionedWrapper(screen.getByTestId(`hand-tile-${order[0]}`)))
+    for (const bayElement of screen.getAllByTestId(/human-meld-bay-/)) {
+      const bay = positionedRect(positionedWrapper(bayElement))
+      expect(bay.left).toBeGreaterThanOrEqual(rack.left)
+      expect(bay.right).toBeLessThanOrEqual(rack.right)
+      expect(bay.top).toBeGreaterThanOrEqual(rack.top)
+      expect(bay.bottom).toBeLessThanOrEqual(rack.bottom)
+      expect(
+        bay.right <= concealed.left || bay.left >= concealed.right || bay.bottom <= concealed.top || bay.top >= concealed.bottom,
+        JSON.stringify({ bay, concealed, width }),
+      ).toBe(true)
+    }
+  })
+
   it('turns the claimed tile sideways in an exposed meld', () => {
     const tiles = idsFor('C2', 3)
     const pung: Meld = {
@@ -231,22 +323,16 @@ describe('HandTiles', () => {
     expect(flowerBottom).toBeCloseTo(tileBottom)
   })
 
-  // KICKOFF-phase9-human-melds.md's verification item 2: "the row's tile
-  // width and layout.scale for a given hand+meld configuration are
-  // identical to the values before this phase" — proving items 1-3's shelf/
-  // offset/shadow rendering cost nothing horizontally. Computes the expected
-  // width/height directly from fitRowTileWidth (the same pure function
-  // HandTiles.tsx itself calls) rather than a hardcoded pixel value, so this
-  // stays correct if TILE_GAP/MELD_GAP/HAND_TILE_WIDTH_FLOOR ever change for
-  // an unrelated reason.
-  it('keeps the row width solve unchanged with melds present (a concealed kong, so the width-demand code path is exercised)', () => {
+  // Computes the expected width/height directly from fitRowTileWidth (the
+  // same pure function HandTiles.tsx itself calls), including the human-only
+  // meld-bay gap while keeping the tile dimensions on the existing scale.
+  it('reserves the human meld-bay gap without changing the tile size model', () => {
     const order = idsFor('C1', 3)
     const kong: Meld = { id: 'k-0', kind: 'kong', exposure: 'concealed', kongSource: 'concealed', tiles: idsFor('C2', 4), ownerSeat: 0 }
     render(<HandTiles order={order} activeId={null} overId={null} region={TEST_REGION} melds={[kong]} flowers={[]} />)
 
     const TILE_GAP = 4
-    const MELD_GAP = 24
-    const meldReserve = MELD_GAP - TILE_GAP
+    const meldReserve = HUMAN_MELD_GAP_PX - TILE_GAP
     const { width: nominalWidth, height: nominalHeight } = TILE_BOX_PX.large
     const expected = fitRowTileWidth(
       order.length + kong.tiles.length,

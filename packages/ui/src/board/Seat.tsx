@@ -8,7 +8,7 @@ import { useSettingsContext } from '../settings/SettingsContext.js'
 import { useStageMetrics } from '../stage/StageMetricsContext.js'
 import { Positioned } from '../stage/Positioned.js'
 import { fitRowTileWidth, getBoardRegions, type SeatLineRegion, type SeatRole } from '../stage/stageLayout.js'
-import { HAND_TILE_WIDTH_FLOOR, SEAT_LINE_MELD_SHIFT_PX, TILE_BOX_PX, TILE_FACE_COMPACT_PX } from '../tiles/tileStyles.js'
+import { HAND_TILE_WIDTH_FLOOR, HUMAN_MELD_GAP_PX, SEAT_LINE_MELD_SHIFT_PX, TILE_BOX_PX, TILE_FACE_COMPACT_PX } from '../tiles/tileStyles.js'
 import { SeatLine } from './SeatLine.js'
 
 // The sort control's own reserved slot at the left edge of the human row —
@@ -193,11 +193,11 @@ export function Seat({
   const handTileCount = (handOrder?.length ?? player.hand.concealedTiles.length) + player.hand.melds.reduce((sum, meld) => sum + meld.tiles.length, 0)
   const flowerWidth = TILE_FACE_COMPACT_PX[tileScale].width
   const flowerReserve = player.hand.flowers.length > 0 ? player.hand.flowers.length * flowerWidth + (player.hand.flowers.length - 1) * 4 + 16 : 0
-  const meldReserve = player.hand.melds.length > 0 ? 12 : 0
+  const groupCount = (handOrder?.length ?? player.hand.concealedTiles.length) > 0 ? 1 + player.hand.melds.length : player.hand.melds.length
+  const meldReserve = Math.max(0, groupCount - 1) * (HUMAN_MELD_GAP_PX - 4)
   const nominal = TILE_BOX_PX[tileScale]
   const fitted = fitRowTileWidth(handTileCount, handRegion.width - flowerReserve - meldReserve, nominal.width, nominal.height, 4, HAND_TILE_WIDTH_FLOOR)
-  const groupCount = (handOrder?.length ?? player.hand.concealedTiles.length) > 0 ? 1 + player.hand.melds.length : player.hand.melds.length
-  const naturalHandWidth = handTileCount > 0 ? handTileCount * fitted.width + Math.max(0, handTileCount - groupCount) * 4 + Math.max(0, groupCount - 1) * 16 : 0
+  const naturalHandWidth = handTileCount > 0 ? handTileCount * fitted.width + Math.max(0, handTileCount - groupCount) * 4 + Math.max(0, groupCount - 1) * HUMAN_MELD_GAP_PX : 0
   const playingWidth = handRegion.width - flowerReserve
   const firstTileLeft = handRegion.x + Math.max(0, (playingWidth - naturalHandWidth) / 2)
   const controlCenterX = Math.max(SORT_CONTROL_WIDTH / 2, firstTileLeft - 8 - SORT_CONTROL_WIDTH / 2)
