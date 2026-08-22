@@ -23,12 +23,11 @@ function outsWord(n: number): string {
   return `${n} out${n === 1 ? '' : 's'}`
 }
 
-// SPEC.md §6's Hand Plan tab ≈ Tutor: current hand shape, primary route,
-// and — the critical MCR-specific trap for learners — whether the hand can
-// even reach the 8-point minimum required to declare Hu. Reuses
-// computeHandPlan directly (M5 engine core), which is itself built on the
-// M4 shanten/waits machinery, so this can never disagree with the rest of
-// the game about shanten or scoring.
+// SPEC.md §6's Hand Plan tab ≈ Tutor: current hand shape and primary route.
+// The 8-point-minimum answer now lives only in RouteToPointsTab, whose
+// tri-state computeRouteToPoints result supersedes this tab's older binary
+// worstCaseReachesMinimum warning. Reuses computeHandPlan directly (M5
+// engine core), which is itself built on the M4 shanten/waits machinery.
 //
 // Route rendering matches BestMoveTab's own route table exactly (same
 // viable-dot styling, same shanten/outs format) rather than a second
@@ -85,14 +84,6 @@ export function HandPlanTab({ hand, prevailingWind, seatWind }: HandPlanTabProps
             })}
           </ul>
         </div>
-      )}
-
-      {plan.worstCaseReachesMinimum === false && (
-        <p role="alert" className="rounded-md border border-amber-600 bg-amber-950/40 p-2 text-sm text-amber-300">
-          {plan.bestCaseReachesMinimum
-            ? "Careful — some of your waits wouldn't reach the 8-point minimum to declare Hu."
-            : "None of your current waits reach the 8-point minimum to declare Hu."}
-        </p>
       )}
     </div>
   )

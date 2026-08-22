@@ -40,7 +40,7 @@ describe('HandPlanTab', () => {
     expect(screen.getByRole('list', { name: 'Locked-in fans' })).toHaveTextContent('Dragon Pung')
   })
 
-  it('shows tenpai and a fan-value warning when some waits cannot reach the 8-point minimum', () => {
+  it('does not show the superseded 8-point warning when some current waits fall short', () => {
     // Same mixed-value shanpon fixture (C9/DG) verified computationally in
     // the engine's hints.test.ts: C9-discard scores 7, everything else 8+.
     const hand = handWith([
@@ -56,7 +56,8 @@ describe('HandPlanTab', () => {
     ])
     render(<HandPlanTab hand={hand} prevailingWind="east" seatWind="north" />)
     expect(currentShapeSummary()).toHaveTextContent(/Tenpai/)
-    expect(screen.getByRole('alert')).toHaveTextContent(/8-point minimum/)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/8-point minimum/)).not.toBeInTheDocument()
   })
 
   // KICKOFF-phase10 gap fix, verbatim example from the task: a hand
