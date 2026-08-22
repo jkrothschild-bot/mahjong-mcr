@@ -23,6 +23,11 @@ describe('FanEncyclopedia', () => {
     expect(screen.getByTestId('encyclopedia-fan-59')).toBeInTheDocument()
   })
 
+  it('stacks above the movable Strategy Coach window', () => {
+    render(<FanEncyclopedia onClose={() => {}} initialFanId={49} />)
+    expect(screen.getByRole('dialog', { name: 'Fan encyclopedia' }).parentElement).toHaveClass('z-[80]')
+  })
+
   it('calls onClose when the Close button or backdrop is clicked', () => {
     const onClose = vi.fn()
     render(<FanEncyclopedia onClose={onClose} />)
