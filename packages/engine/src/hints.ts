@@ -217,8 +217,23 @@ function shapeLeanFeature(counts: Readonly<Record<TileTypeId, number>>): HintFea
 // true, that a different discard among today's other best-shanten options
 // would have dropped one of them (rankDiscards' whole reason for existing —
 // see bots/policy.ts's computeRouteRegret).
+//
+// `r.viable` alone is NOT enough to justify the prose here, and deliberately
+// stays unchanged for the table's own display (kickoffLiveHand's fixture
+// locks that in): it asks "could SOME candidate in today's tied group still
+// reach this shape reasonably," which can be true even when the RECOMMENDED
+// discard's own number for that shape is nowhere close — e.g. Standard at
+// 1-shanten, Seven Pairs at 3-shanten for the discard actually being
+// recommended, with `viable` true only because a DIFFERENT tied candidate
+// reaches Seven Pairs at 2. Saying "Keeps Seven Pairs alive" off that would
+// appeal to a route this specific recommendation has already fallen behind
+// on — caught live where the 8-point route tab had independently flagged
+// the same fan ceiling-only (crediblePointsTotal-excluded). The prose needs
+// the RECOMMENDED discard's own route.shanten (already on each RouteRow,
+// no extra computation) within the same margin of ITS OWN resultingShanten,
+// not the group's best.
 function flexibilityFeature(top: DiscardEvaluation, atMin: readonly DiscardEvaluation[], routeTable: readonly RouteRow[]): HintFeature | null {
-  const viableSpecial = routeTable.filter((r) => r.shape !== 'standard' && r.viable)
+  const viableSpecial = routeTable.filter((r) => r.shape !== 'standard' && r.viable && r.shanten <= top.resultingShanten + VIABLE_ROUTE_SHANTEN_MARGIN)
   if (viableSpecial.length === 0) return null
 
   const names = viableSpecial.map((r) => SHAPE_LABEL[r.shape]).join(' and ')

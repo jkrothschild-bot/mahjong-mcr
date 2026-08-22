@@ -148,6 +148,39 @@ describe('computeBestMoveHint', () => {
     expect(hint.recommendedDiscard).toBe(chooseDiscard(hand))
   })
 
+  // Live playtesting defect (found via the 8-point route tab contradicting
+  // this tab in the same modal): flexibilityFeature used to gate its "Keeps
+  // X alive" prose on RouteRow.viable alone — a GROUP-wide signal ("could
+  // SOME tied candidate still reach this shape reasonably") that can stay
+  // true even when the RECOMMENDED discard's own number for that shape is
+  // nowhere close. This hand's tied group has 5 distinct types at
+  // std-1-shanten; the highest-ukeire one (D3) sits at sevenPairs 3-shanten
+  // for itself, while a DIFFERENT tied candidate (B8 or D2) reaches
+  // sevenPairs 2-shanten, which is all `viable` used to check — producing
+  // "Keeps Seven Pairs alive" on a route the recommended discard had
+  // actually fallen behind on (independently, the 8-point route tab would
+  // exclude the same fan as ceiling-only under its own credibility gate).
+  // The table's own `viable` flag is UNCHANGED (still group-wide, still
+  // true here — see kickoffLiveHand above for why that stays correct for
+  // the table); only the prose now also requires the recommended discard's
+  // OWN route.shanten to be within margin of ITS OWN resultingShanten.
+  it('does not claim to keep a route alive that the recommended discard has itself fallen behind on', () => {
+    const hand = handWith([
+      ...idsFor('B2', 2), ...idsFor('B5', 2), ...idsFor('B6', 2), ...idsFor('B7', 1), ...idsFor('B8', 1),
+      ...idsFor('C7', 1), ...idsFor('C8', 1), ...idsFor('C9', 1),
+      ...idsFor('D2', 1), ...idsFor('D3', 2),
+    ])
+    const hint = computeBestMoveHint(hand)!
+    expect(typeIdOfInstance(hint.recommendedDiscard)).toBe('D3')
+
+    const sevenPairsRow = hint.routeTable.find((r) => r.shape === 'sevenPairs')!
+    expect(sevenPairsRow.shanten).toBe(3) // D3's OWN number — 2 behind Standard's 1
+    expect(sevenPairsRow.viable).toBe(true) // group-wide flag stays true — table display is unchanged
+
+    // ...but the prose must not appeal to it.
+    expect(hint.features.some((f) => /Seven Pairs/.test(`${f.title} ${f.detail}`))).toBe(false)
+  })
+
   it('does not mention a special shape when no non-Standard route is viable', () => {
     // tenpaiPlusIsolated is a plain standard-shape hand with no real pair
     // structure — Seven Pairs/Thirteen Orphans should sit far outside the
