@@ -40,7 +40,7 @@ describe('SoundUnlockBoundary', () => {
   beforeEach(() => window.localStorage.clear())
 
   it('unlocks audio and iPad speech from the landing-page pointer gesture', () => {
-    const player: SoundEffectsPlayer = { unlock: vi.fn(), play: vi.fn(), speakCall: vi.fn() }
+    const player: SoundEffectsPlayer = { unlock: vi.fn(), play: vi.fn(), speakCall: vi.fn(), cancelSpeech: vi.fn() }
     render(<SoundUnlockBoundary player={player}><button type="button">Start</button></SoundUnlockBoundary>)
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Start' }))
@@ -50,7 +50,7 @@ describe('SoundUnlockBoundary', () => {
 
   it('does not initialize speech when sound effects are disabled', () => {
     window.localStorage.setItem('mcr-mahjong:settings:v1', JSON.stringify({ soundEffects: false }))
-    const player: SoundEffectsPlayer = { unlock: vi.fn(), play: vi.fn(), speakCall: vi.fn() }
+    const player: SoundEffectsPlayer = { unlock: vi.fn(), play: vi.fn(), speakCall: vi.fn(), cancelSpeech: vi.fn() }
     render(<SoundUnlockBoundary player={player}><button type="button">Start</button></SoundUnlockBoundary>)
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Start' }))

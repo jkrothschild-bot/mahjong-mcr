@@ -87,4 +87,28 @@ describe('soundEffectsPlayer voice', () => {
     expect(speak).toHaveBeenCalledTimes(1)
     expect(resume).toHaveBeenCalledTimes(1)
   })
+
+  it('cancels queued speech when gameplay ends or leaves the screen', () => {
+    const speak = vi.fn()
+    const cancel = vi.fn()
+    class FakeUtterance {
+      text: string
+      lang = ''
+      rate = 1
+      pitch = 1
+      volume = 1
+      onend: (() => void) | null = null
+      onerror: (() => void) | null = null
+      constructor(text: string) { this.text = text }
+    }
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance)
+    vi.stubGlobal('speechSynthesis', { speak, cancel, resume: vi.fn(), getVoices: vi.fn(() => []), paused: false })
+
+    const player = createSoundEffectsPlayer()
+    player.speakCall('chow')
+    player.cancelSpeech()
+
+    expect(speak).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledOnce()
+  })
 })

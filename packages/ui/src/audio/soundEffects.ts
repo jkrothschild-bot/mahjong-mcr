@@ -5,6 +5,7 @@ export interface SoundEffectsPlayer {
   unlock: () => void
   play: (effect: SoundEffect) => void
   speakCall: (call: SpokenCall) => void
+  cancelSpeech: () => void
 }
 
 interface Impact {
@@ -191,7 +192,19 @@ export function createSoundEffectsPlayer(): SoundEffectsPlayer {
     }
   }
 
-  return { unlock, play, speakCall }
+  function cancelSpeech() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel()
+      } catch {
+        // Speech is supplementary. Some browsers can tear down their
+        // synthesis service during navigation before React cleanup runs.
+      }
+    }
+    activeUtterances.clear()
+  }
+
+  return { unlock, play, speakCall, cancelSpeech }
 }
 
 export const soundEffectsPlayer = createSoundEffectsPlayer()

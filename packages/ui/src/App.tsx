@@ -25,6 +25,7 @@ import { useSessionStats } from './stats/useSessionStats.js'
 import { capabilitiesFor, DEFAULT_GAME_CONFIG, type GameConfig } from './app/gameConfig.js'
 import { useAnalytics } from './analytics/AnalyticsContext.js'
 import { trackSafely } from './analytics/AnalyticsService.js'
+import { soundEffectsPlayer } from './audio/soundEffects.js'
 import { HomeIcon } from './components/HomeIcon.js'
 import { LogoutIcon } from './components/LogoutIcon.js'
 import { MAHJONG_ANNOUNCEMENT_MS } from './game/gameEventPresentation.js'
@@ -59,6 +60,7 @@ function App({ config = DEFAULT_GAME_CONFIG, initialSnapshot, matchSeed, onSnaps
   // it costs nobody the behaviour precisely because the OS query was always
   // sufficient on its own.
   const reducedMotion = useReducedMotion()
+  useEffect(() => () => soundEffectsPlayer.cancelSpeech(), [])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tileCountGridOpen, setTileCountGridOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)

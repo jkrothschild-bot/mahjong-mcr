@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GameState } from '@mahjong-mcr/engine'
-import { soundEffectsPlayer, type SoundEffectsPlayer } from '../audio/soundEffects.js'
+import { soundEffectsPlayer, type SoundEffectsPlayer, type SpokenCall } from '../audio/soundEffects.js'
 import { MELD_SETTLE_MS, presentGameAction, type GameEventAnnouncementData } from './gameEventPresentation.js'
 
 export interface GameEventPresentationState {
@@ -33,16 +33,29 @@ export function useGameEventPresentation(
     const newActions = state.actionLog.slice(seenLengthRef.current)
     seenLengthRef.current = state.actionLog.length
     let newestAnnouncement: GameEventAnnouncementData | null = null
+    let newestSpokenCall: SpokenCall | null = null
     for (const action of newActions) {
       const presented = presentGameAction(action, state)
       if (soundEnabled && presented.sound) player.play(presented.sound)
-      if (soundEnabled && presented.spokenCall) player.speakCall(presented.spokenCall)
+      if (soundEnabled && presented.spokenCall) newestSpokenCall = presented.spokenCall
       if (presented.announcement) newestAnnouncement = presented.announcement
     }
+
+    // SpeechSynthesis queues utterances globally. Flush any earlier claim
+    // words before the hand-ending call so a delayed "Chow" or "Pung"
+    // cannot play over the result screen. If React delivered several actions
+    // together, speak only the newest one—the visual presentation already
+    // follows that same newest-event policy.
+    if (state.phase === 'handEnded') player.cancelSpeech()
+    if (newestSpokenCall) player.speakCall(newestSpokenCall)
     if (!newestAnnouncement) return
     setAnnouncement(newestAnnouncement)
     setRecentMeldId(newestAnnouncement.meldId ?? null)
   }, [player, soundEnabled, state])
+
+  useEffect(() => {
+    if (!soundEnabled) player.cancelSpeech()
+  }, [player, soundEnabled])
 
   useEffect(() => {
     if (!announcement) return

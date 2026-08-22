@@ -2,10 +2,22 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest'
 import { typeIdOfInstance } from '@mahjong-mcr/engine'
 import App from './App'
+import { soundEffectsPlayer } from './audio/soundEffects.js'
 import { sortByMode } from './hand/handOrder.js'
 import { initLoopState, type LoopState } from './game/useGameLoop.js'
 
 describe('App', () => {
+  it('cancels queued speech when gameplay unmounts', () => {
+    const cancelSpeech = vi.spyOn(soundEffectsPlayer, 'cancelSpeech')
+    const { unmount } = render(<App matchSeed={42} />)
+    cancelSpeech.mockClear()
+
+    unmount()
+
+    expect(cancelSpeech).toHaveBeenCalledOnce()
+    cancelSpeech.mockRestore()
+  })
+
   it('temporarily toggles a full-board occupancy preview', () => {
     render(<App matchSeed={42} />)
     const preview = screen.getByRole('button', { name: 'Preview full board' })

@@ -51,12 +51,13 @@ function Harness({ state, soundEnabled = false, player }: { state: GameState; so
 }
 
 describe('game-event presentation', () => {
-  const player: SoundEffectsPlayer = { unlock: vi.fn(), play: vi.fn(), speakCall: vi.fn() }
+  const player: SoundEffectsPlayer = { unlock: vi.fn(), play: vi.fn(), speakCall: vi.fn(), cancelSpeech: vi.fn() }
 
   beforeEach(() => {
     vi.useFakeTimers()
     vi.mocked(player.play).mockClear()
     vi.mocked(player.speakCall).mockClear()
+    vi.mocked(player.cancelSpeech).mockClear()
   })
   afterEach(() => vi.useRealTimers())
 
@@ -175,6 +176,28 @@ describe('game-event presentation', () => {
     hook.rerender({ state: stateWithLog([{ seq: 0, seat: 1, type: 'win', winTile: 5, winMethod: 'discard', discardSeat: 0 }], 'handEnded') })
 
     expect(player.speakCall).toHaveBeenCalledWith('mahjong')
+  })
+
+  it('cancels stale claim speech before the hand-ending call', () => {
+    const initial = stateWithLog([])
+    const claim = claimAction('chow')
+    const hook = renderHook(
+      ({ state }) => useGameEventPresentation(state, true, player),
+      { initialProps: { state: initial } },
+    )
+    hook.rerender({ state: stateWithLog([claim]) })
+    hook.rerender({
+      state: stateWithLog(
+        [claim, { seq: 1, seat: 1, type: 'win', winTile: 5, winMethod: 'discard', discardSeat: 0 }],
+        'handEnded',
+      ),
+    })
+
+    expect(player.cancelSpeech).toHaveBeenCalledOnce()
+    expect(player.speakCall).toHaveBeenLastCalledWith('mahjong')
+    expect(vi.mocked(player.cancelSpeech).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(player.speakCall).mock.invocationCallOrder.at(-1)!,
+    )
   })
 
   it('plays a discard clink for the human but not for bots', () => {
