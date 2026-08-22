@@ -22,8 +22,8 @@ export type TileScale = 'normal' | 'large'
 //   second mechanism (and without a "Next" button appearing mid-board).
 export interface Settings {
   botSpeedMs: number
-  // SPEC.md §8's "tile size / zoom" — a named preset, not a continuous
-  // value, matching BOT_SPEED_PRESETS below.
+  // Kept in the internal shape because tile rendering uses the scale type,
+  // but this is intentionally fixed to Large and is not user-configurable.
   tileScale: TileScale
   soundEffects: boolean
 }
@@ -41,7 +41,7 @@ export const TILE_SCALE_VALUES: readonly TileScale[] = ['normal', 'large']
 
 export const DEFAULT_SETTINGS: Settings = {
   botSpeedMs: BOT_SPEED_PRESETS.normal,
-  tileScale: 'normal',
+  tileScale: 'large',
   soundEffects: true,
 }
 
@@ -49,10 +49,6 @@ const STORAGE_KEY = 'mcr-mahjong:settings:v1'
 
 function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
-}
-
-function isTileScale(value: unknown): value is TileScale {
-  return typeof value === 'string' && (TILE_SCALE_VALUES as readonly string[]).includes(value)
 }
 
 // Pure — no localStorage access — so it's directly unit-testable, including
@@ -78,7 +74,8 @@ export function loadSettings(raw: string | null): Settings {
   // version bump for any of these removals.
   return {
     botSpeedMs: isNumber(candidate.botSpeedMs) ? candidate.botSpeedMs : DEFAULT_SETTINGS.botSpeedMs,
-    tileScale: isTileScale(candidate.tileScale) ? candidate.tileScale : DEFAULT_SETTINGS.tileScale,
+    // Ignore legacy persisted Normal values: tile size is now always Large.
+    tileScale: 'large',
     soundEffects: typeof candidate.soundEffects === 'boolean' ? candidate.soundEffects : DEFAULT_SETTINGS.soundEffects,
   }
 }

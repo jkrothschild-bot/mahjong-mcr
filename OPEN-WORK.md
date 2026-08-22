@@ -169,6 +169,19 @@ gone. Whoever picks this up should also decide whether a `data-testid="board"` a
 keeping for e2e stability independent of internal rewrites, given this is the second time a
 testid rename has silently broken a consumer.
 
+### A12. `SPEC.md §8` names "tile size / zoom" as a player setting — no longer true  `[code-verified 2026-08-22]`
+`SPEC.md §8` (Settings) still lists: "Bot speed; hint level; claim-timer on/off and duration;
+sound on/off; color-blind-safe palette; **tile size / zoom**." As of the housekeeping pass that
+hard-fixed tile scale, this is stale: `SettingsPanel.tsx` no longer renders a tile-size control
+(the `Tile size` radiogroup and its `TILE_SCALE_LABELS` were removed), `useSettings.ts`'s
+`DEFAULT_SETTINGS.tileScale` is fixed to `'large'`, and `loadSettings` now normalizes any
+legacy persisted value — including a previously-valid `'normal'` — to `'large'` rather than
+honoring it. `TileScale` survives only as an internal type consumed by tile-rendering code
+(`tileStyles.ts`), never as user-configurable state. §8's "tile size / zoom" clause needs
+removing or correcting; not done here — same convention as §C (docs corrected in place, dated,
+once actually verified), but recorded here rather than edited directly per this pass's own
+instruction not to touch `SPEC.md`.
+
 ---
 
 ## B. Tracked elsewhere — pointers only

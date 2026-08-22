@@ -43,9 +43,9 @@ describe('loadSettings', () => {
     expect(loadSettings(raw)).toEqual({ botSpeedMs: 3000, tileScale: 'large', soundEffects: true })
   })
 
-  it('falls back to default tileScale for an unrecognized value', () => {
-    const raw = JSON.stringify({ tileScale: 'huge' })
-    expect(loadSettings(raw)).toEqual(DEFAULT_SETTINGS)
+  it('normalizes legacy tileScale values to Large', () => {
+    expect(loadSettings(JSON.stringify({ tileScale: 'normal' })).tileScale).toBe('large')
+    expect(loadSettings(JSON.stringify({ tileScale: 'huge' })).tileScale).toBe('large')
   })
 
   it('loads and round-trips the sound preference', () => {
@@ -59,8 +59,8 @@ describe('useSettings', () => {
     window.localStorage.clear()
   })
 
-  it('starts from stored settings if present', () => {
-    window.localStorage.setItem('mcr-mahjong:settings:v1', serializeSettings({ ...DEFAULT_SETTINGS, tileScale: 'large' }))
+  it('starts from stored settings and upgrades Normal tiles to Large', () => {
+    window.localStorage.setItem('mcr-mahjong:settings:v1', JSON.stringify({ ...DEFAULT_SETTINGS, tileScale: 'normal' }))
     const { result } = renderHook(() => useSettings())
     expect(result.current.settings.tileScale).toBe('large')
   })
@@ -72,11 +72,11 @@ describe('useSettings', () => {
 
   it('update merges a partial patch and persists it', () => {
     const { result } = renderHook(() => useSettings())
-    act(() => result.current.update({ tileScale: 'large' }))
+    act(() => result.current.update({ botSpeedMs: 500 }))
 
-    expect(result.current.settings).toEqual({ ...DEFAULT_SETTINGS, tileScale: 'large' })
+    expect(result.current.settings).toEqual({ ...DEFAULT_SETTINGS, botSpeedMs: 500 })
     const stored = loadSettings(window.localStorage.getItem('mcr-mahjong:settings:v1'))
-    expect(stored).toEqual({ ...DEFAULT_SETTINGS, tileScale: 'large' })
+    expect(stored).toEqual({ ...DEFAULT_SETTINGS, botSpeedMs: 500 })
   })
 
   it('persists sound-off across a new hook instance', () => {

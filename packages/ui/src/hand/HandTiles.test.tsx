@@ -63,14 +63,16 @@ describe('HandTiles', () => {
     expect(onTileClick).toHaveBeenCalledWith(c2)
   })
 
-  it('highlights the selected tile', () => {
+  it('highlights the selected tile with a much more visible amber match glow', () => {
     const [c1] = idsFor('C1', 1)
     const [c2] = idsFor('C2', 1)
     render(<HandTiles order={[c1!, c2!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} selectedTileId={c2} />)
 
-    expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('ring-2')
-    expect(screen.getByTestId(`hand-tile-${c2}`).className).toContain('-translate-y-2')
-    expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-2')
+    const selected = screen.getByTestId(`hand-tile-${c2}`)
+    expect(selected.className).toContain('ring-4')
+    expect(selected.className).toContain('ring-amber-300')
+    expect(selected.className).toContain('shadow-[0_0_18px_rgba(253,230,138,0.72)]')
+    expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-amber-300')
   })
 
   it('marks the just-drawn tile distinctly from an explicit selection, so it is identifiable without clicking', () => {
@@ -83,12 +85,12 @@ describe('HandTiles', () => {
     expect(screen.getByTestId(`hand-tile-${c1}`).className).not.toContain('ring-sky-400')
   })
 
-  it('lets an explicit selection\'s amber ring take precedence over the just-drawn ring on the same tile', () => {
+  it('lets an explicit selection\'s amber glow take precedence over the just-drawn ring on the same tile', () => {
     const [c1] = idsFor('C1', 1)
     render(<HandTiles order={[c1!]} activeId={null} overId={null} region={TEST_REGION} melds={[]} flowers={[]} selectedTileId={c1} justDrawnTileId={c1} />)
 
     const el = screen.getByTestId(`hand-tile-${c1}`)
-    expect(el.className).toContain('ring-amber-400')
+    expect(el.className).toContain('ring-amber-300')
     expect(el.className).not.toContain('ring-sky-400')
   })
 
@@ -245,7 +247,7 @@ describe('HandTiles', () => {
     const TILE_GAP = 4
     const MELD_GAP = 24
     const meldReserve = MELD_GAP - TILE_GAP
-    const { width: nominalWidth, height: nominalHeight } = TILE_BOX_PX.normal
+    const { width: nominalWidth, height: nominalHeight } = TILE_BOX_PX.large
     const expected = fitRowTileWidth(
       order.length + kong.tiles.length,
       TEST_REGION.width - meldReserve,

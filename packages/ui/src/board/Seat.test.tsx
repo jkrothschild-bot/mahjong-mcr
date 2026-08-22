@@ -85,17 +85,54 @@ describe('Seat', () => {
     expect(screen.getByRole('button', { name: 'Sort hand' })).toBeInTheDocument()
   })
 
-  it('anchors the sort control immediately to the left of the first human tile', () => {
+  // Positioned.tsx sets left/top/marginLeft on the node it centers directly
+  // — UNLESS its own `scale` prop isn't exactly 1 (stageLayout's
+  // shrink-to-fit path), in which case it inserts one extra, unpositioned
+  // `<div style={{width,height,transform}}>` wrapper around the child to
+  // carry the scale transform, pushing the positioned styles up one more
+  // DOM level. A 13-tile hand at `large` tileScale no longer fits this
+  // test's region at nominal (76px) width, so the row shrinks toward
+  // HAND_TILE_WIDTH_FLOOR and lands fractionally under scale 1 — walk up to
+  // whichever ancestor actually carries `left` rather than assuming a fixed
+  // DOM depth, so this doesn't re-break the next time a shrink boundary
+  // shifts which level that lands on.
+  function positionedAncestor(el: HTMLElement): HTMLElement {
+    let node: HTMLElement | null = el.parentElement
+    while (node && node.style.left === '') node = node.parentElement
+    if (!node) throw new Error('no positioned ancestor found')
+    return node
+  }
+
+  // Seat.tsx's own layout reserves a full SORT_CONTROL_WIDTH band ahead of
+  // handRegion (handRegion.x = board.human.row.x + SORT_CONTROL_WIDTH), so
+  // the first tile can never start before the control's own right edge —
+  // overlap is structurally impossible. The 8px gap is the DESIGNED value
+  // when the hand doesn't fill its full reserved region (there's centering
+  // slack to spend); controlCenterX's own `Math.max(SORT_CONTROL_WIDTH / 2,
+  // ...)` clamp means that gap shrinks toward exactly 0 — never negative —
+  // once the hand is wide enough to use the whole region, which a normal
+  // 13-tile hand at `large` tileScale now does at this test's (unmocked,
+  // MIN_DESIGN_WIDTH-default) viewport. Assert the real invariant — never
+  // overlapping, never more than the designed 8px — rather than the one
+  // fixed number that only held incidentally under the old `normal` default.
+  it('never lets the sort control overlap the first human tile, and sits at most 8px off it', () => {
     const concealedTiles = [...idsFor('C1', 4), ...idsFor('C2', 4), ...idsFor('C3', 4), ...idsFor('C4', 1)]
     const p = player({ seat: 0, hand: { ...emptyHand(), concealedTiles } })
     render(
       <Seat seat={0} role="human" player={p} isDealer={false} isCurrentTurn={false} isHuman matchScore={0} handOrder={p.hand.concealedTiles} onSort={vi.fn()} />,
     )
-    const controlBox = screen.getByRole('button', { name: 'Sort hand' }).parentElement as HTMLElement
-    const firstTileBox = screen.getByTestId(`hand-tile-${p.hand.concealedTiles[0]}`).parentElement as HTMLElement
+    const controlBox = positionedAncestor(screen.getByRole('button', { name: 'Sort hand' }))
+    const firstTileBox = positionedAncestor(screen.getByTestId(`hand-tile-${p.hand.concealedTiles[0]}`))
     const controlRight = Number.parseFloat(controlBox.style.left) + Number.parseFloat(controlBox.style.marginLeft) + Number.parseFloat(controlBox.style.width)
     const firstTileLeft = Number.parseFloat(firstTileBox.style.left) + Number.parseFloat(firstTileBox.style.marginLeft)
-    expect(firstTileLeft - controlRight).toBeCloseTo(8)
+    const gap = firstTileLeft - controlRight
+    expect(gap).toBeGreaterThanOrEqual(0)
+    expect(gap).toBeLessThanOrEqual(8)
+    // This specific fixture (a full 13-tile hand, `large` tileScale,
+    // MIN_DESIGN_WIDTH) is wide enough to have used up all its centering
+    // slack — pin the exact value too, so a future change that reintroduces
+    // slack here doesn't silently go unnoticed.
+    expect(gap).toBeCloseTo(0)
   })
 
   it('omits the sort control when onSort is not provided', () => {

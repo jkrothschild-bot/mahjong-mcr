@@ -1,15 +1,10 @@
-import { BOT_SPEED_PRESETS, type Settings, type TileScale } from './useSettings.js'
+import { BOT_SPEED_PRESETS, type Settings } from './useSettings.js'
 
 const SPEED_LABELS: { preset: keyof typeof BOT_SPEED_PRESETS; label: string }[] = [
   { preset: 'instant', label: 'Instant' },
   { preset: 'fast', label: 'Fast' },
   { preset: 'normal', label: 'Normal' },
   { preset: 'relaxed', label: 'Relaxed' },
-]
-
-const TILE_SCALE_LABELS: { preset: TileScale; label: string }[] = [
-  { preset: 'normal', label: 'Normal' },
-  { preset: 'large', label: 'Large' },
 ]
 
 export interface SettingsPanelProps {
@@ -27,7 +22,7 @@ export interface SettingsPanelProps {
 // it from flow entirely, matching how every other button already behaves.
 //
 // Plain form wiring over useSettings — bot speed, confirm-before-discard,
-// step mode, color-blind palette, tile size (PLAN.md M7 Polish scope), and
+// step mode, color-blind palette, and
 // reduce-motion (M8 Step 3 — App.tsx ORs this with the OS-level
 // prefers-reduced-motion query, so either alone disables tile animation).
 // The claim timer remains removed (owner's call — claims wait indefinitely
@@ -70,26 +65,6 @@ export function SettingsPanel({ open, onClose, settings, onUpdate }: SettingsPan
               </label>
             ))}
           </div>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 font-semibold">Tile size</legend>
-          <div role="radiogroup" aria-label="Tile size" className="flex gap-2">
-            {TILE_SCALE_LABELS.map(({ preset, label }) => (
-              <label key={preset} className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="tile-scale"
-                  checked={settings.tileScale === preset}
-                  onChange={() => onUpdate({ tileScale: preset })}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-          {settings.tileScale !== 'normal' && (
-            <p className="text-xs text-neutral-400">Larger tiles may require scrolling to see the full board.</p>
-          )}
         </fieldset>
 
         <label className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-neutral-700 px-3">
